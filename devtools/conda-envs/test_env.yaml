@@ -4,11 +4,15 @@ dependencies:
     # Base depends
   - python
   - pip
+  - openforcefield
+  - cmiles
+  - numpy
 
     # Testing
   - pytest
   - pytest-cov
   - codecov
+  - qcportal
 
     # Pip-only installs
   #- pip:
