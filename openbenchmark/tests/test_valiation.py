@@ -3,7 +3,7 @@ import pytest
 import qcportal as ptl
 from openforcefield.utils.toolkits import UndefinedStereochemistryError
 
-from openbenchmark.validation import run_through_openeye, sanity_check_bond_order
+from openbenchmark.validation import QCValidator, run_through_openeye, sanity_check_bond_order
 
 
 client = ptl.FractalClient()
@@ -26,3 +26,17 @@ def test_bond_santity_checker():
 
     with pytest.raises(AssertionError):
         sanity_check_bond_order(bad_smiles_in, ds=ds)
+
+
+ds = client.get_collection('OptimizationDataset', 'OpenFF Optimization Set 1')
+
+qcv = QCValidator(
+    small_ds,
+    check_intra_h_bonds=False,
+    check_proton_transfer=True,
+    check_stereochemical_changes=True,
+    check_bond_order_changes=True
+)
+
+qcv.run_validation()
+qcv.to_pandas().head()
