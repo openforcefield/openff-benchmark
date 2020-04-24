@@ -28,15 +28,14 @@ def test_bond_santity_checker():
         sanity_check_bond_order(bad_smiles_in, ds=ds)
 
 
-ds = client.get_collection('OptimizationDataset', 'OpenFF Optimization Set 1')
-
-qcv = QCValidator(
-    small_ds,
-    check_intra_h_bonds=False,
-    check_proton_transfer=True,
-    check_stereochemical_changes=True,
-    check_bond_order_changes=True
-)
-
-qcv.run_validation()
-qcv.to_pandas().head()
+def test_validator_basic():
+    qcv = QCValidator(
+        ds,
+        check_intra_h_bonds=False,
+        check_proton_transfer=True,
+        check_stereochemical_changes=True,
+        check_bond_order_changes=True
+    )
+    
+    qcv.run_validation()
+    qcv.to_pandas().head()
