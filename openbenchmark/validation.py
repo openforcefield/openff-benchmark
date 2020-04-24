@@ -3,7 +3,7 @@ import numpy as np
 import openeye as oechem
 from openforcefield.topology.molecule import Molecule
 import cmiles
-from cmiles.utils import _symbols, BOHR_2_ANGSTROM, ANGSROM_2_BOHR
+from cmiles.utils import _symbols, BOHR_2_ANGSTROM, ANGSROM_2_BOHR # TODO: Cleaner handling of units
 import mdtraj as md
 import pandas as pd
 
@@ -18,6 +18,7 @@ class QCValidator:
         check_proton_transfer=True,
         check_stereochemical_changes=True,
         check_bond_order_changes=True,
+        num_iter=1000,
     ):
 
         self._ds = dataset
@@ -25,7 +26,7 @@ class QCValidator:
         self._check_proton_transfer = check_proton_transfer
         self._check_stereochemical_changes = check_stereochemical_changes
         self._check_bond_order_changes = check_bond_order_changes
-
+        self._num_iter = num_iter
 
     def run_validation(self):
 
@@ -41,14 +42,18 @@ class QCValidator:
                     pass
             master_validation_dict.update({'has_proton_transfer': proton_transfer_validation})
 
+        i = 0
         if self._check_bond_order_changes:
             bond_order_changes_validation = dict()
             for key, val in self._ds.data.records.items():
-                try:
-                    check = self.check_bond_order_changes(key=key)
-                    bond_order_changes_validation.update({key: check})
-                except:
-                    pass
+                i += 1
+                if i < self._num_iter:
+                    try:
+                        check = self.check_bond_order_changes(key=key)
+                        bond_order_changes_validation.update({key: check})
+                    except Exception as e:
+                        print(e)
+                        pass
             master_validation_dict.update({'has_bond_order_changes': bond_order_changes_validation})
 
         if self._check_stereochemical_changes:
@@ -105,7 +110,37 @@ class QCValidator:
 
 
     def check_bond_order_changes(self, key=None):
-        return False
+        # TODO: Replace this with a proper WBO-based inference
+        record = self._ds.get_record(key, specification='default')
+        qcmol = record.get_final_molecule().dict()
+        geometry = np.asarray(qcmol['geometry'], dtype=float) * BOHR_2_ANGSTROM
+        symbols = qcmol['symbols']
+
+        oemol = oechem.OEMol()
+
+        for s in symbols:
+            oemol.NewAtom(_symbols[s])
+
+        oemol.SetCoords(oechem.OEFloatArray(geometry.reshape(-1)))
+        oemol.SetDimension(3)
+    
+        # Let OpenEye try to determine connectivity instead of trusting the connectivity in the record
+        oechem.OEDetermineConnectivity(oemol)
+        oechem.OEFindRingAtomsAndBonds(oemol)
+        oechem.OEPerceiveBondOrders(oemol)
+        oechem.OEAssignImplicitHydrogens(oemol)
+        oechem.OEAssignFormalCharges(oemol)
+        Molecule.from_openeye(oemol).to_rdkit()
+
+        inferred_bond_orders = [b.GetOrder() for b in oemol.GetBonds()]
+
+        smiles_in_entry = self._ds.get_entry(key).dict()['attributes']['canonical_isomeric_smiles']
+        mol_in = Molecule.from_smiles(smiles_in_entry)
+        expected_bond_orders = [b.bond_order for b in mol_in.bonds]
+
+        for initial, inferred in zip(expected_bond_orders, inferred_bond_orders):
+            assert initial == inferred
+            return False
 
 
 def run_through_openeye(record):
