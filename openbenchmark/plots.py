@@ -1,3 +1,7 @@
+import numpy as np
+from functools import partial
+
+
 def dde_vs_rmsd(dataframes, forcefields):
     for df in dataframes:
         print(df.head())
@@ -43,20 +47,23 @@ def tfd_distribution(dataframes, forcefields):
     return _histogram(dataframes, forcefields, column="TFD", title="Torsion Fingerprint Deviation")
 
 
-def energy_mse(dataframes, forcefields):
-
+def boxplots(dicts, forcefield_names=None, title="Boxplot", yaxis="Error"):
+    all_data = []
+    for d in dicts:
+        data = {"y": np.random.rand(50), "type": "box", "name": d["forcefield"]}
+        all_data.append(data)
     return {
-        "data": [
-            {"x": [1, 2, 3], "y": [4, 1, 2], "type": "bar", "name": "SF"},
-            {"x": [1, 2, 3], "y": [2, 4, 5], "type": "bar", "name": u"Montréal"},
-        ],
-        "layout": {"title": "Dash Data Visualization"},
+        "data": all_data,
+        "layout": {"title": title, "yaxis": {"title": {"text": yaxis}},},
     }
 
 
-PLOTS = (
-    {"label": "RMSD distribution", "value": "rmsd_distribution"},
-    {"label": "TFD distribution", "value": "tfd_distribution"},
-    # {"label": "ddE vs RMSD", "value": "dde_vs_rmsd"},
-    # {"label": "Energy Mean Signed Errors", "value": "energy_mse"},
-)
+def boxplots_csv(dfs, selector, forcefield_names=None, title="Boxplot", yaxis="Error"):
+    all_data = []
+    for df, ff in zip(dfs, forcefield_names):
+        data = {"y": selector(df), "type": "box", "name": ff}
+        all_data.append(data)
+    return {
+        "data": all_data,
+        "layout": {"title": title, "yaxis": {"title": {"text": yaxis}},},
+    }
