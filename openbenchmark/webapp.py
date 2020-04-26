@@ -1,34 +1,30 @@
 """
 webapp.py
 Comparison benchmarks between public force fields and Open Force Field Initiative force fields
-
-Handles the primary functions
 """
 
+from dash import Dash
 
-def canvas(with_attribution=True):
+from .layout import layout, THEME
+from .callbacks import register_callbacks
+
+
+def create_app():
     """
-    Placeholder function to show example docstring (NumPy format)
-
-    Replace this function and doc string for your own project
-
-    Parameters
-    ----------
-    with_attribution : bool, Optional, default: True
-        Set whether or not to display who the quote is from
-
-    Returns
-    -------
-    quote : str
-        Compiled string including quote and optional attribution
+    Bootstrap Dash app with layout, theme and callbacks
     """
 
-    quote = "The code is but a canvas to our imagination."
-    if with_attribution:
-        quote += "\n\t- Adapted from Henry David Thoreau"
-    return quote
+    app = Dash(__name__, external_stylesheets=[THEME])
+    app.title = "Openbenchmark - Openforcefield Initiative"
+    app.layout = layout()
+    app = register_callbacks(app)
+    return app
+
+
+def main():
+    app = create_app()
+    app.run_server(debug=True)
 
 
 if __name__ == "__main__":
-    # Do something if this file is invoked on its own
-    print(canvas())
+    main()

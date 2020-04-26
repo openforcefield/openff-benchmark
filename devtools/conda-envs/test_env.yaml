@@ -4,6 +4,10 @@ dependencies:
     # Base depends
   - python
   - pip
+  - pandas
+  - dash
+  - dash-bootstrap-components
+  - dash-bio
 
     # Testing
   - pytest
