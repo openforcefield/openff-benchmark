@@ -19,7 +19,7 @@ FORCEFIELDS = {
     "gaff2": "GAFF2",
     "mmff94": "MMFF94",
     "mmff94s": "MMFF94s",
-    "opls3e": "OPLS3e",
+    # "opls3e": "OPLS3e",
     "parsley": "Parsley 1.0",
     "parsley110": "Parsley 1.1",
 }
