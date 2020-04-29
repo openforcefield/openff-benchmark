@@ -1,19 +1,21 @@
-
 import numpy as np
-import openeye as oechem
-from openforcefield.topology.molecule import Molecule
-import cmiles
-from cmiles.utils import _symbols, BOHR_2_ANGSTROM, ANGSROM_2_BOHR # TODO: Cleaner handling of units
 import mdtraj as md
 import pandas as pd
+from openforcefield.topology.molecule import Molecule
+import openeye as oechem
+import cmiles
+from cmiles.utils import _symbols, BOHR_2_ANGSTROM
 
+
+#  TODO: Cleaner handling of units
 
 class QCValidator:
     """
     Run throughValidate that a QCArchive entry against its CMILES representation in entry
     """
     def __init__(
-        self, dataset=None,
+        self,
+        dataset=None,
         check_intra_h_bonds=True,
         check_proton_transfer=True,
         check_stereochemical_changes=True,
@@ -38,7 +40,7 @@ class QCValidator:
                 try:
                     check = self.check_proton_transfer(key=key)
                     proton_transfer_validation.update({key: check})
-                except:
+                except Exception as _:
                     pass
             master_validation_dict.update({'has_proton_transfer': proton_transfer_validation})
 
@@ -51,8 +53,7 @@ class QCValidator:
                     try:
                         check = self.check_bond_order_changes(key=key)
                         bond_order_changes_validation.update({key: check})
-                    except Exception as e:
-                        print(e)
+                    except Exception as _:
                         pass
             master_validation_dict.update({'has_bond_order_changes': bond_order_changes_validation})
 
@@ -62,7 +63,7 @@ class QCValidator:
                 try:
                     check = self.check_stereochemical_changes(key=key)
                     stereochemistry_validation.update({key: check})
-                except:
+                except Exception as _:
                     pass
             master_validation_dict.update({'has_stereochemical_changes': stereochemistry_validation})
 
@@ -74,16 +75,14 @@ class QCValidator:
                 try:
                     check = self.check_intra_h_bonds(key=key)
                     h_bond_validation.update({key: check})
-                except:
+                except Exception as _:
                     pass
             master_validation_dict.update({'has_intra_h_bonds': h_bond_validation})
 
         self._validation_data = master_validation_dict
 
-
     def to_pandas(self):
         return pd.DataFrame(self._validation_data)
-
 
     def check_intra_h_bonds(self, key=None):
         record = self._ds.get_record(key, specification='default')
@@ -100,14 +99,11 @@ class QCValidator:
         else:
             return False
 
-
     def check_stereochemical_changes(self, key=None):
         return False
 
-
     def check_proton_transfer(self, key=None):
         return False
-
 
     def check_bond_order_changes(self, key=None):
         # TODO: Replace this with a proper WBO-based inference
@@ -123,7 +119,7 @@ class QCValidator:
 
         oemol.SetCoords(oechem.OEFloatArray(geometry.reshape(-1)))
         oemol.SetDimension(3)
-    
+
         # Let OpenEye try to determine connectivity instead of trusting the connectivity in the record
         oechem.OEDetermineConnectivity(oemol)
         oechem.OEFindRingAtomsAndBonds(oemol)
