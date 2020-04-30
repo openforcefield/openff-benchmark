@@ -13,6 +13,8 @@ dependencies:
   - openeye-toolkits
   - cmiles
   - numpy
+  - pandas
+  - mdtraj
 
     # Testing
   - pytest

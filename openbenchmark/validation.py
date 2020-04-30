@@ -1,6 +1,6 @@
 import numpy as np
-import mdtraj as md
 import pandas as pd
+import mdtraj as md
 from openforcefield.topology.molecule import Molecule
 import openeye as oechem
 import cmiles
@@ -16,6 +16,8 @@ class QCValidator:
     def __init__(
         self,
         dataset=None,
+        check_connectivity_changes_heuristic=True,
+        check_connectivity_changes_wbo=True,
         check_intra_h_bonds=True,
         check_proton_transfer=True,
         check_stereochemical_changes=True,
@@ -23,7 +25,10 @@ class QCValidator:
         num_iter=1000,
     ):
 
-        self._ds = dataset
+        # Should these be set-able by the user?
+        self._dataset = dataset
+        self._check_connectivity_changes_heuristic = check_connectivity_changes_heuristic,
+        self._check_connectivity_changes_wbo = check_connectivity_changes_wbo,
         self._check_intra_h_bonds = check_intra_h_bonds
         self._check_proton_transfer = check_proton_transfer
         self._check_stereochemical_changes = check_stereochemical_changes
@@ -32,54 +37,25 @@ class QCValidator:
 
     def run_validation(self):
 
-        master_validation_dict = dict()
+        validation = dict()
+        if self._check_connectivity_changes_heuristic:
+            validation['connectivity_changes'] = dict()
+        if self._check_connectivity_changes_wbo:
+            validation['wbo_changes'] = dict()
 
-        if self._check_proton_transfer:
-            proton_transfer_validation = dict()
-            for key, val in self._ds.data.records.items():
-                try:
-                    check = self.check_proton_transfer(key=key)
-                    proton_transfer_validation.update({key: check})
-                except Exception as _:
-                    pass
-            master_validation_dict.update({'has_proton_transfer': proton_transfer_validation})
+        for key, record in self._dataset.collection.items():
+            if self._check_connectivity_changes_wbo:
+                wbo_changes = record.detect_connectivity_changes_wbo(0.65)
+                # TODO: QCSubmit collapses multiple molecules into one entry and this
+                # does not account for diffconthis looks at sever
+                check = any(wbo_changes.values())
+                validation['wbo_changes'][key] = check
+            if self._check_connectivity_changes_heuristic:
+                heuristic_changes = record.detect_connectivity_changes_heuristic()
+                check = any(heuristic_changes)
+                validation['connectivity_changes'][key] = check
 
-        i = 0
-        if self._check_bond_order_changes:
-            bond_order_changes_validation = dict()
-            for key, val in self._ds.data.records.items():
-                i += 1
-                if i < self._num_iter:
-                    try:
-                        check = self.check_bond_order_changes(key=key)
-                        bond_order_changes_validation.update({key: check})
-                    except Exception as _:
-                        pass
-            master_validation_dict.update({'has_bond_order_changes': bond_order_changes_validation})
-
-        if self._check_stereochemical_changes:
-            stereochemistry_validation = dict()
-            for key, val in self._ds.data.records.items():
-                try:
-                    check = self.check_stereochemical_changes(key=key)
-                    stereochemistry_validation.update({key: check})
-                except Exception as _:
-                    pass
-            master_validation_dict.update({'has_stereochemical_changes': stereochemistry_validation})
-
-        if self._check_intra_h_bonds:
-            h_bond_validation = dict()
-            for key, val in self._ds.data.records.items():
-                if key[1] == 'c':
-                    continue
-                try:
-                    check = self.check_intra_h_bonds(key=key)
-                    h_bond_validation.update({key: check})
-                except Exception as _:
-                    pass
-            master_validation_dict.update({'has_intra_h_bonds': h_bond_validation})
-
-        self._validation_data = master_validation_dict
+        self._validation = validation
 
     def to_pandas(self):
         return pd.DataFrame(self._validation_data)
