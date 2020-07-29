@@ -1,5 +1,5 @@
 """
-openbenchmark
+OpenFF Benchmark
 Comparison benchmarks between public force fields and Open Force Field Initiative force fields
 """
 import sys
@@ -21,7 +21,7 @@ except:
 
 setup(
     # Self-descriptive entries which should always be present
-    name='openbenchmark',
+    name='openff-benchmark',
     author='Open Forcefield Consortium',
     author_email='jaime.rodriguez-guerra@openforcefield.org',
     description=short_description[0],

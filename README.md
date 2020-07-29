@@ -1,8 +1,8 @@
-openbenchmark
+OpenFF Benchmark
 ==============================
 [//]: # (Badges)
-[![Travis Build Status](https://travis-ci.com/REPLACE_WITH_OWNER_ACCOUNT/openbenchmark.svg?branch=master)](https://travis-ci.com/REPLACE_WITH_OWNER_ACCOUNT/openbenchmark)
-[![codecov](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/openbenchmark/branch/master/graph/badge.svg)](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/openbenchmark/branch/master)
+[![Travis Build Status](https://travis-ci.com/openforcefield/openff-benchmark.svg?branch=master)](https://travis-ci.com/openforcefield/openff-benchmark)
+[![codecov](https://codecov.io/gh/openforcefield/openff-benchmark/branch/master/graph/badge.svg)](https://codecov.io/gh/openforcefield/openff-benchmark/branch/master)
 
 Comparison benchmarks between public force fields and Open Force Field Initiative force fields
 
