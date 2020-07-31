@@ -1,5 +1,5 @@
 """
-openbenchmark
+openff-benchmark
 Comparison benchmarks between public force fields and Open Force Field Initiative force fields
 """
 

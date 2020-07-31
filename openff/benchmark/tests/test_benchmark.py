@@ -1,12 +1,12 @@
 """
-Unit and regression test for the openbenchmark package.
+Unit and regression test for the openff-benchmark package.
 """
 
 # Import package, test suite, and other packages as needed
-import openbenchmark
+import openff.benchmark
 import pytest
 import sys
 
-def test_openbenchmark_imported():
+def test_openff_benchmark_imported():
     """Sample test, will always pass so long as import statement worked"""
-    assert "openbenchmark" in sys.modules
+    assert "openff.benchmark" in sys.modules
