@@ -3,7 +3,7 @@ Unit and regression test for the openff-benchmark package.
 """
 
 # Import package, test suite, and other packages as needed
-from openff import benchmark
+import openff.benchmark
 import pytest
 import sys
 
