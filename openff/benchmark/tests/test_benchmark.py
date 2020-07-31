@@ -1,5 +1,5 @@
 """
-Unit and regression test for the openbenchmark package.
+Unit and regression test for the openff-benchmark package.
 """
 
 # Import package, test suite, and other packages as needed
