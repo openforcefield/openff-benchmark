@@ -26,7 +26,6 @@ def export_molecule_data(server_uri, destination_path):
     """
     # export all molecule/optimization data from all datasets 
 
-
     # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
 
     # subfolders for each compute spec, files named according to molecule ids

@@ -6,7 +6,7 @@ with many configuration details either hidden or hard-set for our use-case.
 
 """
 
-from qcfractal.cli.qcfractal_server import server_init, server_start
+from qcfractal.cli import qcfractal_server
 
 
 def fractal_server_init():
@@ -15,18 +15,39 @@ def fractal_server_init():
     """
     # be sure to initialize DB in a reliable place on filesystem
     # default is `~/.qca`, which should be good
+    args = {"overwrite_config": True,
+            "clear_database": True}
+
+    config = qcfractal_server.FractalConfig()
+    
+    # might not be terribly safe to use this
+    qcfractal_server.server_init(args, config)
 
 
 def fractal_server_start():
     """Start QCFractal server, including any configuration items specific to benchmarking.
 
     """
-    # be sure to disable authentication
+    # be sure to disable authentication; not needed, and just a barrier
+    args = {"local_manager": False,
+            "disable_ssl": False,
+            "tls_key": None,
+            "tls_cert": None,
+            "start_periodics": True}
 
+    config = qcfractal_server.FractalConfig()
+
+    # might not be terribly safe to use this
+    qcfractal_server.server_start(args, config)
+
+def fractal_manager_init():
+    """Initialize QCFractal manager, including any configuration items specific to benchmarking.
+
+    """
+    # need configuration generation
+    # will require survey results to get this right
 
 def fractal_manager_start():
     """Start QCFractal manager, including any configuration items specific to benchmarking.
 
     """
-    # need configuration generation
-    # will require survey results to get this right

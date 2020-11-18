@@ -9,10 +9,7 @@ from .fractal import (fractal_server_init,
                       fractal_server_start,
                       fractal_manager_start)
 
-from .geometry_optimizations.compute import (submit_molecules,
-                                             export_molecule_data,
-                                             execute_optimization_from_server,
-                                             execute_optimization_from_molecule)
+from .geometry_optimizations import compute as optcompute
                     
 
 
@@ -26,22 +23,33 @@ def fractal():
 
 @fractal.command()
 def server_init():
-    print("Fractal init!")
+    fractal_server_init()
 
 @fractal.command()
 def server_start():
-    print("Fractal start!")
+    fractal_server_start()
+
+@fractal.command()
+def manager_init():
+    pass
 
 @fractal.command()
 def manager_start():
-    print("Fractal start!")
+    pass
 
 @cli.group()
 def optimize():
+    """Control points for executing benchmarking geometry optimizations.
+
+    """
     pass
 
 @optimize.command()
-def submit():
+def submit_molecules():
+    pass
+
+@optimize.command()
+def submit_compute():
     pass
 
 @optimize.command()
@@ -53,8 +61,14 @@ def status():
     pass
 
 @optimize.command()
-@click.option('--sleep-time')
-def error_cycle():
+@click.option('--mode',
+              type=click.Choice(['singleshot', 'service']),
+              default='singleshot',
+              help="If 'singleshot', runs once and exits; if 'service', runs in a loop")
+@click.option('--sleep-time', default=3600, help="Time in seconds to sleep when in 'service' mode")
+@click.option('--only-compute', default=None, help="Comma-separated compute spec names to limit errorcycling to")
+@click.argument('molids', nargs=-1)
+def errorcycle(molids, mode, sleep_time, only_compute):
     pass
 
 @optimize.command()
