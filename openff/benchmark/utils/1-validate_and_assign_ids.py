@@ -16,12 +16,18 @@ def validate_and_assign(molecules, groupname):
     """
 
     tkr = ToolkitRegistry([RDKitToolkitWrapper, AmberToolsToolkitWrapper])
+    
+    # TODO: Raise error if bad input format here?
+    
     mols = Molecule.from_file(molecules)
+
     
     # If there's only one  molecule in the file, turn it into a list
     if not isinstance(mols, list):
         mols = [mols]
-    
+
+    # TODO: Enumerate stereoisomers?
+        
     # Deduplicate multiple instances of the same molecule
     unique_mols = []
     for idx, mol in enumerate(mols):
