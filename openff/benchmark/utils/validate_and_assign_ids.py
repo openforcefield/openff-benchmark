@@ -1,21 +1,21 @@
-import click
 from openforcefield.topology import Molecule
-from openforcefield.utils.toolkits import RDKitToolkitWrapper, AmberToolsToolkitWrapper, ToolkitRegistry
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+oetk_loaded = False
+for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
+    if isinstance(tkw, OpenEyeToolkitWrapper):
+        oetk_loaded = True
+if oetk_loaded:
+    GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
 
-@click.command()
-@click.option('-m',
-              '--molecules',
-              help='SDF file to read containing input molecules.')
-@click.option('--groupname',
-              help='Group name for assigning IDs to the molecules.')
+
+    
 def validate_and_assign(molecules, groupname):
     """
     Load a molecule dataset from SDF, validate it for common 
     issues, and assign it unique identifiers.
     """
-
-    tkr = ToolkitRegistry([RDKitToolkitWrapper, AmberToolsToolkitWrapper])
     
     # TODO: Raise error if bad input format here?
     
@@ -31,7 +31,7 @@ def validate_and_assign(molecules, groupname):
     # Deduplicate multiple instances of the same molecule
     unique_mols = []
     for idx, mol in enumerate(mols):
-        this_smiles = mol.to_smiles(toolkit_registry=tkr)
+        this_smiles = mol.to_smiles()
         if this_smiles in unique_mols:
             other_idx = unique_mols.index(this_smiles)
             other_mol = mols[other_idx]
