@@ -89,7 +89,8 @@ def validate_and_assign(input_graph_files,
         for mol_index, mol in enumerate(loaded_mols):
             # Sanitize any information that might already be present
             mol.name = None
-            for key in mol.properties.keys():
+            keys = list(mol.properties.keys())
+            for key in keys:
                 mol.properties.pop(key)
             mol.partial_charges = None
             
@@ -124,6 +125,7 @@ def validate_and_assign(input_graph_files,
         mol_name = f'{group_name}-{unique_mol_index:05d}'
         smiles2mol[smiles].properties['group_name'] = group_name
         smiles2mol[smiles].properties['group_index'] = unique_mol_index
+        smiles2mol[smiles].name = mol_name
         mol_copy = Molecule(smiles2mol[smiles])
         # Pop off now-nonessential metadata
         mol_copy.properties.pop('original_file')
@@ -138,8 +140,9 @@ def validate_and_assign(input_graph_files,
         if mol_copy.conformers is None:
             continue
         
-        for conformer, conf_index in enumerate(smiles2mol[smiles].conformers):
+        for conf_index, conformer in enumerate(smiles2mol[smiles].conformers):
             mol_copy._conformers = None
+            #raise Exception(conformer)
             mol_copy.add_conformer(conformer)
             mol_copy.properties['conformer_index'] = conf_index
             out_file_name = f'{mol_copy.name}-{conf_index:02d}.sdf'
