@@ -9,9 +9,6 @@ for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
         oetk_loaded = True
 if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
-
-
-
     
 def validate_and_assign(input_graph_files,
                         input_3d_files,
@@ -148,48 +145,6 @@ def validate_and_assign(input_graph_files,
             out_file_name = f'{mol_copy.name}-{conf_index:02d}.sdf'
             mol_copy.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
             
-            
     
-                # If there's only one  molecule in the file, turn it into a list
-    #if not isinstance(mols, list):
-    #    mols = [mols]
-
-    # TODO: Enumerate stereoisomers?
-    
-
-    
-    # group multiple instances of the same molecule
-    #unique_mols = {}
-    #for mol_index, mol in enumerate(mols):
-    #    this_smiles = mol.to_smiles()
-    #    #if this_smiles in unique_mols:
-    #    #    other_idx = unique_mols.index(this_smiles)
-    #    #    other_mol = mols[other_idx]
-    #    if this_smiles in unique_mols:
-    #        orig_mol = unique_mols[this_smiles]
-    #        group_name = other_mol.properties['group_name']
-    #        mol_index = other_mol.properties['mol_index']
-    #        num_existing_confs = len(unique_mols[this_smiles])
-    #        mol.properties['group_name'] = group_name
-    #        mol.properties['mol_index'] = mol_index
-    #        mol.properties['conformer_index'] = num_existing_confs + 1
-    #        mol.name = f'{group_name}-{mol_index:05d}-{num_existing_confs+1:02d}'
-    #        unique_mols[this_smiles].append(mol)
-    #    else:
-    #        mol.properties['group_name'] = groupname
-    #        mol.properties['mol_index'] = mol_index
-    #        mol.properties['conformer_index'] = 1
-    #        mol.name = f'{groupname}-{mol_index:05d}-{01}'
-    #        unique_mols[this_smiles] = [mol]
-    #    
-    # Write to files
-    #for unique_smiles, mol_list in unique_mols.items():
-    #    for mol in mol_list:
-    #        output_filename = f'{mol.name}.sdf'
-    #        mol.to_file(output_filename, file_format='sdf')
-        
-        
-
-        
 if __name__ == '__main__':
     validate_and_assign()
