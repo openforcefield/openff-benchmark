@@ -5,11 +5,6 @@ Top-level `openff-benchmark` cli entrypoint.
 
 import click
 
-from .fractal import (fractal_server_init,
-                      fractal_server_start,
-                      fractal_manager_start)
-
-from .geometry_optimizations import compute as optcompute
                     
 
 
@@ -26,10 +21,12 @@ def fractal():
 
 @fractal.command()
 def server_init():
+    from .fractal import fractal_server_init
     fractal_server_init()
 
 @fractal.command()
 def server_start():
+    from .fractal import fractal_server_start
     fractal_server_start()
 
 @fractal.command()
@@ -38,6 +35,7 @@ def manager_init():
 
 @fractal.command()
 def manager_start():
+    from .fractal import fractal_manager_start
     fractal_manager_start()
 
 @cli.group()
@@ -53,6 +51,7 @@ def optimize():
 @click.option('--season', default=1)
 @click.argument('input-path', nargs=-1)
 def submit_molecules(server_uri, input_path, season, dataset_name):
+    from .geometry_optimizations import compute as optcompute
     optcompute.submit_molecules(
             server_uri, input_path, season, dataset_name)
 

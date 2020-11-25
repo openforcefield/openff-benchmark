@@ -3,13 +3,11 @@ Components for energy minimization / geometry optimization of molecules for FF b
 
 These components leverage the QCArchive software stack for execution.
 
-In general, we abstract away much of the server's operational details, including datasets.
-We store multiple datasets as needed
-
 """
 
 import os
 import logging
+logging.disable(logging.WARNING) 
 
 from openforcefield.topology import Molecule
 from openforcefield.utils import toolkits
@@ -77,7 +75,6 @@ def export_molecule_data(server_uri, destination_path):
 
     """
     # export all molecule/optimization data from all datasets 
-
 
     # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
 
