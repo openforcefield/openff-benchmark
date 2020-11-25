@@ -183,6 +183,19 @@ class Test3dInputsWOGraphs:
         assert 'BBB-00000.smi' in output_files
         assert 'BBB-00000-00.sdf' in output_files
         assert len(output_files) == 2
+        file_text = open(os.path.join(test_dir, 'BBB-00000-00.sdf')).read()
+        assert """
+>  <group_name>  (1) 
+BBB""" in file_text
+        assert """
+>  <group_index>  (1) 
+0""" in file_text
+        assert """
+>  <conformer_index>  (1) 
+0""" in file_text
+        
+        
+                         
     
     # single file multi mol
     def test_single_file_multi_mol(self):
