@@ -12,8 +12,8 @@ if oetk_loaded:
     
 def validate_and_assign(input_graph_files,
                         input_3d_files,
-                        output_directory,
-                        group_name):
+                        group_name,
+                        output_directory='1-validate_and_assign'):
     """
     Load a molecule dataset from SDF, validate it for common 
     issues, and assign it unique identifiers.
@@ -121,7 +121,7 @@ def validate_and_assign(input_graph_files,
     for unique_mol_index, smiles in enumerate(smiles2mol.keys()):
         mol_name = f'{group_name}-{unique_mol_index:05d}'
         smiles2mol[smiles].properties['group_name'] = group_name
-        smiles2mol[smiles].properties['group_index'] = unique_mol_index
+        smiles2mol[smiles].properties['molecule_index'] = unique_mol_index
         smiles2mol[smiles].name = mol_name
         mol_copy = Molecule(smiles2mol[smiles])
         # Pop off now-nonessential metadata

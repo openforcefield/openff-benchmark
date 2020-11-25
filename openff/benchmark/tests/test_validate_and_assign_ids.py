@@ -23,13 +23,15 @@ def test_dont_overwrite_output_directory():
     input_mols = [get_data_file_path('input_single_mol.sdf')]
     validate_and_assign(input_mols,
                         '',
+                        'BBB',
                         test_dir,
-                        'BBB')
+                        )
     with pytest.raises(Exception, match='delete this manually'):
         validate_and_assign(input_mols,
                             '',
-                            test_dir,
-                            'BBB')
+                            'BBB',
+                            test_dir
+                            )
 
 
 # Graph inputs w/o conformers
@@ -45,8 +47,9 @@ class TestGraphInputsWOConformers:
         input_mols = [get_data_file_path('input_single_mol.sdf')]
         validate_and_assign(input_mols,
                             '',
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -64,8 +67,9 @@ class TestGraphInputsWOConformers:
         input_mols = [get_data_file_path('input_multi_mol.sdf')]
         validate_and_assign(input_mols,
                             '',
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -85,8 +89,9 @@ class TestGraphInputsWOConformers:
                       get_data_file_path('input_one_stereoisomer.sdf')]
         validate_and_assign(input_mols,
                             '',
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -106,8 +111,9 @@ class TestGraphInputsWOConformers:
                       get_data_file_path('input_all_stereoisomers.sdf')]
         validate_and_assign(input_mols,
                             '',
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -127,8 +133,9 @@ class TestGraphInputsWOConformers:
         with pytest.raises(Exception, match='Duplicate'):
             validate_and_assign(input_mols,
                                 '',
-                                test_dir,
-                                'BBB')
+                                'BBB',
+                                test_dir
+                                )
             
     # multi file multi mol duplicates (error)
     def test_multi_file_multi_mol_duplicate_error(self):
@@ -144,8 +151,9 @@ class TestGraphInputsWOConformers:
         with pytest.raises(Exception, match='Duplicate'):
             validate_and_assign(input_mols,
                                 '',
+                                'BBB',
                                 test_dir,
-                                'BBB')
+                                )
             
     # input undefined stereochemistry (error)
     def test_undefined_stereochemistry(self):
@@ -160,8 +168,9 @@ class TestGraphInputsWOConformers:
         with pytest.raises(Exception, match='stereo'):
             validate_and_assign(input_mols,
                                 '',
+                                'BBB',
                                 test_dir,
-                                'BBB')
+                                )
 
 # Conformers w/o graphs
 class Test3dInputsWOGraphs:
@@ -176,8 +185,9 @@ class Test3dInputsWOGraphs:
         input_mols = [get_data_file_path('input_single_mol.sdf')]
         validate_and_assign('',
                             input_mols,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -188,7 +198,7 @@ class Test3dInputsWOGraphs:
 >  <group_name>  (1) 
 BBB""" in file_text
         assert """
->  <group_index>  (1) 
+>  <molecule_index>  (1) 
 0""" in file_text
         assert """
 >  <conformer_index>  (1) 
@@ -208,8 +218,9 @@ BBB""" in file_text
         input_mols = [get_data_file_path('input_multi_mol.sdf')]
         validate_and_assign('',
                             input_mols,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -229,8 +240,9 @@ BBB""" in file_text
         input_mols = [get_data_file_path('input_duplicates.sdf')]
         validate_and_assign('',
                             input_mols,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -250,8 +262,9 @@ BBB""" in file_text
                       get_data_file_path('input_one_stereoisomer.sdf')]
         validate_and_assign('',
                             input_mols,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -272,8 +285,9 @@ BBB""" in file_text
                       get_data_file_path('input_all_stereoisomers.sdf')]
         validate_and_assign('',
                             input_mols,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -297,8 +311,9 @@ BBB""" in file_text
                       get_data_file_path('input_all_stereoisomers.sdf')]
         validate_and_assign('',
                             input_mols,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -324,8 +339,9 @@ class TestGraphAnd3dInputs:
         input_3ds = [get_data_file_path('input_one_stereoisomer.sdf')]
         validate_and_assign(input_graphs,
                             input_3ds,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -347,8 +363,9 @@ class TestGraphAnd3dInputs:
         input_3ds = [get_data_file_path('input_one_stereoisomer.sdf')]
         validate_and_assign(input_graphs,
                             input_3ds,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
@@ -370,8 +387,9 @@ class TestGraphAnd3dInputs:
                      get_data_file_path('input_single_mol.sdf')]
         validate_and_assign(input_graphs,
                             input_3ds,
+                            'BBB',
                             test_dir,
-                            'BBB')
+                            )
         output_files = glob.glob(os.path.join(test_dir, '*'))
         output_files = [os.path.basename(fname) for fname in output_files]
         assert 'BBB-00000.smi' in output_files
