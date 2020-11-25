@@ -6,7 +6,7 @@ with many configuration details either hidden or hard-set for our use-case.
 
 """
 
-from qcfractal.cli import qcfractal_server
+from qcfractal.cli import qcfractal_server, qcfractal_manager
 
 
 def fractal_server_init():
@@ -40,14 +40,19 @@ def fractal_server_start():
     # might not be terribly safe to use this
     qcfractal_server.server_start(args, config)
 
+
 def fractal_manager_init():
     """Initialize QCFractal manager, including any configuration items specific to benchmarking.
 
     """
     # need configuration generation
     # will require survey results to get this right
+    # could be done as a wizard-style prompt in the cli
 
 def fractal_manager_start():
     """Start QCFractal manager, including any configuration items specific to benchmarking.
 
     """
+    # TODO: NEEDS WORK
+    #settings = qcfractal_manager.ManagerSettings()
+    #qcfractal_manager.main()

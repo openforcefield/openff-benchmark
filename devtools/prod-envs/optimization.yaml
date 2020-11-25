@@ -4,6 +4,7 @@ channels:
   - psi4/label/dev
   - omnia
   - defaults
+  - omnia/label/rc
 dependencies:
   - python =3.7
   - pip
@@ -43,3 +44,7 @@ dependencies:
 
   # compute backends
   - dask-jobqueue
+
+  # submission
+  - qcportal
+  - qcsubmit==v0.1.0
