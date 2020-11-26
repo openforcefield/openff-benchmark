@@ -5,8 +5,6 @@ Top-level `openff-benchmark` cli entrypoint.
 
 import click
 
-                    
-
 
 @click.group()
 def cli():
@@ -61,8 +59,13 @@ def submit_compute(server_uri, input_path):
     pass
 
 @optimize.command()
-def export():
-    pass
+@click.option('--server-uri', default="localhost:7777")
+@click.option('--dataset-name', default="Benchmark Optimizations")
+@click.argument('destination-path')
+def export(server_uri, destination_path, dataset_name):
+    from .geometry_optimizations import compute as optcompute
+    optcompute.export_molecule_data(
+            server_uri, destination_path, dataset_name)
 
 @optimize.command()
 def status():

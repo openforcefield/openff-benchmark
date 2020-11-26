@@ -23,8 +23,9 @@ from qcportal import FractalClient
 
 from .seasons import SEASONS
 
+
 def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Optimizations"):
-    """Submit SDF molecules from given directory.
+    """Submit SDF molecules from given directory to the target QCFractal server.
 
     Parameters
     ----------
@@ -34,6 +35,8 @@ def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Op
         Paths to SDF files or directories; if directories, all files SDF files in are loaded, recursively.
     season : integer
         Benchmark season number. Indicates the mix of compute specs to utilize.
+    dataset_name : str
+        Dataset name to use for submission on the QCFractal server.
 
     """
     # extract molecules from SDF inputs
@@ -66,21 +69,62 @@ def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Op
     logging.info("Submitted!")
 
 
-def export_molecule_data(server_uri, destination_path):
-    """Export molecule data from target QCFractal instance.
+def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark Optimizations"):
+    """Export all molecule data from target QCFractal server to the given directory.
 
     Parameters
     ----------
-
+    server_uri : str
+        Target QCFractal server URI.
+    destination_path : str
+        Directory path to deposit exported data.
+    dataset_name : str
+        Dataset name to extract from the QCFractal server.
 
     """
-    # export all molecule/optimization data from all datasets 
+    # get dataset
+    client = FractalClient(server_uri, verify=False)
+    optds = client.get_collection("OptimizationDataset", dataset_name)
+    optds.status()
 
-    # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
+    try:
+        os.makedirs(output_directory)
+    except OSError:
+        raise Exception(f'Output directory {output_directory} already exists. '
+                         'The user must delete this manually.')
 
-    # SDF key-value pairs also used for final energies
+    # for each compute spec, create a folder in the output directory
+    # deposit SDF giving final molecule, energy
+    specs = optds.list_specifications().index.tolist()
+    for spec in specs:
+        os.makedirs(os.path.join(output_directory, spec))
+        optentspec = optds.get_specification(spec)
 
-    # subfolders for each compute spec, files named according to molecule ids
+        for id, opt in optds.df[spec].iteritems():
+            mol = Molecule.from_qcschema(
+                    optds.data.dict()['records']['off-00000-0'], client=client)
+            #qcmol_d = opt.get_final_molecule().dict(encoding='json')
+            #qcmol_d['attributes'] = qcmol_d['extras']
+            #mol = Molecule.from_qcschema(qcmol_d, client=client)
+            mol.name = id
+
+            (mol.properties['group_name'],
+             mol.properties['molecule_index'],
+             mol.properties['conformer_index']) = id.split('-')
+
+            # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
+            mol.properties['method'] = optentspec.qc_spec.method
+            mol.properties['basis'] = optentspec.qc_spec.basis
+            mol.properties['program'] = optentspec.qc_spec.program
+
+            # SDF key-value pairs also used for final energies
+            mol.properties['initial_energy'] = opt.energies[0]
+            mol.properties['final_energy'] = opt.energies[-1]
+
+            # subfolders for each compute spec, files named according to molecule ids
+            outfile = "{}.sdf".format(
+                    os.path.join(output_directory, spec, id))
+            mol.to_file(outfile, file_format='sdf')
 
 
 def get_optimization_status(server_uri):
