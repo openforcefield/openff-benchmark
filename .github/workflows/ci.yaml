@@ -33,7 +33,7 @@ jobs:
         mamba-version: "*"
         channels: conda-forge,defaults
         channel-priority: true
-        environment-file: devtools/conda-envs/test_env.yaml
+        environment-file: devtools/prod-envs/optimization.yaml
         auto-activate-base: false
 
     - name: Additional info about the build
