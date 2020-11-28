@@ -3,13 +3,16 @@
 """
 
 SEASONS = {
-        1: {"default": {
+        "1:1": {
+            "default": {
                  "method": "B3LYP-D3BJ",
                  "basis": "DZVP",
                  "program": "psi4",
                  "spec_name": "default",
                  "spec_description": "Standard OpenFF optimization quantum chemistry specification.",
                },
+            },
+        "1:2": {
             "openff-1.0.0": {
                  "method": "openff-1.0.0",
                  "basis": "smirnoff",

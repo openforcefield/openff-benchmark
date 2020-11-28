@@ -45,8 +45,9 @@ def optimize():
 
 @optimize.command()
 @click.option('--server-uri', default="localhost:7777")
-@click.option('--dataset-name', default="Benchmark Optimizations")
-@click.option('--season', default=1)
+@click.option('--dataset-name', required=True)
+#@click.option('--replace', is_flag=True)
+@click.option('--season', required=True)
 @click.argument('input-path', nargs=-1)
 def submit_molecules(server_uri, input_path, season, dataset_name):
     from .geometry_optimizations import compute as optcompute
@@ -60,16 +61,22 @@ def submit_compute(server_uri, input_path):
 
 @optimize.command()
 @click.option('--server-uri', default="localhost:7777")
-@click.option('--dataset-name', default="Benchmark Optimizations")
-@click.argument('destination-path')
-def export(server_uri, destination_path, dataset_name):
+@click.option('--dataset-name', required=True)
+@click.option('--delete-existing', is_flag=True)
+@click.argument('output-directory')
+def export(server_uri, output_directory, dataset_name, delete_existing):
     from .geometry_optimizations import compute as optcompute
     optcompute.export_molecule_data(
-            server_uri, destination_path, dataset_name)
+            server_uri, output_directory, dataset_name, delete_existing)
 
 @optimize.command()
-def status():
-    pass
+@click.option('--server-uri', default="localhost:7777")
+@click.option('--dataset-name', required=True)
+def status(server_uri, dataset_name):
+    from .geometry_optimizations import compute as optcompute
+    optdf = optcompute.get_optimization_status(server_uri, dataset_name)
+    print(optdf.applymap(lambda x: x.status.value))
+
 
 @optimize.command()
 @click.option('--mode',
@@ -83,9 +90,16 @@ def errorcycle(molids, mode, sleep_time, only_compute):
     pass
 
 @optimize.command()
-def local_from_server():
+def execute_from_server():
     pass
 
 @optimize.command()
-def local_from_molecule():
-    pass
+@click.option('--season', required=True)
+@click.option('--ncores', default=2)
+@click.option('--delete-existing', is_flag=True)
+@click.argument('input-path', nargs=-1)
+@click.argument('output-directory')
+def execute(input_path, output_directory, season, ncores, delete_existing):
+    from .geometry_optimizations import compute as optcompute
+    optcompute.execute_optimization_from_molecules(
+            input_path, output_directory, season, ncores=ncores, delete_existing=delete_existing)
