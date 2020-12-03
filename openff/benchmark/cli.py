@@ -104,6 +104,7 @@ def execute(input_path, output_directory, season, ncores, delete_existing):
     optcompute.execute_optimization_from_molecules(
             input_path, output_directory, season, ncores=ncores, delete_existing=delete_existing)
 
+@cli.group()
 def validate():
     pass
 
@@ -114,6 +115,7 @@ def validate():
 
 @click.option('--input_3d_molecules',
               default='',
+              nargs=-1,
               help='SDF file(s) to read containing input molecules in specific geometries. This argument should be included if there are particular low-energy conformers that naive conformer generation may not find.')
 
 @click.option('--output_directory',
