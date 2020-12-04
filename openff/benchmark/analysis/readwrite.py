@@ -27,13 +27,19 @@ def read_sdfs(path):
     return mols
 
 def mols_to_dataframe(mols):
-    df = pd.DataFrame()
-    for i, mol in enumerate(mols):
-        df.loc[i, 'name'] = mol.name
-        df.loc[i, 'mol'] = mol
+    moldata = []
+    for mol in mols:
+        moldata_i = {
+                'name': mol.name,
+                'mol': mol
+                }
         for key, item in mol.properties.items():
-            df.loc[i, key] = item
-    df.molecule_index = df.molecule_index.astype(int)
-    df.conformer_index = df.conformer_index.astype(int)
-    df.index = df.name
+            moldata_i[key] = item
+
+        moldata.append(moldata_i)
+
+    df = pd.DataFrame(moldata)
+    df['molecule_index'] = df['molecule_index'].astype(int)
+    df['conformer_index'] = df['conformer_index'].astype(int)
+    df.set_index('name')
     return df
