@@ -10,6 +10,7 @@ Version: Nov 25 2020
 
 """
 
+import numpy as np
 from rdkit import Chem
 from rdkit.Chem import TorsionFingerprints
 
