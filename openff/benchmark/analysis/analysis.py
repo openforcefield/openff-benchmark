@@ -87,26 +87,20 @@ def main():
     mols = {}
     dataframes = {}
     for m in methods:
-        mols[m] = readwrite.read_sdfs('qcarchive')
+        mols[m] = readwrite.read_sdfs(m)
         dataframes[m] = readwrite.mols_to_dataframe(mols[m])
 
     ref_confs = get_ref_confs(dataframes[ref_method])
 
-    for m in methods:
-        ref_to_ref_confs(dataframes[m], ref_confs)
-        if m == ref_method:
-            continue
-        else:
-            calc_rmsd(dataframes[ref_method], dataframes[m])
-            calc_tfd(dataframes[ref_method], dataframes[m])
-            calc_dde(dataframes[ref_method], dataframes[m])
-
     os.makedirs('results', exist_ok=True)
     for m in methods:
-        if m == ref_method:
-            continue
-        else:
-            dataframes[m].to_csv(f'results/{m}.csv')
+        ref_to_ref_confs(dataframes[m], ref_confs)
+        calc_rmsd(dataframes[ref_method], dataframes[m])
+        calc_tfd(dataframes[ref_method], dataframes[m])
+        calc_dde(dataframes[ref_method], dataframes[m])
+
+        print(dataframes[m].iloc[:2,:])
+        readwrite.write_results(dataframes[m], f'results/{m}.csv')
 
 ### ------------------- Parser -------------------
 

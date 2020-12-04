@@ -15,6 +15,8 @@ import numpy as np
 import pandas as pd
 from openforcefield.topology import Molecule
 
+import pint
+ureg = pint.UnitRegistry()
 
 def read_sdfs(path):
     mols = []
@@ -25,6 +27,12 @@ def read_sdfs(path):
                 if (os.path.exists(file_name) and file_name.split('.')[-1] == 'sdf' ):
                     mols.append(Molecule.from_file(file_name, 'SDF', allow_undefined_stereo=True))
     return mols
+
+def convert_to_quantity(dataframe, columns='final_energy', to='kilocalories / mole'):
+    if type(columns) is str:
+        columns=[columns]
+    for col in columns:
+        dataframe[col] = dataframe[col].apply(lambda val: ureg.Quantity(val).to(to).magnitude)
 
 def mols_to_dataframe(mols):
     moldata = []
@@ -41,5 +49,17 @@ def mols_to_dataframe(mols):
     df = pd.DataFrame(moldata)
     df['molecule_index'] = df['molecule_index'].astype(int)
     df['conformer_index'] = df['conformer_index'].astype(int)
-    df.set_index('name')
+    convert_to_quantity(df, columns=['initial_energy', 'final_energy'])
+    df.set_index('name', drop=False, inplace=True)
     return df
+
+
+def write_results(dataframe, file_name, columns=['name', 'group_name', 'molecule_index', 'conformer_index', 'rmsd', 'tfd', 'dde']):
+    if 'molecule_index' in columns:
+        dataframe['molecule_index'] = dataframe['molecule_index'].apply(lambda x: f'{x:05d}')
+    if 'conformer_index' in columns:
+        dataframe['conformer_index'] = dataframe['conformer_index'].apply(lambda x: f'{x:02d}')
+    dataframe[columns].to_csv(file_name, 
+                              index=False if 'name' in columns else True, 
+                              float_format='%15.8e')
+    
