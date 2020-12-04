@@ -33,7 +33,7 @@ def mols_to_dataframe(mols):
         df.loc[i, 'mol'] = mol
         for key, item in mol.properties.items():
             df.loc[i, key] = item
-    df.molecule_index = df.molecule_index.astype(int)
-    df.conformer_index = df.conformer_index.astype(int)
-    df.index = df.name
+    df['molecule_index'] = df['molecule_index'].astype(int)
+    df['conformer_index'] = df['conformer_index'].astype(int)
+    df.set_index('name')
     return df
