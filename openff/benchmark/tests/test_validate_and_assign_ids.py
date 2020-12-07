@@ -17,7 +17,7 @@ def test_openeye_deregistered():
 
 def test_dont_overwrite_output_directory():
     test_name = inspect.stack()[0].function
-    test_dir = os.path.join(test_name, '1-validate_and_assign')
+    test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
     if os.path.exists(test_dir):
         shutil.rmtree(test_dir)
     input_mols = [get_data_file_path('input_single_mol.sdf')]
@@ -39,7 +39,7 @@ class TestGraphInputsWOConformers:
     # single file single mol
     def test_single_file_single_mol(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -59,7 +59,7 @@ class TestGraphInputsWOConformers:
     def test_single_file_multi_mol(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
         #raise Exception(inspect.stack()[0].function)
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -80,7 +80,7 @@ class TestGraphInputsWOConformers:
     def test_multi_file_single_mol(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
         #raise Exception(inspect.stack()[0].function)
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -102,7 +102,7 @@ class TestGraphInputsWOConformers:
     def test_multi_file_multi_mol(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
         #raise Exception(inspect.stack()[0].function)
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -124,7 +124,7 @@ class TestGraphInputsWOConformers:
     def test_single_file_multi_mol_duplicate_error(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
         #raise Exception(inspect.stack()[0].function)
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -141,7 +141,7 @@ class TestGraphInputsWOConformers:
     def test_multi_file_multi_mol_duplicate_error(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
         #raise Exception(inspect.stack()[0].function)
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -159,7 +159,7 @@ class TestGraphInputsWOConformers:
     def test_undefined_stereochemistry(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
         #raise Exception(inspect.stack()[0].function)
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -177,7 +177,7 @@ class Test3dInputsWOGraphs:
     # single file single mol
     def test_single_file_single_mol(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -210,7 +210,7 @@ BBB""" in file_text
     # single file multi mol
     def test_single_file_multi_mol(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -232,7 +232,7 @@ BBB""" in file_text
     # single file multi conformer
     def test_single_file_multi_conformer(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -253,7 +253,7 @@ BBB""" in file_text
     # multi file single mol
     def test_multi_file_single_mol(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -276,7 +276,7 @@ BBB""" in file_text
     # multi file multi mol
     def test_multi_file_multi_mol(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -302,7 +302,7 @@ BBB""" in file_text
         #raise Exception(inspect.stack()[0])
         #test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -330,7 +330,7 @@ class TestGraphAnd3dInputs:
     # no overlap
     def test_no_overlap(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -353,7 +353,7 @@ class TestGraphAnd3dInputs:
     # graphs superset of conformers
     def test_graphs_superset_of_conformers(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
@@ -377,7 +377,7 @@ class TestGraphAnd3dInputs:
     # conformers superset of graphs
     def test_conformers_superset_of_graphs(self):
         test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-        test_dir = os.path.join(test_name, '1-validate_and_assign')
+        test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
         #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
         if os.path.exists(test_dir):
             shutil.rmtree(test_dir)
