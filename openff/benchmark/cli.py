@@ -33,11 +33,8 @@ def report():
     pass
 
 @analyze.command()
-@click.option('--input-path', default='./', required=True)
-@click.option('--dataset-name', required=True)
-@click.option('--season', required=True)
-def plots(season, dataset_name):
-    from .analysis import plotting
-    plotting.main(
-            server_uri, input_path, season, dataset_name)
+@click.option('--input-path', default='./', multiple=True, required=True)
+def plots(input_path):
+    from .analysis import draw
+    draw.plot_compare_ffs(input_path)
 
