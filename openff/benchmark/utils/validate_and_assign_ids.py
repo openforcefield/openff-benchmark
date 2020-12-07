@@ -2,6 +2,10 @@ from openforcefield.topology import Molecule
 from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 import glob
 import os
+import logging
+import io
+
+#logger = logging.logger()
 
 oetk_loaded = False
 for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
@@ -16,7 +20,7 @@ def validate_and_assign(input_graph_files,
                         output_directory='1-validate_and_assign'):
     """
     Load a molecule dataset from SDF, validate it for common 
-    issues, and assign it unique identifiers.
+j    issues, and assign it unique identifiers.
     """
     
     # Load all the graph molecules
@@ -35,19 +39,36 @@ def validate_and_assign(input_graph_files,
     # Write all conformers to 3D sdfs with numerical conformer
 
     smiles2mol = {}
+    error_mols = []
 
     # Handle graph molecules
     #molecule_graph_files = glob.glob(input_graph_files)
     
     for molecule_graph_file in input_graph_files:
         # TODO: Have an option for permissive stereochemistry?
+        logger = logging.getLogger('openforcefield.utils.toolkits')
+        prev_log_level = logger.getEffectiveLevel()
+        logger.setLevel(logging.ERROR)
         loaded_mols = Molecule.from_file(molecule_graph_file,
-                                         file_format='sdf')
+                                         file_format='sdf',
+                                         allow_undefined_stereo=True)
+        logger.setLevel(prev_log_level)
         if not isinstance(loaded_mols, list):
             loaded_mols = [loaded_mols]
             
         # Process each graph molecule and check for duplicates
         for mol_index, mol in enumerate(loaded_mols):
+            # Check for errors such as undefined stereochemistry
+            try:
+                sio = io.StringIO()
+                mol.to_file(sio, file_format='sdf')
+                sio.seek(0)
+                bio = io.BytesIO(sio.read().encode('utf8'))
+                Molecule.from_file(bio, file_format='sdf')
+            except Exception as e:
+                error_mols.append((f'{molecule_graph_file}:{mol_index}', mol, e))
+                continue
+                
             # Sanitize any unwanted original information
             mol.name = None
             keys = list(mol.properties.keys())
@@ -64,13 +85,18 @@ def validate_and_assign(input_graph_files,
             # Check whether this is a duplicate
             smiles = mol.to_smiles()
             if smiles in smiles2mol:
-                other_mol = smiles2mol[smiles]
-                other_file = other_mol.properties['original_file']
-                other_index = other_mol.properties['original_file_index']
-                msg = 'Duplicate graph molecule detected:\n'
-                msg += f'Molecule {other_index}: {other_mol}\n'
-                msg += f'Molecule {mol_index}: {mol}'
-                raise Exception(msg)
+                try:
+                    other_mol = smiles2mol[smiles]
+                    other_file = other_mol.properties['original_file']
+                    other_index = other_mol.properties['original_file_index']
+                    msg = 'Duplicate graph molecule detected:\n'
+                    msg += f'Molecule {other_index}: {other_mol}\n'
+                    msg += f'Molecule {mol_index}: {mol}'
+                    raise Exception(msg)
+                except Exception as e:
+                    error_mols.append((f'{molecule_graph_file}:{mol_index}', mol, e))
+                    #error_mols.append((molecule_graph_file, mol, e))
+                    continue
                 
             smiles2mol[smiles] = mol
                  
@@ -78,12 +104,29 @@ def validate_and_assign(input_graph_files,
     # Handle 3d molecules
     #molecule_3d_files = glob.glob(input_3d_files)
     for molecule_3d_file in input_3d_files:
+        # TODO: Squalch warnings
+        logger = logging.getLogger('openforcefield.utils.toolkits')
+        prev_log_level = logger.getEffectiveLevel()
+        logger.setLevel(logging.ERROR)
         loaded_mols = Molecule.from_file(molecule_3d_file,
-                                         file_format='sdf')
+                                         file_format='sdf',
+                                         allow_undefined_stereo=True)
+        logger.setLevel(prev_log_level)
         if not isinstance(loaded_mols, list):
             loaded_mols = [loaded_mols]
 
+        print(len(loaded_mols))
+
         for mol_index, mol in enumerate(loaded_mols):
+            # Check for errors such as undefined stereochemistry
+            try:
+                sio = io.StringIO()
+                mol.to_file(sio, file_format='sdf')
+                Molecule.from_file(sio, file_format='sdf')
+            except Exception as e:
+                error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, e))
+                continue
+
             # Sanitize any information that might already be present
             mol.name = None
             keys = list(mol.properties.keys())
@@ -144,7 +187,23 @@ def validate_and_assign(input_graph_files,
             mol_copy.properties['conformer_index'] = conf_index
             out_file_name = f'{mol_copy.name}-{conf_index:02d}.sdf'
             mol_copy.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
-            
+
+    error_dir = os.path.join(output_directory, 'error_mols')
+    os.makedirs(error_dir)
+
+    # Write error mols
+    for idx, (filename, error_mol, exception) in enumerate(error_mols):
+        output_mol_file = os.path.join(error_dir, f'error_mol_{idx}.sdf')
+        try:
+            error_mol.to_file(output_mol_file, file_format='sdf')
+        except Exception as e:
+            exception = str(exception) + str(e)
+        output_summary_file = os.path.join(error_dir, f'error_mol_{idx}.txt')
+        with open(output_summary_file, 'w') as of:
+            of.write(f'source: {filename}\n')
+            of.write(f'error text: {exception}\n')
+                  
+        
     
 if __name__ == '__main__':
     validate_and_assign()
