@@ -31,6 +31,12 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     license='MIT',
 
+    entry_points={
+        "console_scripts": [
+            "openff-benchmark = openff.benchmark.cli:cli",
+        ]
+    },
+
     # Which Python importable modules should be included when your package is installed
     # Handled automatically by setuptools. Use 'exclude' to prevent some specific
     # subpackage(s) from being added, if needed

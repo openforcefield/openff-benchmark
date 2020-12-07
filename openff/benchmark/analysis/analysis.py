@@ -16,10 +16,11 @@ Version: Dec 1 2020
 import os
 import numpy as np
 import pandas as pd
-import metrics
-import readwrite
 from rdkit import Chem
 from rdkit.Chem import rdMolAlign
+
+from . import metrics, readwrite
+
 
 def get_ref_confs(dataframe):
     ref_confs = {}
@@ -53,54 +54,52 @@ def calc_dde(reference, result):
     result.loc[:,'dde'] = result.final_energy - reference.final_energy
 
 
-def main():
+def main(input_path, ref_method, output_directory="./results"):
     """
-    For 2+ SDF files that are analogous in terms of molecules and their
+    For 2+ sets of SDF files that are analogous in terms of molecules and their
     conformers, assess them with respective to a reference SDF file (e.g., QM).
     Metrics include RMSD of conformers, TFD, and relative energy differences.
 
-    Parameter
-    ---------
-    in_dict : OrderedDict
-        dictionary from input file, where key is method and value is dictionary
-        first entry should be reference method
-        in sub-dictionary, keys are 'sdfile' and 'sdtag'
-    read_pickle : Boolean
-        read in data from metrics.pickle
-    conf_id_tag : string
-        label of the SD tag that should be the same for matching conformers
-        in different files
-    plot : Boolean
-        generate line plots of conformer energies
-    mol_slice : numpy slice object
-        The resulting integers are numerically sorted and duplicates removed.
-        e.g., slices = np.s_[0, 3:5, 6::3] would be parsed to return
-        [0, 3, 4, 6, 9, 12, 15, 18, ...]
-        Can also parse from end: [-3:] gets the last 3 molecules, and
-        [-2:-1] is the same as [-2] to get just next to last molecule.
-
+    Parameters
+    ----------
+    input_path : str
+        Path to directory with SDF files of molecules. 
+        Multiple input paths can be specified.
+    ref_method : str
+        Tag of reference methods. The molecules having this tag in
+        the "method" SDF property will be used as reference
+    output_directory : str
+        Directory path to deposit exported data. If not present, this 
+        directory will be created. default: ./results/
     """
-    # for now hardcoded, could be taken from SEASONS of David D. or from CL arg
-    methods = ['qcarchive', 'openff-1.2.0']
-    ref_method = 'qcarchive'
-
     mols = {}
     dataframes = {}
-    for m in methods:
-        mols[m] = readwrite.read_sdfs(m)
-        dataframes[m] = readwrite.mols_to_dataframe(mols[m])
+    for path in input_path:
+        # read in molecules
+        m_mols = readwrite.read_sdfs(path)
 
+        # specify method of molecules
+        method = m_mols[0].properties['method']
+        # assert that all molecules of path are from the same method
+        for mol in m_mols:
+            assert mol.properties["method"] == method, f"Molecules of different methods in path {path}."
+
+        # append method, mols and dataframes
+        mols[method] = m_mols
+        dataframes[method] = readwrite.mols_to_dataframe(mols[method])
+
+    assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
+    
     ref_confs = get_ref_confs(dataframes[ref_method])
 
-    os.makedirs('results', exist_ok=True)
-    for m in methods:
+    os.makedirs(output_directory, exist_ok=True)
+    for m in dataframes:
         ref_to_ref_confs(dataframes[m], ref_confs)
         calc_rmsd(dataframes[ref_method], dataframes[m])
         calc_tfd(dataframes[ref_method], dataframes[m])
         calc_dde(dataframes[ref_method], dataframes[m])
 
-        print(dataframes[m].iloc[:2,:])
-        readwrite.write_results(dataframes[m], f'results/{m}.csv')
+        readwrite.write_results(dataframes[m], os.path.join(output_directory, f"{m}.csv"))
 
 ### ------------------- Parser -------------------
 
