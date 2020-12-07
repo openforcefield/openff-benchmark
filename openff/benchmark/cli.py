@@ -51,11 +51,8 @@ def doit(input_graph_molecules,
         input_3d_molecules = []
     else:
         input_3d_molecules = [input_3d_molecules]
-    print(input_graph_molecules)
-    print(input_3d_molecules)
-    print(output_directory)
-    print(group_name)
-    validate_and_assign(input_graph_molecules,
+
+        validate_and_assign(input_graph_molecules,
                         input_3d_molecules,
                         group_name,
                         output_directory)
