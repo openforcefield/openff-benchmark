@@ -13,10 +13,20 @@ Version: Nov 18 2020
 import os
 import numpy as np
 import pandas as pd
-from openforcefield.topology import Molecule
-
+    
 import pint
 ureg = pint.UnitRegistry()
+
+from openforcefield.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+
+oetk_loaded = False
+for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
+    if isinstance(tkw, OpenEyeToolkitWrapper):
+        oetk_loaded = True
+if oetk_loaded:
+    GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
 def read_sdfs(path):
     mols = []
