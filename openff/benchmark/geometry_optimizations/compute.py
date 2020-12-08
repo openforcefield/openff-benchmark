@@ -37,6 +37,7 @@ def _mols_from_paths(input_paths):
 
     return mols
 
+
 def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Optimizations", 
         replace=True):
     """Submit SDF molecules from given directory to the target QCFractal server.
@@ -92,6 +93,7 @@ def _mol_from_qcserver(record):
         pass
 
     return Molecule.from_qcschema(record)
+
 
 def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark Optimizations",
                          delete_existing=False):
