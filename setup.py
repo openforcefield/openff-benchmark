@@ -2,6 +2,8 @@
 OpenFF Benchmark
 Comparison benchmarks between public force fields and Open Force Field Initiative force fields
 """
+import os
+from os.path import relpath, join
 import sys
 from setuptools import setup, find_namespace_packages
 import versioneer
@@ -19,6 +21,14 @@ except:
     long_description = "\n".join(short_description[2:])
 
 
+def find_package_data(data_root, package_root):
+    files = []
+    for root, dirnames, filenames in os.walk(data_root):
+        for fn in filenames:
+            files.append(relpath(join(root, fn), package_root))
+    return files
+
+
 setup(
     # Self-descriptive entries which should always be present
     name='openff-benchmark',
@@ -30,6 +40,14 @@ setup(
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     license='MIT',
+
+    entry_points={
+        "console_scripts": [
+            "openff-benchmark = openff.benchmark.cli:cli",
+        ]
+    },
+
+    package_data={'openff.benchmark': find_package_data('openff/benchmark/data', 'openff/benchmark')},
 
     # Which Python importable modules should be included when your package is installed
     # Handled automatically by setuptools. Use 'exclude' to prevent some specific
