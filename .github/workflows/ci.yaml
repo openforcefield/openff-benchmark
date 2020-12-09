@@ -36,15 +36,16 @@ jobs:
         path: ~/conda_pkgs_dir
         key:
           ${{ matrix.os }}-conda-${{ env.CACHE_NUMBER }}-${{
-          hashFiles('devtools/prod-envs/optimization.yaml') }}
+          hashFiles('devtools/prod-envs/openff-benchmark-optimization.yaml') }}
 
     - name: Configure conda
       uses: conda-incubator/setup-miniconda@v2
       with:
         #python-version: ${{ matrix.python-version }}
         activate-environment: openff-benchmark-optimization
-        environment-file: devtools/prod-envs/optimization.yaml
+        environment-file: devtools/prod-envs/openff-benchmark-optimization.yaml
         auto-activate-base: false
+          use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
 
     - name: Additional info about the build
       shell: bash
