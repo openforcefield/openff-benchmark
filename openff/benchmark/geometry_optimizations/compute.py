@@ -144,9 +144,9 @@ def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark O
             mol.properties['program'] = optentspec.qc_spec.program
 
             # SDF key-value pairs also used for final energies
-            mol.properties['initial_energy'] = opt.energies[0]
+            mol.properties['initial_energy'] = opt.energies[0] #TODO: add conversion to kcal/mol
             mol.properties['final_energy'] = opt.energies[-1]
-            mol.properties['energy_unit'] = 'hartree'
+            mol.properties['energy_unit'] = 'kcal/mol'
 
             # subfolders for each compute spec, files named according to molecule ids
             outfile = "{}.sdf".format(
