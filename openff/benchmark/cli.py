@@ -111,18 +111,15 @@ def preprocess():
     pass
 
 @preprocess.command()
+@click.option('--delete-existing', is_flag=True)
 @click.option('-o', '--output-directory',
               default='1-validate_and_assign', 
               help='Directory to put output files. If this directory does not exist, one will be created.')
 @click.option('-g', '--group-name',
               help='Group name for assigning IDs to the molecules.')
 @click.argument('input-3d-molecules',
-                nargs=-1,
-                help='SDF file(s) to read containing input molecules in specific geometries.')
-def validate(input_graph_molecules,
-         input_3d_molecules,
-         output_directory,
-         group_name):
+                nargs=-1)
+def validate(input_3d_molecules, output_directory, group_name, delete_existing):
     """Validate and assign identifiers to molecules.
 
     This script preprocesses, validates, and creates a naming system for molecles that will be submitted to the benchmarking workflow. 
@@ -133,20 +130,22 @@ def validate(input_graph_molecules,
     """
     from .utils.validate_and_assign_ids import validate_and_assign
 
-    validate_and_assign(input_graph_molecules,
-                        input_3d_molecules,
+    validate_and_assign(input_3d_molecules,
                         group_name,
                         output_directory)
 
 
 @preprocess.command()
+@click.option('--delete-existing', is_flag=True)
 @click.option('-o', '--output-directory',
               default='2-generate_conformers', 
               help='Directory for output files. If this directory does not exist, one will be created.')
-@click.argument('input-directory',
-              help='Directory of validated molecules; output directory from the validate step')
-def generate_conformers(input_directory, output_directory):
+@click.argument('input-directory')
+def generate_conformers(input_directory, output_directory, delete_existing):
     """Generate additional conformers for validated molecules.
+
+    INPUT-DIRECTORY should contain validated molecules;
+    this is the output directory from the validate step.
 
     """
     from openff.benchmark.utils.generate_conformers import generate_conformers
