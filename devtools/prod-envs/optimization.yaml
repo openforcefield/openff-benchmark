@@ -48,3 +48,6 @@ dependencies:
   # submission
   - qcportal
   - qcsubmit =0.1.1
+  - pip:
+      - pytest
+      - pytest-cov
