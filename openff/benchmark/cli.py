@@ -62,7 +62,7 @@ def submit_compute(server_uri, input_path):
 @click.option('--server-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
 @click.option('--delete-existing', is_flag=True)
-@click.argument('output-directory')
+@click.option('-o', '--output-directory', default='3-export-compute')
 def export(server_uri, output_directory, dataset_name, delete_existing):
     from .geometry_optimizations import compute as optcompute
     optcompute.export_molecule_data(
@@ -96,8 +96,8 @@ def execute_from_server():
 @click.option('--season', required=True)
 @click.option('--ncores', default=2)
 @click.option('--delete-existing', is_flag=True)
+@click.option('-o', '--output-directory', default='3-export-compute')
 @click.argument('input-path', nargs=-1)
-@click.argument('output-directory')
 def execute(input_path, output_directory, season, ncores, delete_existing):
     from .geometry_optimizations import compute as optcompute
     optcompute.execute_optimization_from_molecules(
@@ -111,17 +111,14 @@ def preprocess():
     pass
 
 @preprocess.command()
-@click.option('-g', '--input-graph-molecules',
-              multiple=True,
-              help="SDF file(s) to read containing molecules to put through the standard benchmarking workflow. 3D conformers in this file will be ignored and the molecule graph/connectivity will be used to generate conformers for these molecules.")
-@click.option('-3', '--input-3d-molecules',
-              multiple=True,
-              help='SDF file(s) to read containing input molecules in specific geometries. This argument should be included if there are particular low-energy conformers that naive conformer generation may not find.')
 @click.option('-o', '--output-directory',
               default='1-validate_and_assign', 
               help='Directory to put output files. If this directory does not exist, one will be created.')
-@click.option('-c', '--group-name',
+@click.option('-g', '--group-name',
               help='Group name for assigning IDs to the molecules.')
+@click.argument('input-3d-molecules',
+                nargs=-1,
+                help='SDF file(s) to read containing input molecules in specific geometries.')
 def validate(input_graph_molecules,
          input_3d_molecules,
          output_directory,
@@ -143,15 +140,12 @@ def validate(input_graph_molecules,
 
 
 @preprocess.command()
-@click.option('--input-directory',
-              default='',
-              help='Output directory from the validate step')
-@click.option('--output-directory',
+@click.option('-o', '--output-directory',
               default='2-generate_conformers', 
-              help='Directory to put output files. If this directory does not exist, one will be created.')
-@click.option('--group-name',
-              help='Group name for assigning IDs to the molecules.')
-def generate_conformers(input_directory, output_directory, group_name):
+              help='Directory for output files. If this directory does not exist, one will be created.')
+@click.argument('input-directory',
+              help='Directory of validated molecules; output directory from the validate step')
+def generate_conformers(input_directory, output_directory):
     """Generate additional conformers for validated molecules.
 
     """
