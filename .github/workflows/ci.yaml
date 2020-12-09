@@ -57,6 +57,11 @@ jobs:
         conda info
         conda list
 
+    - name: Install pytest, pytest plugins
+      shell: bash -l {0}
+      run: |
+        python -m pip install pytest pytest-cov
+
     - name: Install package
       shell: bash -l {0}
       run: |
