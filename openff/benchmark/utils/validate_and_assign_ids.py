@@ -1,9 +1,12 @@
-from openforcefield.topology import Molecule
-from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 import glob
 import os
 import logging
 import io
+
+from openforcefield.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+from .io import mols_from_paths
 
 #logger = logging.logger()
 
@@ -45,13 +48,16 @@ j    issues, and assign it unique identifiers.
     #molecule_graph_files = glob.glob(input_graph_files)
     
     for molecule_graph_file in input_graph_files:
+
         # TODO: Have an option for permissive stereochemistry?
         logger = logging.getLogger('openforcefield.utils.toolkits')
         prev_log_level = logger.getEffectiveLevel()
         logger.setLevel(logging.ERROR)
-        loaded_mols = Molecule.from_file(molecule_graph_file,
-                                         file_format='sdf',
-                                         allow_undefined_stereo=True)
+
+        loaded_mols = mols_from_paths([molecule_graph_file])
+        #loaded_mols = Molecule.from_file(molecule_graph_file,
+        #                                 file_format='sdf',
+        #                                 allow_undefined_stereo=True)
         logger.setLevel(prev_log_level)
         if not isinstance(loaded_mols, list):
             loaded_mols = [loaded_mols]
@@ -108,14 +114,14 @@ j    issues, and assign it unique identifiers.
         logger = logging.getLogger('openforcefield.utils.toolkits')
         prev_log_level = logger.getEffectiveLevel()
         logger.setLevel(logging.ERROR)
-        loaded_mols = Molecule.from_file(molecule_3d_file,
-                                         file_format='sdf',
-                                         allow_undefined_stereo=True)
+
+        loaded_mols = mols_from_paths([molecule_3d_file])
+        #loaded_mols = Molecule.from_file(molecule_3d_file,
+        #                                 file_format='sdf',
+        #                                 allow_undefined_stereo=True)
         logger.setLevel(prev_log_level)
         if not isinstance(loaded_mols, list):
             loaded_mols = [loaded_mols]
-
-        print(len(loaded_mols))
 
         for mol_index, mol in enumerate(loaded_mols):
             # Check for errors such as undefined stereochemistry

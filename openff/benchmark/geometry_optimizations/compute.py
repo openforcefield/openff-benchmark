@@ -13,29 +13,7 @@ logging.disable(logging.WARNING)
 from qcportal import FractalClient
 
 from .seasons import SEASONS
-
-def _mols_from_paths(input_paths):
-    from openforcefield.topology import Molecule
-    from openforcefield.utils import toolkits
-    
-    # make sure we deregister OpenEye, if it is present
-    try:
-        toolkits.GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(toolkits.OpenEyeToolkitWrapper)
-    except toolkits.ToolkitUnavailableException:
-        pass
-
-    mols = []
-    for path in input_paths:
-        if (os.path.isfile(path) and path.split('.')[-1].lower() == 'sdf'):
-            mols.append(Molecule.from_file(path))
-        elif os.path.isdir(path):
-            for root, dirs, files in os.walk(path):
-                for file in files:
-                    path = os.path.join(root, file)
-                    if (os.path.isfile(path) and path.split('.')[-1].lower() == 'sdf'):
-                        mols.append(Molecule.from_file(path))
-
-    return mols
+from .utils.io import mols_from_paths
 
 
 def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Optimizations", 
@@ -57,7 +35,7 @@ def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Op
     from qcsubmit.factories import OptimizationDataset, OptimizationDatasetFactory
 
     # extract molecules from SDF inputs
-    mols = _mols_from_paths(input_paths)
+    mols = mols_from_paths(input_paths)
 
     # create OptimizationDataset with QCSubmit
     ds = OptimizationDataset(dataset_name=dataset_name)
@@ -168,6 +146,7 @@ def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark O
             # SDF key-value pairs also used for final energies
             mol.properties['initial_energy'] = opt.energies[0]
             mol.properties['final_energy'] = opt.energies[-1]
+            mol.properties['energy_unit'] = 'hartree'
 
             # subfolders for each compute spec, files named according to molecule ids
             outfile = "{}.sdf".format(

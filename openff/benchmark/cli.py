@@ -103,27 +103,20 @@ def execute(input_path, output_directory, season, ncores, delete_existing):
     optcompute.execute_optimization_from_molecules(
             input_path, output_directory, season, ncores=ncores, delete_existing=delete_existing)
 
-@cli.group()
-def validate():
-    pass
 
-@validate.command()
-@click.option('--input_graph_molecules',
-              default='',
+@cli.command()
+@click.option('-g', '--input-graph-molecules',
+              multiple=True,
               help="SDF file(s) to read containing molecules to put through the standard benchmarking workflow. 3D conformers in this file will be ignored and the molecule graph/connectivity will be used to generate conformers for these molecules.")
-
-@click.option('--input_3d_molecules',
-              default='',
-              nargs=-1,
+@click.option('-3', '--input-3d-molecules',
+              multiple=True,
               help='SDF file(s) to read containing input molecules in specific geometries. This argument should be included if there are particular low-energy conformers that naive conformer generation may not find.')
-
-@click.option('--output_directory',
+@click.option('-o', '--output-directory',
               default='1-validate_and_assign', 
               help='Directory to put output files. If this directory does not exist, one will be created.')
-
-@click.option('--group_name',
+@click.option('-c', '--group-name',
               help='Group name for assigning IDs to the molecules.')
-def doit(input_graph_molecules,
+def validate(input_graph_molecules,
          input_3d_molecules,
          output_directory,
          group_name):
@@ -136,40 +129,22 @@ def doit(input_graph_molecules,
     """
     from .utils.validate_and_assign_ids import validate_and_assign
 
-    if input_graph_molecules == '':
-        input_graph_molecules = []
-    else:
-        input_graph_molecules = [input_graph_molecules]
-
-    if input_3d_molecules == '':
-        input_3d_molecules = []
-    else:
-        input_3d_molecules = [input_3d_molecules]
-
-        validate_and_assign(input_graph_molecules,
+    validate_and_assign(input_graph_molecules,
                         input_3d_molecules,
                         group_name,
                         output_directory)
 
-@cli.group()
-def generate_conformers():
-    pass
 
-
-@generate_conformers.command()
-
-@click.option('--input_directory',
+@cli.command()
+@click.option('--input-directory',
               default='',
               help='Output directory from the validate step')
-
-@click.option('--output_directory',
+@click.option('--output-directory',
               default='2-generate_conformers', 
               help='Directory to put output files. If this directory does not exist, one will be created.')
-
-@click.option('--group_name',
+@click.option('--group-name',
               help='Group name for assigning IDs to the molecules.')
-def doit(input_directory,
-         output_directory):
+def generate_conformers(input_directory, output_directory, group_name):
     from openff.benchmark.utils.generate_conformers import generate_conformers
 
     generate_conformers(input_directory,
