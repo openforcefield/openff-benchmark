@@ -116,6 +116,7 @@ def preprocess():
               default='1-validate_and_assign', 
               help='Directory to put output files. If this directory does not exist, one will be created.')
 @click.option('-g', '--group-name',
+              required=True,
               help='Group name for assigning IDs to the molecules.')
 @click.argument('input-3d-molecules',
                 nargs=-1)
