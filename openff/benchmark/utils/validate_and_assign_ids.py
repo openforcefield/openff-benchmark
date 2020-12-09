@@ -17,7 +17,7 @@ for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
 if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
     
-def validate_and_assign(input_graph_files,
+def validate_and_assign(#input_graph_files,
                         input_3d_files,
                         group_name,
                         output_directory='1-validate_and_assign'):
@@ -47,64 +47,64 @@ j    issues, and assign it unique identifiers.
     # Handle graph molecules
     #molecule_graph_files = glob.glob(input_graph_files)
     
-    for molecule_graph_file in input_graph_files:
+    # for molecule_graph_file in input_graph_files:
 
-        # TODO: Have an option for permissive stereochemistry?
-        logger = logging.getLogger('openforcefield.utils.toolkits')
-        prev_log_level = logger.getEffectiveLevel()
-        logger.setLevel(logging.ERROR)
+    #     # TODO: Have an option for permissive stereochemistry?
+    #     logger = logging.getLogger('openforcefield.utils.toolkits')
+    #     prev_log_level = logger.getEffectiveLevel()
+    #     logger.setLevel(logging.ERROR)
 
-        loaded_mols = mols_from_paths([molecule_graph_file])
-        #loaded_mols = Molecule.from_file(molecule_graph_file,
-        #                                 file_format='sdf',
-        #                                 allow_undefined_stereo=True)
-        logger.setLevel(prev_log_level)
-        if not isinstance(loaded_mols, list):
-            loaded_mols = [loaded_mols]
+    #     loaded_mols = mols_from_paths([molecule_graph_file])
+    #     #loaded_mols = Molecule.from_file(molecule_graph_file,
+    #     #                                 file_format='sdf',
+    #     #                                 allow_undefined_stereo=True)
+    #     logger.setLevel(prev_log_level)
+    #     if not isinstance(loaded_mols, list):
+    #         loaded_mols = [loaded_mols]
             
-        # Process each graph molecule and check for duplicates
-        for mol_index, mol in enumerate(loaded_mols):
-            # Check for errors such as undefined stereochemistry
-            try:
-                sio = io.StringIO()
-                mol.to_file(sio, file_format='sdf')
-                sio.seek(0)
-                bio = io.BytesIO(sio.read().encode('utf8'))
-                Molecule.from_file(bio, file_format='sdf')
-            except Exception as e:
-                error_mols.append((f'{molecule_graph_file}:{mol_index}', mol, e))
-                continue
+    #     # Process each graph molecule and check for duplicates
+    #     for mol_index, mol in enumerate(loaded_mols):
+    #         # Check for errors such as undefined stereochemistry
+    #         try:
+    #             sio = io.StringIO()
+    #             mol.to_file(sio, file_format='sdf')
+    #             sio.seek(0)
+    #             bio = io.BytesIO(sio.read().encode('utf8'))
+    #             Molecule.from_file(bio, file_format='sdf')
+    #         except Exception as e:
+    #             error_mols.append((f'{molecule_graph_file}:{mol_index}', mol, e))
+    #             continue
                 
-            # Sanitize any unwanted original information
-            mol.name = None
-            keys = list(mol.properties.keys())
-            for key in keys:
-                mol.properties.pop(key)
-            mol.partial_charges = None
-            # Since this is a graph molecule input, clear any conformers
-            mol._conformers = []
+    #         # Sanitize any unwanted original information
+    #         mol.name = None
+    #         keys = list(mol.properties.keys())
+    #         for key in keys:
+    #             mol.properties.pop(key)
+    #         mol.partial_charges = None
+    #         # Since this is a graph molecule input, clear any conformers
+    #         mol._conformers = []
             
-            # Keep a record of the context from which this was loaded
-            mol.properties['original_file'] = molecule_graph_file
-            mol.properties['original_file_index'] = mol_index + 1
+    #         # Keep a record of the context from which this was loaded
+    #         mol.properties['original_file'] = molecule_graph_file
+    #         mol.properties['original_file_index'] = mol_index + 1
 
-            # Check whether this is a duplicate
-            smiles = mol.to_smiles()
-            if smiles in smiles2mol:
-                try:
-                    other_mol = smiles2mol[smiles]
-                    other_file = other_mol.properties['original_file']
-                    other_index = other_mol.properties['original_file_index']
-                    msg = 'Duplicate graph molecule detected:\n'
-                    msg += f'Molecule {other_index}: {other_mol}\n'
-                    msg += f'Molecule {mol_index}: {mol}'
-                    raise Exception(msg)
-                except Exception as e:
-                    error_mols.append((f'{molecule_graph_file}:{mol_index}', mol, e))
-                    #error_mols.append((molecule_graph_file, mol, e))
-                    continue
+    #         # Check whether this is a duplicate
+    #         smiles = mol.to_smiles()
+    #         if smiles in smiles2mol:
+    #             try:
+    #                 other_mol = smiles2mol[smiles]
+    #                 other_file = other_mol.properties['original_file']
+    #                 other_index = other_mol.properties['original_file_index']
+    #                 msg = 'Duplicate graph molecule detected:\n'
+    #                 msg += f'Molecule {other_index}: {other_mol}\n'
+    #                 msg += f'Molecule {mol_index}: {mol}'
+    #                 raise Exception(msg)
+    #             except Exception as e:
+    #                 error_mols.append((f'{molecule_graph_file}:{mol_index}', mol, e))
+    #                 #error_mols.append((molecule_graph_file, mol, e))
+    #                 continue
                 
-            smiles2mol[smiles] = mol
+    #         smiles2mol[smiles] = mol
                  
             
     # Handle 3d molecules
@@ -115,10 +115,10 @@ j    issues, and assign it unique identifiers.
         prev_log_level = logger.getEffectiveLevel()
         logger.setLevel(logging.ERROR)
 
-        loaded_mols = mols_from_paths([molecule_3d_file])
-        #loaded_mols = Molecule.from_file(molecule_3d_file,
-        #                                 file_format='sdf',
-        #                                 allow_undefined_stereo=True)
+        #loaded_mols = mols_from_paths([molecule_3d_file])
+        loaded_mols = Molecule.from_file(molecule_3d_file,
+                                         file_format='sdf',
+                                         allow_undefined_stereo=True)
         logger.setLevel(prev_log_level)
         if not isinstance(loaded_mols, list):
             loaded_mols = [loaded_mols]
@@ -128,7 +128,9 @@ j    issues, and assign it unique identifiers.
             try:
                 sio = io.StringIO()
                 mol.to_file(sio, file_format='sdf')
-                Molecule.from_file(sio, file_format='sdf')
+                sio.seek(0)
+                bio = io.BytesIO(sio.read().encode('utf8'))
+                Molecule.from_file(bio, file_format='sdf')
             except Exception as e:
                 error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, e))
                 continue
@@ -177,9 +179,9 @@ j    issues, and assign it unique identifiers.
         mol_copy.properties.pop('original_file')
         mol_copy.properties.pop('original_file_index')
         # Write the graph representation as a fully mapped SMILES
-        with open(os.path.join(output_directory, f'{mol_name}.smi'), 'w') as of:
-            cmiles = smiles2mol[smiles].to_smiles(mapped=True)
-            of.write(cmiles)
+        #with open(os.path.join(output_directory, f'{mol_name}.smi'), 'w') as of:
+        #    cmiles = smiles2mol[smiles].to_smiles(mapped=True)
+        #    of.write(cmiles)
 
         # Write conformers
         # Don't try to write conformers if there aren't any
