@@ -13,7 +13,7 @@ logging.disable(logging.WARNING)
 from qcportal import FractalClient
 
 from .seasons import SEASONS
-from .utils.io import mols_from_paths
+from ..utils.io import mols_from_paths
 
 
 def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Optimizations", 
