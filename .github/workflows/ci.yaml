@@ -1,14 +1,12 @@
-name: ci
+name: CI
 
 on:
   push:
     branches:
       - "master"
-      - "maintenance/.+"
   pull_request:
     branches:
       - "master"
-      - "maintenance/.+"
 
 jobs:
   test:
@@ -29,11 +27,8 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         python-version: ${{ matrix.python-version }}
-        activate-environment: test
-        mamba-version: "*"
-        channels: conda-forge,defaults
-        channel-priority: true
-        environment-file: devtools/conda-envs/test_env.yaml
+        activate-environment: openff-benchmark-optimization
+        environment-file: devtools/prod-envs/optimization.yaml
         auto-activate-base: false
 
     - name: Additional info about the build
