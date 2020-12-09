@@ -14,7 +14,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macOS-latest, ubuntu-latest]
+        os: 
+          - ubuntu-latest
+         #- macOS-latest 
         python-version: [3.6, 3.7]
     env:
       CI_OS: ${{ matrix.os }}
