@@ -27,7 +27,7 @@ dependencies:
 
   # QM calculations
   - psi4 =1.4a2.dev1058+670a850
-  - xtb-python =20.2
+  #- xtb-python =20.2
   - dftd3
   - gcp
     
