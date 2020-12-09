@@ -72,11 +72,13 @@ def test_generate_conformers():
     bbb4_confs = glob.glob(os.path.join(output_dir, 'BBB-00004-*.sdf'))
     assert len(bbb4_confs) == 10
 
+    ## BBB-00005 is a molecule with one torsional degree of freedom.
+    # It has 2 possible distinct conformations at an RMS cutoff of 2A.
+    # One of these conformations is provided, so two total should be output. 
+    bbb4_confs = glob.glob(os.path.join(output_dir, 'BBB-00005-*.sdf'))
+    assert len(bbb4_confs) == 2
 
-# test loading a molecule with 10 pre-set conformers, so no new confs should be generated
 
-# test loading a molecule with 11 pre-set conformers, and deleting one 
-
-# test loading a molecule with pre-set conformers within the RMSD threshold of each other
+# test loading a molecule where the pre-existing conformer displaces one of the generated conformers
 
 
