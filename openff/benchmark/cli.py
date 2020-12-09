@@ -5,7 +5,6 @@ Top-level `openff-benchmark` cli entrypoint.
 
 import click
 
-
 @click.group()
 def cli():
     pass
@@ -137,7 +136,44 @@ def doit(input_graph_molecules,
     """
     from .utils.validate_and_assign_ids import validate_and_assign
 
-    validate_and_assign(input_molecules,
-                        input_conformers,
-                        output_directory,
-                        group_name)
+    if input_graph_molecules == '':
+        input_graph_molecules = []
+    else:
+        input_graph_molecules = [input_graph_molecules]
+
+    if input_3d_molecules == '':
+        input_3d_molecules = []
+    else:
+        input_3d_molecules = [input_3d_molecules]
+
+        validate_and_assign(input_graph_molecules,
+                        input_3d_molecules,
+                        group_name,
+                        output_directory)
+
+@cli.group()
+def generate_conformers():
+    pass
+
+
+@generate_conformers.command()
+
+@click.option('--input_directory',
+              default='',
+              help='Output directory from the validate step')
+
+@click.option('--output_directory',
+              default='2-generate_conformers', 
+              help='Directory to put output files. If this directory does not exist, one will be created.')
+
+@click.option('--group_name',
+              help='Group name for assigning IDs to the molecules.')
+def doit(input_directory,
+         output_directory):
+    from openff.benchmark.utils.generate_conformers import generate_conformers
+
+    generate_conformers(input_directory,
+                        output_directory)
+    
+if __name__ == "__main__":
+    cli()

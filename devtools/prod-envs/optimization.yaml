@@ -27,7 +27,7 @@ dependencies:
 
   # QM calculations
   - psi4 =1.4a2.dev1058+670a850
-  - xtb-python =20.2
+  #- xtb-python =20.2
   - dftd3
   - gcp
     
@@ -37,7 +37,7 @@ dependencies:
   - openmm =7.4.2
   - openmmforcefields =0.8.0
   - conda-forge::libiconv
-  - ambertools ==20.4
+  - ambertools =20.4
 
   # procedures
   - geometric
@@ -47,4 +47,4 @@ dependencies:
 
   # submission
   - qcportal
-  - qcsubmit==v0.1.0
+  - qcsubmit =0.1.1
