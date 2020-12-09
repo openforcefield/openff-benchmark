@@ -4,7 +4,7 @@
 
 import pytest
 
-from openff.benchmark.geometry_optimization import compute
+from openff.benchmark.geometry_optimizations import compute
 from openff.benchmark.utils.utils import get_data_file_path
 
 def test_submit_molecules():
