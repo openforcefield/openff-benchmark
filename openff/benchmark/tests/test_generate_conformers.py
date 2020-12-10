@@ -26,7 +26,7 @@ def test_dont_overwrite_output_directory(tmpdir):
         generate_conformers(input_dir,
                             output_dir,
                             )
-        with pytest.raises(Exception, match='delete this manually'):
+        with pytest.raises(Exception, match='Specify `delete_existing=True` to remove'):
             generate_conformers(input_dir,
                                 output_dir,
             )

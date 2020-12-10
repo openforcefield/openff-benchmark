@@ -13,13 +13,17 @@ if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
 
-def generate_conformers(input_directory, output_directory):
-    if os.path.exists(output_directory):
-        raise Exception(f'Output directory {output_directory} already exists. '
-                         'The user must delete this manually. '
-                         'This script will not overwrite it.')
-    
+def generate_conformers(input_directory, output_directory, delete_existing=False):
 
+    try:
+        os.makedirs(output_directory)
+    except OSError:
+        if delete_existing:
+            shutil.rmtree(output_directory)
+            os.makedirs(output_directory)
+        else:
+            raise Exception(f'Output directory {output_directory} already exists. '
+                             'Specify `delete_existing=True` to remove.')
 
     input_3d_files = glob.glob(os.path.join(input_directory,'*.sdf'))
     input_graph_files = glob.glob(os.path.join(input_directory,'*.smi'))
@@ -90,8 +94,6 @@ def generate_conformers(input_directory, output_directory):
             #                 group2idx2mols2confs))
 
     # Write outputs
-    os.makedirs(output_directory)
-    
     for group_id in group2idx2mols2confs:
         for mol_idx in group2idx2mols2confs[group_id]:
             for conf_idx in group2idx2mols2confs[group_id][mol_idx]:

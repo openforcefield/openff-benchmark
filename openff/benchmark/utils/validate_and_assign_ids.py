@@ -20,7 +20,8 @@ if oetk_loaded:
 def validate_and_assign(#input_graph_files,
                         input_3d_files,
                         group_name,
-                        output_directory='1-validate_and_assign'):
+                        output_directory='1-validate_and_assign',
+                        delete_existing=False):
     """
     Load a molecule dataset from SDF, validate it for common 
 j    issues, and assign it unique identifiers.
@@ -33,10 +34,15 @@ j    issues, and assign it unique identifiers.
     #    if not, make a new 2d molecule
     #    if so, add the coordinates as a new molecule (performing an isomorphism)
 
-    if os.path.exists(output_directory):
-        raise Exception(f'Output directory {output_directory} already exists. '
-                         'The user must delete this manually. '
-                         'This script will not overwrite it.')
+    try:
+        os.makedirs(output_directory)
+    except OSError:
+        if delete_existing:
+            shutil.rmtree(output_directory)
+            os.makedirs(output_directory)
+        else:
+            raise Exception(f'Output directory {output_directory} already exists. '
+                             'Specify `delete_existing=True` to remove.')
     
     # Write all molecules to .smi files
     # Write all conformers to 3D sdfs with numerical conformer
@@ -166,7 +172,6 @@ j    issues, and assign it unique identifiers.
             else:
                 smiles2mol[smiles] = mol                
                 
-    os.makedirs(output_directory)
     
     # Assign names and write out files
     for unique_mol_index, smiles in enumerate(smiles2mol.keys()):
@@ -197,7 +202,6 @@ j    issues, and assign it unique identifiers.
             mol_copy.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
 
     error_dir = os.path.join(output_directory, 'error_mols')
-    os.makedirs(error_dir)
 
     # Write error mols
     for idx, (filename, error_mol, exception) in enumerate(error_mols):

@@ -26,7 +26,7 @@ def test_dont_overwrite_output_directory(tmpdir):
                             'BBB',
                             test_dir,
                             )
-        with pytest.raises(Exception, match='delete this manually'):
+        with pytest.raises(Exception, match='Specify `delete_existing=True` to remove'):
             validate_and_assign(input_mols,
                                 'BBB',
                                 test_dir
