@@ -4,11 +4,11 @@
 
 SEASONS = {
         "1:1": {
-            "default": {
+            "b3lyp-d3bj/dzvp": {
                  "method": "B3LYP-D3BJ",
                  "basis": "DZVP",
                  "program": "psi4",
-                 "spec_name": "default",
+                 "spec_name": "b3lyp-d3bj/dzvp",
                  "spec_description": "Standard OpenFF optimization quantum chemistry specification.",
                },
             },
