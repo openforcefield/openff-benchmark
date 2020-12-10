@@ -4,6 +4,7 @@ import glob
 import os
 import re
 from simtk import unit
+import shutil
 
 oetk_loaded = False
 for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
@@ -69,16 +70,20 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
 
     for group_id in group2idx2mols2confs:
         for mol_idx in group2idx2mols2confs[group_id]:
-            n_existing_confs = len(group2idx2mols2confs[group_id][mol_idx].keys())
+            n_user_confs = len(group2idx2mols2confs[group_id][mol_idx].keys())
             mol = group2idx2mols2confs[group_id][mol_idx]['00']
             mol.generate_conformers(n_conformers=10,
                                     rms_cutoff=2.*unit.angstrom,
                                     clear_existing=False)
-            # Iterate through newly generated confs and add each to the dict, to a max of 10
-            mol._conformers = mol._conformers[1:]
-            for i in range(n_existing_confs, 10):
+            # Iterate through newly generated confs and add each to the dict as a new mol, to a max of 10
+            
+            # Get rid of the first conformer, since that was there before
+            #mol._conformers = mol._conformers[1:]
+            
+            for i in range(n_user_confs, mol.n_conformers):
                 mol_copy = Molecule(mol)
-                mol_copy._conformers = mol_copy._conformers[:1]
+                mol_copy._conformers = None
+                mol_copy.add_conformer(mol.conformers[i])
                 group2idx2mols2confs[group_id][mol_idx][f'{i:02d}'] = mol_copy
                 
                 #filename = f'{group_id}_{mol_idx}_{i:02d}.sdf'

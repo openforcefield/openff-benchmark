@@ -133,7 +133,8 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing):
 
     validate_and_assign(input_3d_molecules,
                         group_name,
-                        output_directory)
+                        output_directory,
+                        delete_existing=delete_existing)
 
 
 @preprocess.command()
@@ -152,7 +153,8 @@ def generate_conformers(input_directory, output_directory, delete_existing):
     from openff.benchmark.utils.generate_conformers import generate_conformers
 
     generate_conformers(input_directory,
-                        output_directory)
+                        output_directory,
+                        delete_existing=delete_existing)
     
 if __name__ == "__main__":
     cli()

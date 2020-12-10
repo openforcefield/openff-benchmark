@@ -2,6 +2,7 @@ import glob
 import os
 import logging
 import io
+import shutil
 
 from openforcefield.topology import Molecule
 from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
@@ -202,6 +203,7 @@ j    issues, and assign it unique identifiers.
             mol_copy.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
 
     error_dir = os.path.join(output_directory, 'error_mols')
+    os.makedirs(error_dir)
 
     # Write error mols
     for idx, (filename, error_mol, exception) in enumerate(error_mols):
