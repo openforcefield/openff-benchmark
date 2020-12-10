@@ -1,9 +1,16 @@
 """Tests for geometry optimization library components.
 
 """
+import os
 
 import pytest
 
+import pint
+
+punit = pint.UnitRegistry()
+Q_ = punit.Quantity
+
+from openforcefield.topology import Molecule
 from openff.benchmark.geometry_optimizations import compute
 from openff.benchmark.utils.utils import get_data_file_path
 
@@ -30,4 +37,13 @@ def test_execute_optimization_from_molecules(tmpdir):
         compute.execute_optimization_from_molecules(
                 input_mols, 
                 '3-export-compute',
-                '1:1')
+                '1:1',
+                ncores=1)
+
+        file = '3-export-compute/b3lyp-d3bj/dzvp/OFF-00000-00.sdf'
+        assert os.path.exists(file)
+        
+        mol = Molecule.from_file(file) 
+
+        assert Q_(mol.properties['initial_energy']) > Q_(mol.properties['final_energy'])
+

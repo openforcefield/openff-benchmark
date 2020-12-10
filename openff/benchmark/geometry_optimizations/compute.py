@@ -91,6 +91,9 @@ def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark O
     """
     from openforcefield.topology.molecule import unit
     import numpy as np
+    import pint
+
+    punit = pint.UnitRegistry()
 
     # get dataset
     client = FractalClient(server_uri, verify=False)
@@ -144,9 +147,8 @@ def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark O
             mol.properties['program'] = optentspec.qc_spec.program
 
             # SDF key-value pairs also used for final energies
-            mol.properties['initial_energy'] = opt.energies[0] #TODO: add conversion to kcal/mol
-            mol.properties['final_energy'] = opt.energies[-1]
-            mol.properties['energy_unit'] = 'kcal/mol'
+            mol.properties['initial_energy'] = (opt.energies[0] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
+            mol.properties['final_energy'] = (opt.energies[-1] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
 
             # subfolders for each compute spec, files named according to molecule ids
             outfile = "{}.sdf".format(
