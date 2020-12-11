@@ -1,5 +1,6 @@
 import os
 import contextlib
+
 def get_data_file_path(relative_path):
     """
     Get the full path to one of the reference files.
