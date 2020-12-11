@@ -1,10 +1,19 @@
-from openforcefield.topology import Molecule
-from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 import glob
 import os
 import re
 from simtk import unit
 import shutil
+import logging
+
+logger = logging.getLogger('openforcefield.utils.toolkits')
+prev_log_level = logger.getEffectiveLevel()
+logger.setLevel(logging.ERROR)
+
+from openforcefield.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+logger.setLevel(prev_log_level)
+
 
 oetk_loaded = False
 for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
@@ -70,6 +79,9 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
 
     for group_id in group2idx2mols2confs:
         for mol_idx in group2idx2mols2confs[group_id]:
+
+            # TODO: Add tqdm progress bar
+            
             n_user_confs = len(group2idx2mols2confs[group_id][mol_idx].keys())
             mol = group2idx2mols2confs[group_id][mol_idx]['00']
             mol.generate_conformers(n_conformers=10,
@@ -107,13 +119,13 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
                 this_conf.properties['group_name'] = group_id
                 this_conf.properties['molecule_index'] = mol_idx
                 this_conf.name = mol_name
-
+                
                 this_conf.properties['conformer_index'] = conf_idx
                 out_file_name = f'{this_conf.name}-{int(conf_idx):02d}.sdf'
                 this_conf.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
-
+                
                 #mol_copy = Molecule(group2idx2mols2confs[group_id][mol_idx])
-
+                
                 # Write the graph representation as a fully mapped SMILES
                 #with open(os.path.join(output_directory, f'{mol_name}.smi'), 'w') as of:
                 #    cmiles = mol_copy.to_smiles(mapped=True)

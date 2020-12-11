@@ -4,8 +4,15 @@ import logging
 import io
 import shutil
 
+logger = logging.getLogger('openforcefield.utils.toolkits')
+prev_log_level = logger.getEffectiveLevel()
+logger.setLevel(logging.ERROR)
+
 from openforcefield.topology import Molecule
 from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+logger.setLevel(prev_log_level)
+
 
 from .io import mols_from_paths
 
@@ -143,6 +150,7 @@ j    issues, and assign it unique identifiers.
                 continue
 
             # Sanitize any information that might already be present
+            # TODO: log mapping of input names/properties to output mols
             mol.name = None
             keys = list(mol.properties.keys())
             for key in keys:
@@ -167,6 +175,8 @@ j    issues, and assign it unique identifiers.
                                                       )
                 reordered_mol = mol.remap(atom_map)
                 smiles2mol[smiles].add_conformer(reordered_mol.conformers[0])
+                
+                # TODO: Deduplicate identical geometries
                 
             # If this graph molecule ISN'T already known, then add
             # this representation as a new molecule
