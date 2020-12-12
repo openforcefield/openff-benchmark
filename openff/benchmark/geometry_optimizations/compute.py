@@ -212,7 +212,7 @@ def execute_optimization_from_molecules(input_paths, output_directory, season,
         complete = df.applymap(lambda x: x.status.value == 'COMPLETE').sum().sum()
         total = df.size
         print(f"{complete}/{total} COMPLETE", end='\r')
-        if complete:
+        if complete == df.size:
             break
         sleep(5)
 
