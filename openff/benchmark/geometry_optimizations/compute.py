@@ -258,7 +258,7 @@ def execute_optimization_from_molecules(
 
         # write out what we can
         export_molecule_data(server_uri, output_directory, dataset_name=dataset_name,
-                delete_existing=delete_existing, keep_existing=keep_existing)
+                delete_existing=False, keep_existing=True)
 
         # break if complete
         complete = df.applymap(lambda x: x.status.value == 'COMPLETE').sum().sum()
@@ -269,4 +269,4 @@ def execute_optimization_from_molecules(
         sleep(10)
 
     export_molecule_data(server_uri, output_directory, dataset_name=dataset_name,
-            delete_existing=delete_existing, keep_existing=keep_existing)
+            delete_existing=False, keep_existing=True)
