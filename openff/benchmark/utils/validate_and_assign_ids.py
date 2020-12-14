@@ -34,28 +34,6 @@ def validate_and_assign(#input_graph_files,
                         group_name,
                         output_directory='1-validate_and_assign',
                         delete_existing=False):
-    """
-    Validate and assign identifiers to molecules.
-
-    This command preprocesses, validates, and creates a naming system for molecules that will be submitted to the benchmarking workflow. 
-
-    This command takes 3D molecules in SDF format and a three-character "group name" as input. 
-    It produces a directory containing:
-      * validated molecules named "GGG-MMMMM-CC.sdf", where G is the group name, M is the molecule ID, and C is the conformer index
-    At least one 3D geometry of each molecule must be provided.
-    The "group name" becomes the first three characters of the validated file names. 
-    Multiple confomers of the same molecule will be automatically detected and grouped under a single molecule ID.
-    The definition of "identical molecule" is whether RDKit assigns them the same canonical, isomeric, explicit hydrogen SMILES. 
-    When molecules are grouped, their RMSD (accounting for symmetry automorphs) is tested. 
-    If two inputs are within 0.1 A by RMSD, the second is considered an error and is removed from the workflow.
-    SD data pairs and molecule names are stripped from the input molecules.
-    The order of atoms may change during this step.
-    
-    
-    This command also attempts to detect technical issues that could prevent the files from working with the OpenFF toolkit. Files that will cause problems in subsequent steps are routed to the "error_mols" subdirectory of the output directory. Where possible, these cases write both an SDF file of the molecule (with key-value paris indicating the file the structure came from), and a correspondingly-named txt file containing more details about the error.
-
-    When complete, a mapping from input molecule name/file/index to benchmarking ID will be provided in the name_assignments.csv file in the output directory.
-    """
     
     try:
         os.makedirs(output_directory)
