@@ -46,8 +46,10 @@ j    issues, and assign it unique identifiers.
         else:
             raise Exception(f'Output directory {output_directory} already exists. '
                              'Specify `delete_existing=True` to remove.')
-    
 
+    logging.basicConfig(filename=os.path.join(output_directory,'log.txt'),
+                        level=logging.DEBUG)
+        
     smiles2mol = {}
     error_mols = []
 
@@ -80,7 +82,6 @@ j    issues, and assign it unique identifiers.
 
             # Sanitize any information that might already be present
             # TODO: log mapping of input names/properties to output mols
-            mol.name = None
             keys = list(mol.properties.keys())
             for key in keys:
                 mol.properties.pop(key)
@@ -89,6 +90,8 @@ j    issues, and assign it unique identifiers.
             # Keep a record of the context from which this was loaded
             mol.properties['original_file'] = molecule_3d_file
             mol.properties['original_file_index'] = mol_index + 1
+            mol.properties['original_name'] = mol.name
+            mol.name = None
 
             # If this graph molecule IS already known, add this 3d information as a conformer
             smiles = mol.to_smiles()
@@ -133,9 +136,16 @@ j    issues, and assign it unique identifiers.
         smiles2mol[smiles].properties['molecule_index'] = unique_mol_index
         smiles2mol[smiles].name = mol_name
         mol_copy = Molecule(smiles2mol[smiles])
+
+        msg = f'Molecule with name {mol_copy.properties["original_name"]} from '
+        msg += f'file:position {mol_copy.properties["original_file"]}:'
+        msg += f'{mol_copy.properties["original_file_index"]} has passed validation '
+        msg += f'and is being given identifier {mol_name}.'
+        logger.info(msg)
         # Pop off now-nonessential metadata
         mol_copy.properties.pop('original_file')
         mol_copy.properties.pop('original_file_index')
+        mol_copy.properties.pop('original_name')
         # Write the graph representation as a fully mapped SMILES
         #with open(os.path.join(output_directory, f'{mol_name}.smi'), 'w') as of:
         #    cmiles = smiles2mol[smiles].to_smiles(mapped=True)
@@ -143,8 +153,8 @@ j    issues, and assign it unique identifiers.
 
         # Write conformers
         # Don't try to write conformers if there aren't any
-        if mol_copy.conformers is None:
-            continue
+        #if mol_copy.conformers is None:
+        #    continue
         
         for conf_index, conformer in enumerate(smiles2mol[smiles].conformers):
             mol_copy._conformers = None
