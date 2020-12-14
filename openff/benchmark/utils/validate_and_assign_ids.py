@@ -89,53 +89,55 @@ def validate_and_assign(#input_graph_files,
             mol.partial_charges = None
             
             # If this graph molecule IS already known, add this 3d information as a conformer
-            smiles = mol.to_smiles()
-            if smiles in smiles2mol:
-                orig_mol = smiles2mol[smiles]
-                _, atom_map = Molecule.are_isomorphic(mol,
-                                                      orig_mol,
-                                                      return_atom_map=True,
-                                                      formal_charge_matching=False,
-                                                      aromatic_matching=False,
-                                                      #atom_stereochemistry_matching=False,
-                                                      #bond_stereochemistry_matching=False,
-                                                      )
-                reordered_mol = mol.remap(atom_map)
-                # Make a temporary copy of the parent mol for conformer alignment and deduplication
-                temp_mol = copy.deepcopy(orig_mol)
-                temp_mol.add_conformer(reordered_mol.conformers[0])
-                aligned_mol, rmslist = align_offmol_conformers(temp_mol)
-                # Don't trust rmslist above for deduplication -- It doesn't take into
-                # account multiple atom mappings
-                confs_to_delete = greedy_conf_deduplication(temp_mol,
-                                                            0.1)
-                if len(confs_to_delete) > 0:
-                    msg = f'Duplicate molecule conformer input detected.\n'
-                    msg += f'{molecule_3d_file}:{mol_index} has an RMSD within 0.1 A '
-                    msg += f'to the molecule originally loaded from '
-                    msg += f'{orig_mol.properties["original_files"]}:{orig_mol.properties["original_file_indices"]}'
-                    logging.warning(msg)
-                    temp_mol._conformers = [temp_mol.conformers[-1]]
-                    error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, msg))
-                    continue
-                # Append the most recent file info to the provenance properties
-                # These properties will be in the same order as the molecule's conformers.
-                temp_mol.properties['original_files'].append(molecule_3d_file)
-                temp_mol.properties['original_file_indices'].append(mol_index)
-                temp_mol.properties['original_names'].append(mol.name)
-                
-                smiles2mol[smiles] = temp_mol
-                
-            # If this graph molecule ISN'T already known, then add
-            # this representation as a new molecule
-            else:
-                # Keep a record of the context from which this was loaded
-                mol.properties['original_files'] = [molecule_3d_file]
-                mol.properties['original_file_indices'] = [mol_index]
-                mol.properties['original_names'] = [mol.name]
-                mol.name = None
-                smiles2mol[smiles] = mol                
+            try:
+                smiles = mol.to_smiles()
+                if smiles in smiles2mol:
+                    orig_mol = smiles2mol[smiles]
+                    _, atom_map = Molecule.are_isomorphic(mol,
+                                                          orig_mol,
+                                                          return_atom_map=True,
+                                                          formal_charge_matching=False,
+                                                          aromatic_matching=False,
+                                                          #atom_stereochemistry_matching=False,
+                                                          #bond_stereochemistry_matching=False,
+                                                          )
+                    reordered_mol = mol.remap(atom_map)
+                    # Make a temporary copy of the parent mol for conformer alignment and deduplication
+                    temp_mol = copy.deepcopy(orig_mol)
+                    temp_mol.add_conformer(reordered_mol.conformers[0])
+                    aligned_mol, rmslist = align_offmol_conformers(temp_mol)
+                    # Don't trust rmslist above for deduplication -- It doesn't take into
+                    # account multiple atom mappings
+                    confs_to_delete = greedy_conf_deduplication(temp_mol,
+                                                                0.1)
+                    if len(confs_to_delete) > 0:
+                        msg = f'Duplicate molecule conformer input detected.\n'
+                        msg += f'{molecule_3d_file}:{mol_index} has an RMSD within 0.1 A '
+                        msg += f'to the molecule originally loaded from '
+                        msg += f'{orig_mol.properties["original_files"]}:{orig_mol.properties["original_file_indices"]}'
+                        logging.warning(msg)
+                        temp_mol._conformers = [temp_mol.conformers[-1]]
+                        error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, msg))
+                        continue
+                    # Append the most recent file info to the provenance properties
+                    # These properties will be in the same order as the molecule's conformers.
+                    temp_mol.properties['original_files'].append(molecule_3d_file)
+                    temp_mol.properties['original_file_indices'].append(mol_index)
+                    temp_mol.properties['original_names'].append(mol.name)
 
+                    smiles2mol[smiles] = temp_mol
+
+                # If this graph molecule ISN'T already known, then add
+                # this representation as a new molecule
+                else:
+                    # Keep a record of the context from which this was loaded
+                    mol.properties['original_files'] = [molecule_3d_file]
+                    mol.properties['original_file_indices'] = [mol_index]
+                    mol.properties['original_names'] = [mol.name]
+                    mol.name = None
+                    smiles2mol[smiles] = mol                
+            except Exception as e:
+                error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, e))
     
     # Assign names and write out files
     # Preserve a mapping of input filename/mol index to output name
