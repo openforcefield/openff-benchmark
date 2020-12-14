@@ -161,7 +161,7 @@ BBB""" in file_text
             assert len(output_files) == 12
 
     # multi file multi mol duplicates (ok)
-    pytest.mark.xfail    
+    @pytest.mark.xfail    
     def test_multi_file_multi_mol_duplicates(self, tmpdir):
         with tmpdir.as_cwd():
             #raise Exception(inspect.stack()[0])
