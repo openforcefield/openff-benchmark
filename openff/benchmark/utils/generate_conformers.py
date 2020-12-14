@@ -7,6 +7,7 @@ import logging
 from rdkit import Chem
 from simtk import unit
 import numpy as np
+from tqdm import tqdm
 
 off_logger = logging.getLogger('openforcefield.utils.toolkits')
 prev_log_level = off_logger.getEffectiveLevel()
@@ -27,6 +28,7 @@ for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
 if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
+RMS_MATRIX_CACHE = {}
 
 def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
     """
@@ -45,12 +47,33 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
         The indices of conformers that will be deleted by this cutoff
     
     """
-    rdmol = offmol.to_rdkit()
+    # Try to pull the rms matrix out of the cache. Calculate it if it doesn't yet exist
+    mol_hash = hash(str(offmol.to_dict()))
+    #print('a', rms_cutoff)
+    if mol_hash not in RMS_MATRIX_CACHE:
+        rdmol = offmol.to_rdkit()
+        rdmol = Chem.RemoveHs(rdmol)
+        rms_matrix = np.zeros((rdmol.GetNumConformers(), rdmol.GetNumConformers()))
+        for i in range(rdmol.GetNumConformers()):
+            for j in range(i+1, rdmol.GetNumConformers()):
+                #print(i,j)
+                rmsd = Chem.rdMolAlign.CalcRMS(rdmol,
+                                               rdmol,
+                                               prbId=j,
+                                               refId=i)
+                rms_matrix[i,j] = rmsd
+                rms_matrix[j,i] = rmsd
+        RMS_MATRIX_CACHE[mol_hash] = rms_matrix
+    else:
+        rms_matrix = RMS_MATRIX_CACHE[mol_hash]
+        
     if user_confs == None:
         user_confs = []
+    #print('b')
+    # Do greedy deduplication
     i = 0
     confs_to_delete = set()
-    while i < rdmol.GetNumConformers():
+    while i < offmol.n_conformers:
         if i not in confs_to_delete:
             #rmslist = []
             #Chem.rdMolAlign.AlignMolConformers(rdmol, RMSlist=rmslist)
@@ -63,14 +86,11 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
                 #    confs_to_delete.add(compare_idx)
             
             # Use CalcRMS because alignMol doesn't try multiple atom mappings
-            for j in range(i+1, rdmol.GetNumConformers()):
-                rmsd = Chem.rdMolAlign.CalcRMS(rdmol,
-                                               rdmol,
-                                               prbId=j,
-                                               refId=i)
+            for j in range(i+1, offmol.n_conformers):
+                rmsd = rms_matrix[i,j]
                 if (rmsd < rms_cutoff) and (j not in user_confs):
                     confs_to_delete.add(j)
-        rdmol.RemoveConformer(i)        
+        #rdmol.RemoveConformer(i)        
         i += 1
     return confs_to_delete
 
@@ -92,7 +112,7 @@ def align_offmol_conformers(offmol):
 
 def gen_confs_preserving_orig_confs(conformer_mols, 
                                     target_n_confs=10, 
-                                    min_rmsd=1.5, 
+                                    min_rmsd=2, 
                                     rmsd_step=0.1):
     """
     Parameters
@@ -143,8 +163,9 @@ def gen_confs_preserving_orig_confs(conformer_mols,
         mol.add_conformer(conformer_mols[conf_idx].conformers[0])
     
     # Generate a large number of candidate conformers
-    mol.generate_conformers(n_conformers=10 * target_n_confs,
-                            rms_cutoff=min_rmsd * unit.angstrom,
+    mol.generate_conformers(n_conformers=5 * target_n_confs,
+                            # Multiply by 1.5 because this RMSD include hydrogens
+                            rms_cutoff=min_rmsd * 1.5 * unit.angstrom, 
                             clear_existing=False)
     
     mol, rmslist = align_offmol_conformers(mol)
@@ -226,25 +247,44 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
         #raise Exception((group_id, mol_id))
 
     # Generate new conformers
-    error_mols = []
+    print('Generating new conformers')
+
+    # TODO: Make tests for error logic
+    error_dir = os.path.join(output_directory, 'error_mols')
+    os.makedirs(error_dir)
+
     sorted_group_ids = sorted(list(group2idx2mols2confs.keys()))
     for group_id in sorted_group_ids:
+        print(f'Processing group {group_id}')
         sorted_mol_ids = sorted(list(group2idx2mols2confs[group_id].keys()))
-        for mol_idx in sorted_mol_ids:
+        for mol_idx in tqdm(sorted_mol_ids):
             try:
                 conf_dict = group2idx2mols2confs[group_id][mol_idx]
                 output_confs = gen_confs_preserving_orig_confs(conf_dict,
                                                                target_n_confs=10,
-                                                               min_rmsd=2)
+                                                               min_rmsd=1)
                 group2idx2mols2confs[group_id][mol_idx] = output_confs
             except Exception as e:
-                error_mols.append((group_id, mol_idx), e)
+                logging.info(f'Error [{e}] for molecule {mol_id}. Writing to error_mols')
+                mol_id = f'{group_id}-{mol_idx}'
+                try:
+                    for conf_idx in group2idx2mols2confs[group_id][mol_idx]:
+                        conf_file = f'{mol_id}-{int(conf_idx):02d}.sdf'
+                        conf_mol = group2idx2mols2confs[group_id][mol_idx][conf_idx]
+                        conf_mol.to_file(os.path.join(error_dir, conf_file), file_format='sdf')
+                except Exception as e2:
+                    logging.info(f'Unable to write all error structures to file. Encountered error [{e}]')
+                    e = str(e) + '\n' + str(e2)
+                    
+                with open(os.path.join(error_dir, f'{mol_id}.txt'), 'w') as of:
+                    of.write(str(e))
                 del group2idx2mols2confs[group_id][mol_idx]
+                continue
             # TODO: Add tqdm progress bar
 
     # Write outputs
-    for group_id in group2idx2mols2confs:
-        for mol_idx in group2idx2mols2confs[group_id]:
+    #for group_id in group2idx2mols2confs:
+    #    for mol_idx in group2idx2mols2confs[group_id]:
             for conf_idx in group2idx2mols2confs[group_id][mol_idx]:
                 mol_name = f'{group_id}-{int(mol_idx):05d}'
                 this_conf = group2idx2mols2confs[group_id][mol_idx][conf_idx]
@@ -256,12 +296,6 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
                 out_file_name = f'{this_conf.name}-{int(conf_idx):02d}.sdf'
                 this_conf.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
 
-    # TODO: Make tests for error logic
-    error_dir = os.path.join(output_directory, 'error_mols')
-    os.makedirs(error_dir)
-    for (group_id, mol_idx), e in error_mols:
-        mol_id = f'{group_id}-{mol_idx}'
-        with open(os.path.join(error_dir, f'{mol_id}.txt'), 'w') as of:
-            of.write(str(e))
+    #for (group_id, mol_idx), e in error_mols:
 
         

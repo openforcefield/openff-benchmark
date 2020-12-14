@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import glob
 import os
 import logging
@@ -34,8 +35,26 @@ def validate_and_assign(#input_graph_files,
                         output_directory='1-validate_and_assign',
                         delete_existing=False):
     """
-    Load a molecule dataset from SDF, validate it for common 
-    issues, and assign it unique identifiers.
+    Validate and assign identifiers to molecules.
+
+    This command preprocesses, validates, and creates a naming system for molecules that will be submitted to the benchmarking workflow. 
+
+    This command takes 3D molecules in SDF format and a three-character "group name" as input. 
+    It produces a directory containing:
+      * validated molecules named "GGG-MMMMM-CC.sdf", where G is the group name, M is the molecule ID, and C is the conformer index
+    At least one 3D geometry of each molecule must be provided.
+    The "group name" becomes the first three characters of the validated file names. 
+    Multiple confomers of the same molecule will be automatically detected and grouped under a single molecule ID.
+    The definition of "identical molecule" is whether RDKit assigns them the same canonical, isomeric, explicit hydrogen SMILES. 
+    When molecules are grouped, their RMSD (accounting for symmetry automorphs) is tested. 
+    If two inputs are within 0.1 A by RMSD, the second is considered an error and is removed from the workflow.
+    SD data pairs and molecule names are stripped from the input molecules.
+    The order of atoms may change during this step.
+    
+    
+    This command also attempts to detect technical issues that could prevent the files from working with the OpenFF toolkit. Files that will cause problems in subsequent steps are routed to the "error_mols" subdirectory of the output directory. Where possible, these cases write both an SDF file of the molecule (with key-value paris indicating the file the structure came from), and a correspondingly-named txt file containing more details about the error.
+
+    When complete, a mapping from input molecule name/file/index to benchmarking ID will be provided in the name_assignments.csv file in the output directory.
     """
     
     try:
@@ -57,7 +76,9 @@ def validate_and_assign(#input_graph_files,
 
             
     # Handle 3d molecules
+    print('Reading input files and validating structures')
     for molecule_3d_file in input_3d_files:
+        print(f"Reading {molecule_3d_file}")
         toolkit_logger = logging.getLogger('openforcefield.utils.toolkits')
         prev_log_level = toolkit_logger.getEffectiveLevel()
         toolkit_logger.setLevel(logging.ERROR)
@@ -69,8 +90,8 @@ def validate_and_assign(#input_graph_files,
         toolkit_logger.setLevel(prev_log_level)
         if not isinstance(loaded_mols, list):
             loaded_mols = [loaded_mols]
-
-        for mol_index, mol in enumerate(loaded_mols):
+        print("Validating contents")
+        for mol_index, mol in tqdm(enumerate(loaded_mols)):
             # Simulate a SDF file roundtrip to check for errors such as undefined stereochemistry
             try:
                 sio = io.StringIO()
@@ -141,7 +162,8 @@ def validate_and_assign(#input_graph_files,
     # Assign names and write out files
     # Preserve a mapping of input filename/mol index to output name
     name_assignments = []
-    for unique_mol_index, smiles in enumerate(smiles2mol.keys()):
+    print("Assigning IDs and writing out validated files")
+    for unique_mol_index, smiles in tqdm(enumerate(smiles2mol.keys())):
         mol_name = f'{group_name}-{unique_mol_index:05d}'
         smiles2mol[smiles].properties['group_name'] = group_name
         smiles2mol[smiles].properties['molecule_index'] = unique_mol_index
