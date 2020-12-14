@@ -133,7 +133,6 @@ def execute(input_path, output_directory, season, ncores, delete_existing, keep_
     dataset_name='Benchmark Scratch'
 
     def handle_signal(sig, frame):
-        print('stopping!')
         optexec.stop = True
         #server_uri = server.get_address()
 
@@ -151,7 +150,6 @@ def execute(input_path, output_directory, season, ncores, delete_existing, keep_
             server, input_path, output_directory, season,
             delete_existing=delete_existing, keep_existing=keep_existing)
 
-    print('stopping server')
     server.stop()
 
 

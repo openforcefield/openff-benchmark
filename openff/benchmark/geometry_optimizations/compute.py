@@ -263,18 +263,6 @@ class OptimizationExecutor:
                 break
             sleep(10)
     
-        print('last export')
         # one final export, just in case some completed since last write
         self.export_molecule_data(server_uri, output_directory, dataset_name=dataset_name, 
                 delete_existing=False, keep_existing=True)
-        server.stop()
-        print('finished last export')
-
-    @staticmethod
-    def _get_server_status(server):
-        from qcfractal.snowflake import FractalSnowflakeHandler
-    
-        if isinstance(server, FractalSnowflakeHandler):
-            return server._running
-        else:
-            return server._active
