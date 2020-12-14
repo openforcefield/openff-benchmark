@@ -51,10 +51,11 @@ def optimize():
 @click.option('--season', required=True)
 @click.argument('input-path', nargs=-1)
 def submit_molecules(server_uri, input_path, season, dataset_name):
-    from .geometry_optimizations import compute as optcompute
-    optcompute.submit_molecules(
-            server_uri, input_path, season, dataset_name)
+    from .geometry_optimizations.compute import OptimizationExecutor
 
+    optexec = OptimizationExecutor()
+    optexec.submit_molecules(
+            server_uri, input_path, season, dataset_name)
 
 @optimize.command()
 def submit_compute(server_uri, input_path):
@@ -69,7 +70,7 @@ def submit_compute(server_uri, input_path):
 @click.option('-o', '--output-directory', default='3-export-compute')
 def export(server_uri, output_directory, dataset_name, delete_existing, keep_existing):
     import os
-    from .geometry_optimizations import compute as optcompute
+    from .geometry_optimizations.compute import OptimizationExecutor
 
     if keep_existing and delete_existing:
         raise ValueError("Cannot use both `--delete-existing` and `--keep-existing`; choose one or neither.")
@@ -77,18 +78,19 @@ def export(server_uri, output_directory, dataset_name, delete_existing, keep_exi
     if not (delete_existing or keep_existing) and os.path.exists(output_directory):
         raise ValueError(f"Output directory {output_directory} exists; specify `--delete-existing` `--keep-existing` to proceed.")
 
-
-    optcompute.export_molecule_data(
+    optexec = OptimizationExecutor()
+    optexec.export_molecule_data(
             server_uri, output_directory, dataset_name, delete_existing, keep_existing)
 
 @optimize.command()
 @click.option('--server-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
 def status(server_uri, dataset_name):
-    from .geometry_optimizations import compute as optcompute
-    optdf = optcompute.get_optimization_status(server_uri, dataset_name)
-    print(optdf.applymap(lambda x: x.status.value))
+    from .geometry_optimizations.compute import OptimizationExecutor
 
+    optexec = OptimizationExecutor()
+    optdf = optexec.get_optimization_status(server_uri, dataset_name)
+    print(optdf.applymap(lambda x: x.status.value))
 
 @optimize.command()
 @click.option('--mode',
@@ -115,14 +117,40 @@ def execute_from_server():
 @click.option('-o', '--output-directory', default='3-export-compute')
 @click.argument('input-path', nargs=-1)
 def execute(input_path, output_directory, season, ncores, delete_existing, keep_existing):
-    from .geometry_optimizations import compute as optcompute
+    import signal
+
+    from qcfractal import FractalSnowflakeHandler
+
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
 
     if keep_existing and delete_existing:
         raise ValueError("Cannot use both `--delete-existing` and `--keep-existing`; choose one or neither.")
 
-    optcompute.execute_optimization_from_molecules(
-            input_path, output_directory, season, ncores=ncores, delete_existing=delete_existing,
-            keep_existing=keep_existing)
+    # start up Snowflake
+    server = FractalSnowflakeHandler(ncores=ncores)
+    dataset_name='Benchmark Scratch'
+
+    def handle_signal(sig, frame):
+        optexec.stop = True
+        #server_uri = server.get_address()
+
+        ## one final export of data
+        #optcompute.export_molecule_data(server_uri, output_directory,
+        #        dataset_name=dataset_name, delete_existing=False, keep_existing=True)
+
+        ## stop server
+        #server.stop()
+
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
+
+    optexec.execute_optimization_from_molecules(
+            server, input_path, output_directory, season,
+            delete_existing=delete_existing, keep_existing=keep_existing)
+
+    server.stop()
 
 
 @cli.group()
