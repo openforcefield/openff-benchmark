@@ -8,12 +8,21 @@ These components leverage the QCArchive software stack for execution.
 import os
 import shutil
 import logging
+from collections import defaultdict
 logging.disable(logging.WARNING) 
 
 from qcportal import FractalClient
 
 from .seasons import SEASONS
 from ..utils.io import mols_from_paths
+
+
+def _mol_to_id(mol):
+    id = "{org}-{molecule:05}-{conformer:02}".format(
+            org=mol.properties['group_name'],
+            molecule=mol.properties['molecule_index'],
+            conformer=mol.properties['conformer_index'])
+    return id
 
 
 def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Optimizations", 
@@ -37,15 +46,14 @@ def submit_molecules(server_uri, input_paths, season, dataset_name="Benchmark Op
     # extract molecules from SDF inputs
     mols = mols_from_paths(input_paths)
 
+    # TODO: check existence of dataset, consult with JH on best way to add to existing
+
     # create OptimizationDataset with QCSubmit
     ds = OptimizationDataset(dataset_name=dataset_name)
     factory = OptimizationDatasetFactory()
 
     for mol in mols:
-        id = "{org}-{molecule:05}-{conformer:02}".format(
-                org=mol.properties['group_name'],
-                molecule=mol.properties['molecule_index'],
-                conformer=mol.properties['conformer_index'])
+        id = _mol_to_id(mol)
 
         attributes = factory.create_cmiles_metadata(mol)
         ds.add_molecule(index=id, molecule=mol, attributes=attributes)
@@ -74,7 +82,7 @@ def _mol_from_qcserver(record):
 
 
 def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark Optimizations",
-                         delete_existing=False):
+                         delete_existing=False, keep_existing=False):
     """Export all molecule data from target QCFractal server to the given directory.
 
     Parameters
@@ -105,20 +113,42 @@ def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark O
     except OSError:
         if delete_existing:
             shutil.rmtree(output_directory)
+        elif keep_existing:
+            pass
         else:
             raise Exception(f'Output directory {output_directory} already exists. '
-                             'Specify `delete_existing=True` to remove.')
+                             'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
 
     # for each compute spec, create a folder in the output directory
     # deposit SDF giving final molecule, energy
     specs = optds.list_specifications().index.tolist()
     for spec in specs:
-        os.makedirs(os.path.join(output_directory, spec))
+        os.makedirs(os.path.join(output_directory, spec), exist_ok=True)
         optentspec = optds.get_specification(spec)
 
         records = optds.data.dict()['records']
 
         for id, opt in optds.df[spec].iteritems():
+
+            # skip incomplete cases
+            if opt.status != 'COMPLETE':
+                continue
+
+            # fix to ensure output fidelity of ids; losing 02 padding on conformer
+            org, molecule, conformer = id.split('-')
+            output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
+                                                                    molecule=int(molecule),
+                                                                    conformer=int(conformer))
+
+            # subfolders for each compute spec, files named according to molecule ids
+            outfile = "{}.sdf".format(
+                    os.path.join(output_directory, spec, output_id))
+
+            # if we did not delete everything at the start and the path already exists,
+            # skip this one; reduces processing and writes to filesystem
+            if (not delete_existing) and os.path.exists(outfile):
+                continue
+
             mol = _mol_from_qcserver(records[id.lower()])
 
             # set conformer as final, optimized geometry
@@ -128,18 +158,13 @@ def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark O
                 )
             mol._add_conformer(geometry.in_units_of(unit.angstrom))
 
-            # fix to ensure output fidelity of ids; losing 02 padding on conformer
-            org, molecule, conformer = id.split('-')
-            id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
-                                                             molecule=int(molecule),
-                                                             conformer=int(conformer))
 
             # set molecule metadata
-            mol.name = id
+            mol.name = output_id
 
             (mol.properties['group_name'],
              mol.properties['molecule_index'],
-             mol.properties['conformer_index']) = id.split('-')
+             mol.properties['conformer_index']) = output_id.split('-')
 
             # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
             mol.properties['method'] = optentspec.qc_spec.method
@@ -150,9 +175,6 @@ def export_molecule_data(server_uri, output_directory, dataset_name="Benchmark O
             mol.properties['initial_energy'] = (opt.energies[0] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
             mol.properties['final_energy'] = (opt.energies[-1] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
 
-            # subfolders for each compute spec, files named according to molecule ids
-            outfile = "{}.sdf".format(
-                    os.path.join(output_directory, spec, id))
             mol.to_file(outfile, file_format='sdf')
 
 
@@ -181,8 +203,20 @@ def execute_optimization_from_server(molecule_id, push_complete=False):
     pass
 
 
-def execute_optimization_from_molecules(input_paths, output_directory, season,
-        ncores=1, delete_existing=False):
+def _source_specs_output_paths(input_paths, specs, output_directory):
+    mols = mols_from_paths(input_paths, sourcefile_keys=True)
+
+    in_out_path_map = defaultdict(list)
+    for sourcefile, mol in mols.items():
+        id = _mol_to_id(mol)
+        for spec in specs:
+            in_out_path_map[sourcefile].append("{}.sdf".format(os.path.join(output_directory, spec, id)))
+
+    return in_out_path_map
+
+
+def execute_optimization_from_molecules(
+        input_paths, output_directory, season, ncores=1, delete_existing=False, keep_existing=False):
     """Execute optimization from the given SDF molecules locally on this host.
 
     """
@@ -193,9 +227,11 @@ def execute_optimization_from_molecules(input_paths, output_directory, season,
     if os.path.isdir(output_directory):
         if delete_existing:
             shutil.rmtree(output_directory)
+        elif keep_existing:
+            pass
         else:
             raise Exception(f'Output directory {output_directory} already exists. '
-                             'Specify `delete_existing=True` to remove.')
+                             'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
 
     dataset_name = "Benchmark Scratch"
 
@@ -204,16 +240,33 @@ def execute_optimization_from_molecules(input_paths, output_directory, season,
     client = server.client()
     server_uri = server.get_address()
 
+    # get paths to submit, using output directory contents to inform choice
+    # for the given specs, if *any* expected output files are not present, we submit corresponding input file
+    if keep_existing:
+        in_out_path_map = _source_specs_output_paths(input_paths, SEASONS[season], output_directory)
+
+        input_paths = []
+        for input_file, output_files in in_out_path_map.items():
+            if not all(map(os.path.exists, output_files)):
+                input_paths.append(input_file)
+
     # submit molecules
     submit_molecules(server_uri, input_paths, season, dataset_name=dataset_name)
 
     while True:
         df = get_optimization_status(server_uri, dataset_name, client=client)
+
+        # write out what we can
+        export_molecule_data(server_uri, output_directory, dataset_name=dataset_name,
+                delete_existing=False, keep_existing=True)
+
+        # break if complete
         complete = df.applymap(lambda x: x.status.value == 'COMPLETE').sum().sum()
         total = df.size
         print(f"{complete}/{total} COMPLETE", end='\r')
-        if complete:
+        if complete == df.size:
             break
-        sleep(5)
+        sleep(10)
 
-    export_molecule_data(server_uri, output_directory, dataset_name=dataset_name)
+    export_molecule_data(server_uri, output_directory, dataset_name=dataset_name,
+            delete_existing=False, keep_existing=True)

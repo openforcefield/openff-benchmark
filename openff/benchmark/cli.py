@@ -9,6 +9,7 @@ import click
 def cli():
     pass
 
+
 @cli.group()
 def fractal():
     """Initialize and start a QCFractal server and managers.
@@ -34,6 +35,7 @@ def manager_init():
 def manager_start():
     from .fractal import fractal_manager_start
     fractal_manager_start()
+
 
 @cli.group()
 def optimize():
@@ -62,11 +64,22 @@ def submit_compute(server_uri, input_path):
 @click.option('--server-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
 @click.option('--delete-existing', is_flag=True)
+@click.option('--keep-existing', is_flag=True,
+              help="Keep using existing output directory if it exists, but do not rewrite results for IDs already present")
 @click.option('-o', '--output-directory', default='3-export-compute')
-def export(server_uri, output_directory, dataset_name, delete_existing):
+def export(server_uri, output_directory, dataset_name, delete_existing, keep_existing):
+    import os
     from .geometry_optimizations import compute as optcompute
+
+    if keep_existing and delete_existing:
+        raise ValueError("Cannot use both `--delete-existing` and `--keep-existing`; choose one or neither.")
+
+    if not (delete_existing or keep_existing) and os.path.exists(output_directory):
+        raise ValueError(f"Output directory {output_directory} exists; specify `--delete-existing` `--keep-existing` to proceed.")
+
+
     optcompute.export_molecule_data(
-            server_uri, output_directory, dataset_name, delete_existing)
+            server_uri, output_directory, dataset_name, delete_existing, keep_existing)
 
 @optimize.command()
 @click.option('--server-uri', default="localhost:7777")
@@ -95,13 +108,22 @@ def execute_from_server():
 @optimize.command()
 @click.option('--season', required=True)
 @click.option('--ncores', default=2)
-@click.option('--delete-existing', is_flag=True)
+@click.option('--delete-existing', is_flag=True,
+              help="Delete existing output directory if it exists")
+@click.option('--keep-existing', is_flag=True,
+              help="Keep using existing output directory if it exists, but do not recalculate results for IDs already present")
 @click.option('-o', '--output-directory', default='3-export-compute')
 @click.argument('input-path', nargs=-1)
-def execute(input_path, output_directory, season, ncores, delete_existing):
+def execute(input_path, output_directory, season, ncores, delete_existing, keep_existing):
     from .geometry_optimizations import compute as optcompute
+
+    if keep_existing and delete_existing:
+        raise ValueError("Cannot use both `--delete-existing` and `--keep-existing`; choose one or neither.")
+
     optcompute.execute_optimization_from_molecules(
-            input_path, output_directory, season, ncores=ncores, delete_existing=delete_existing)
+            input_path, output_directory, season, ncores=ncores, delete_existing=delete_existing,
+            keep_existing=keep_existing)
+
 
 @cli.group()
 def preprocess():
