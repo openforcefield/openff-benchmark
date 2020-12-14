@@ -68,9 +68,10 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
 
 
 def align_offmol_conformers(offmol):
+    from rdkit.Chem import rdMolAlign
     rdmol = offmol.to_rdkit()
     rmslist = []
-    Chem.rdMolAlign.AlignMolConformers(rdmol, RMSlist=rmslist)
+    rdMolAlign.AlignMolConformers(rdmol, RMSlist=rmslist)
     offmol = Molecule.from_rdkit(rdmol)
     return offmol, rmslist
     

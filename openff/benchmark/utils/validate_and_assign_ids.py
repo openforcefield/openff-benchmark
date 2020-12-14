@@ -3,6 +3,8 @@ import os
 import logging
 import io
 import shutil
+from openff.benchmark.utils.generate_conformers import align_offmol_conformers, greedy_conf_deduplication
+from rdkit import Chem
 
 logger = logging.getLogger('openforcefield.utils.toolkits')
 prev_log_level = logger.getEffectiveLevel()
@@ -35,13 +37,6 @@ def validate_and_assign(#input_graph_files,
 j    issues, and assign it unique identifiers.
     """
     
-    # Load all the graph molecules
-    #    delete conformers, if present
-    #    raise an error on any duplicates
-    # Load all the 3d molecules, see if they're identical to any 2d molecules
-    #    if not, make a new 2d molecule
-    #    if so, add the coordinates as a new molecule (performing an isomorphism)
-
     try:
         os.makedirs(output_directory)
     except OSError:
@@ -52,79 +47,13 @@ j    issues, and assign it unique identifiers.
             raise Exception(f'Output directory {output_directory} already exists. '
                              'Specify `delete_existing=True` to remove.')
     
-    # Write all molecules to .smi files
-    # Write all conformers to 3D sdfs with numerical conformer
 
     smiles2mol = {}
     error_mols = []
 
-    # Handle graph molecules
-    #molecule_graph_files = glob.glob(input_graph_files)
-    
-    # for molecule_graph_file in input_graph_files:
-
-    #     # TODO: Have an option for permissive stereochemistry?
-    #     logger = logging.getLogger('openforcefield.utils.toolkits')
-    #     prev_log_level = logger.getEffectiveLevel()
-    #     logger.setLevel(logging.ERROR)
-
-    #     loaded_mols = mols_from_paths([molecule_graph_file])
-    #     #loaded_mols = Molecule.from_file(molecule_graph_file,
-    #     #                                 file_format='sdf',
-    #     #                                 allow_undefined_stereo=True)
-    #     logger.setLevel(prev_log_level)
-    #     if not isinstance(loaded_mols, list):
-    #         loaded_mols = [loaded_mols]
-            
-    #     # Process each graph molecule and check for duplicates
-    #     for mol_index, mol in enumerate(loaded_mols):
-    #         # Check for errors such as undefined stereochemistry
-    #         try:
-    #             sio = io.StringIO()
-    #             mol.to_file(sio, file_format='sdf')
-    #             sio.seek(0)
-    #             bio = io.BytesIO(sio.read().encode('utf8'))
-    #             Molecule.from_file(bio, file_format='sdf')
-    #         except Exception as e:
-    #             error_mols.append((f'{molecule_graph_file}:{mol_index}', mol, e))
-    #             continue
-                
-    #         # Sanitize any unwanted original information
-    #         mol.name = None
-    #         keys = list(mol.properties.keys())
-    #         for key in keys:
-    #             mol.properties.pop(key)
-    #         mol.partial_charges = None
-    #         # Since this is a graph molecule input, clear any conformers
-    #         mol._conformers = []
-            
-    #         # Keep a record of the context from which this was loaded
-    #         mol.properties['original_file'] = molecule_graph_file
-    #         mol.properties['original_file_index'] = mol_index + 1
-
-    #         # Check whether this is a duplicate
-    #         smiles = mol.to_smiles()
-    #         if smiles in smiles2mol:
-    #             try:
-    #                 other_mol = smiles2mol[smiles]
-    #                 other_file = other_mol.properties['original_file']
-    #                 other_index = other_mol.properties['original_file_index']
-    #                 msg = 'Duplicate graph molecule detected:\n'
-    #                 msg += f'Molecule {other_index}: {other_mol}\n'
-    #                 msg += f'Molecule {mol_index}: {mol}'
-    #                 raise Exception(msg)
-    #             except Exception as e:
-    #                 error_mols.append((f'{molecule_graph_file}:{mol_index}', mol, e))
-    #                 #error_mols.append((molecule_graph_file, mol, e))
-    #                 continue
-                
-    #         smiles2mol[smiles] = mol
-                 
             
     # Handle 3d molecules
-    #molecule_3d_files = glob.glob(input_3d_files)
     for molecule_3d_file in input_3d_files:
-        # TODO: Squalch warnings
         logger = logging.getLogger('openforcefield.utils.toolkits')
         prev_log_level = logger.getEffectiveLevel()
         logger.setLevel(logging.ERROR)
@@ -138,7 +67,7 @@ j    issues, and assign it unique identifiers.
             loaded_mols = [loaded_mols]
 
         for mol_index, mol in enumerate(loaded_mols):
-            # Check for errors such as undefined stereochemistry
+            # Simulate a SDF file roundtrip to check for errors such as undefined stereochemistry
             try:
                 sio = io.StringIO()
                 mol.to_file(sio, file_format='sdf')
@@ -174,7 +103,21 @@ j    issues, and assign it unique identifiers.
                                                       #bond_stereochemistry_matching=False,
                                                       )
                 reordered_mol = mol.remap(atom_map)
-                smiles2mol[smiles].add_conformer(reordered_mol.conformers[0])
+                # Make a temporary copy of the parent mol for conformer alignment and deduplication
+                temp_mol = Molecule(orig_mol)
+                temp_mol.add_conformer(reordered_mol.conformers[0])
+                temp_mol, rmslist = align_offmol_conformers(temp_mol)
+                confs_to_delete = greedy_conf_deduplication(temp_mol,
+                                                            0.1)
+                if len(confs_to_delete) > 0:
+                    msg = f'Duplicate molecule conformer input detected.\n'
+                    msg += f'{molecule_3d_file}:{mol_index} has an RMSD within 0.01 A '
+                    msg += f'to the molecule originally loaded from '
+                    msg += f'{orig_mol.properties["original_file"]}:{orig_mol.properties["original_file_index"]}'
+                    logging.warning(msg)
+                    error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, msg))
+                    continue
+                smiles2mol[smiles] = temp_mol
                 
                 # TODO: Deduplicate identical geometries
                 
@@ -183,7 +126,6 @@ j    issues, and assign it unique identifiers.
             else:
                 smiles2mol[smiles] = mol                
                 
-    
     # Assign names and write out files
     for unique_mol_index, smiles in enumerate(smiles2mol.keys()):
         mol_name = f'{group_name}-{unique_mol_index:05d}'
@@ -221,7 +163,9 @@ j    issues, and assign it unique identifiers.
         try:
             error_mol.to_file(output_mol_file, file_format='sdf')
         except Exception as e:
-            exception = str(exception) + str(e)
+            exception = str(exception)
+            exception += "\n Then failed when trying to write mol to error directory with "
+            exception += str(e)
         output_summary_file = os.path.join(error_dir, f'error_mol_{idx}.txt')
         with open(output_summary_file, 'w') as of:
             of.write(f'source: {filename}\n')
