@@ -11,33 +11,6 @@ def cli():
 
 
 @cli.group()
-def fractal():
-    """Initialize and start a QCFractal server and managers.
-
-    """
-    pass
-
-@fractal.command()
-def server_init():
-    from .fractal import fractal_server_init
-    fractal_server_init()
-
-@fractal.command()
-def server_start():
-    from .fractal import fractal_server_start
-    fractal_server_start()
-
-@fractal.command()
-def manager_init():
-    pass
-
-@fractal.command()
-def manager_start():
-    from .fractal import fractal_manager_start
-    fractal_manager_start()
-
-
-@cli.group()
 def optimize():
     """Execute benchmarking geometry optimizations.
 
@@ -86,11 +59,29 @@ def export(server_uri, output_directory, dataset_name, delete_existing, keep_exi
 @click.option('--server-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
 def status(server_uri, dataset_name):
+    import pandas as pd
     from .geometry_optimizations.compute import OptimizationExecutor
 
     optexec = OptimizationExecutor()
     optdf = optexec.get_optimization_status(server_uri, dataset_name)
+
+    pd.options.display.max_rows = len(optdf)
+
     print(optdf.applymap(lambda x: x.status.value))
+
+@optimize.command()
+@click.option('--server-uri', default="localhost:7777")
+@click.option('--dataset-name', required=True)
+@click.argument('priority', nargs=1)
+def set_priority(server_uri, dataset_name, priority):
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    if priority not in ('high', 'normal', 'low'):
+        raise ValueError("PRIORITY must be one of 'high', 'normal', or 'low'")
+
+    optexec = OptimizationExecutor()
+    optexec.set_optimization_priority(server_uri, priority, dataset_name)
+
 
 @optimize.command()
 @click.option('--mode',

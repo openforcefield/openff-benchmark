@@ -162,7 +162,6 @@ class OptimizationExecutor:
                     )
                 mol._add_conformer(geometry.in_units_of(unit.angstrom))
     
-    
                 # set molecule metadata
                 mol.name = output_id
     
@@ -190,7 +189,24 @@ class OptimizationExecutor:
     
         optds = client.get_collection("OptimizationDataset", dataset_name)
         optds.status()
-        return optds.df
+        return optds.df.sort_index(ascending=True)
+
+    def set_optimization_priority(self, server_uri, priority, dataset_name="Benchmark Optimizations"):
+        from qcportal.models.task_models import PriorityEnum
+
+        client = FractalClient(server_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+        opts = optds.df.values.flatten()
+
+        priority_map = {"high": PriorityEnum.HIGH,
+                        "normal": PriorityEnum.NORMAL,
+                        "low": PriorityEnum.LOW}
+
+        for opt in opts:
+            client.modify_tasks(operation='modify', base_result=opt.id, new_priority=priority_map[priority])
+
     
     def errorcycle_optimizations(self, server_uri):
         """Error cycle optimizations that have failed.
