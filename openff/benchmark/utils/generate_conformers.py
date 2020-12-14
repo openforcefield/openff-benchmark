@@ -52,16 +52,24 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
     confs_to_delete = set()
     while i < rdmol.GetNumConformers():
         if i not in confs_to_delete:
-            # TODO: Always keep user inputs
-            rmslist = []
-            Chem.rdMolAlign.AlignMolConformers(rdmol, RMSlist=rmslist)
+            #rmslist = []
+            #Chem.rdMolAlign.AlignMolConformers(rdmol, RMSlist=rmslist)
             #print(rmslist)
-            for idx, rmsd in enumerate(rmslist):
+            #for idx, rmsd in enumerate(rmslist):
                 # +1 because the reference conf is not included in the rmslist
                 # so when i is 0 and idx is 0, the first entry in rmslist is actually conf 1
-                compare_idx = i + idx + 1 
-                if (rmsd < rms_cutoff) and (compare_idx not in user_confs):
-                    confs_to_delete.add(compare_idx)
+                #compare_idx = i + idx + 1 
+                #if (rmsd < rms_cutoff) and (compare_idx not in user_confs):
+                #    confs_to_delete.add(compare_idx)
+            
+            # Use CalcRMS because alignMol doesn't try multiple atom mappings
+            for j in range(i+1, rdmol.GetNumConformers()):
+                rmsd = Chem.rdMolAlign.CalcRMS(rdmol,
+                                               rdmol,
+                                               prbId=j,
+                                               refId=i)
+                if (rmsd < rms_cutoff) and (j not in user_confs):
+                    confs_to_delete.add(j)
         rdmol.RemoveConformer(i)        
         i += 1
     return confs_to_delete
@@ -72,8 +80,14 @@ def align_offmol_conformers(offmol):
     rdmol = offmol.to_rdkit()
     rmslist = []
     rdMolAlign.AlignMolConformers(rdmol, RMSlist=rmslist)
-    offmol = Molecule.from_rdkit(rdmol)
-    return offmol, rmslist
+    offmol2 = Molecule.from_rdkit(rdmol)
+    # The RDKit roundtrip above may have messed with the properties dict,
+    # so transfer all the aligned confs to a copy of the original mol.
+    return_mol = Molecule(offmol)
+    return_mol._conformers = []
+    for aligned_conf in offmol2.conformers:
+        return_mol.add_conformer(aligned_conf)
+    return return_mol, rmslist
     
 
 def gen_confs_preserving_orig_confs(conformer_mols, 
@@ -181,7 +195,6 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
                              'Specify `delete_existing=True` to remove.')
 
     logging.basicConfig(filename=os.path.join(output_directory,'log.txt'),
-                        #encoding='utf-8',
                         level=logging.DEBUG)
 
     input_3d_files = glob.glob(os.path.join(input_directory,'*.sdf'))
