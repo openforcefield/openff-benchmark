@@ -1,5 +1,6 @@
 import glob
 import os
+import copy
 import re
 from simtk import unit
 import shutil
@@ -103,7 +104,7 @@ def align_offmol_conformers(offmol):
     offmol2 = Molecule.from_rdkit(rdmol)
     # The RDKit roundtrip above may have messed with the properties dict,
     # so transfer all the aligned confs to a copy of the original mol.
-    return_mol = Molecule(offmol)
+    return_mol = copy.deepcopy(offmol)
     return_mol._conformers = []
     for aligned_conf in offmol2.conformers:
         return_mol.add_conformer(aligned_conf)
@@ -157,7 +158,7 @@ def gen_confs_preserving_orig_confs(conformer_mols,
     n_user_confs = len(conformer_mols)
     
     # Make a single offmol with all conformers 
-    mol = Molecule(conformer_mols['00'])
+    mol = copy.deepcopy(conformer_mols['00'])
     sorted_conf_idxs = sorted([i for i in conformer_mols.keys()])
     for conf_idx in sorted_conf_idxs[1:]:
         mol.add_conformer(conformer_mols[conf_idx].conformers[0])
@@ -192,7 +193,7 @@ def gen_confs_preserving_orig_confs(conformer_mols,
     confs_to_write = [i for i in range(mol.n_conformers) if i not in confs_to_delete]
     logging.info(f'conformers to write are {confs_to_write}')
     for output_conf_index, generated_conf_index in enumerate(confs_to_write):
-        new_mol = Molecule(mol)
+        new_mol = copy.deepcopy(mol)
         new_mol._conformers = []
         new_mol.add_conformer(mol.conformers[generated_conf_index])
         new_mol.name = mol.name

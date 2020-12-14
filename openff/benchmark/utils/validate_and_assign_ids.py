@@ -102,7 +102,7 @@ def validate_and_assign(#input_graph_files,
                                                       )
                 reordered_mol = mol.remap(atom_map)
                 # Make a temporary copy of the parent mol for conformer alignment and deduplication
-                temp_mol = Molecule(orig_mol)
+                temp_mol = copy.deepcopy(orig_mol)
                 temp_mol.add_conformer(reordered_mol.conformers[0])
                 aligned_mol, rmslist = align_offmol_conformers(temp_mol)
                 # Don't trust rmslist above for deduplication -- It doesn't take into
@@ -146,7 +146,7 @@ def validate_and_assign(#input_graph_files,
         smiles2mol[smiles].properties['group_name'] = group_name
         smiles2mol[smiles].properties['molecule_index'] = unique_mol_index
         smiles2mol[smiles].name = mol_name
-        mol_copy = Molecule(smiles2mol[smiles])
+        mol_copy = copy.deepcopy(smiles2mol[smiles])
 
         # Pop off now-nonessential metadata
         mol_copy.properties.pop('original_files')
