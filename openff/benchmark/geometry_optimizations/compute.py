@@ -30,13 +30,13 @@ class OptimizationExecutor:
                 conformer=mol.properties['conformer_index'])
         return id
     
-    def submit_molecules(self, server_uri, input_paths, season, dataset_name="Benchmark Optimizations", 
+    def submit_molecules(self, fractal_uri, input_paths, season, dataset_name="Benchmark Optimizations", 
             replace=True):
         """Submit SDF molecules from given directory to the target QCFractal server.
     
         Parameters
         ----------
-        server_uri : str
+        fractal_uri : str
             Target QCFractal server URI.
         input_paths : iterable of Path-like
             Paths to SDF files or directories; if directories, all files SDF files in are loaded, recursively.
@@ -68,7 +68,7 @@ class OptimizationExecutor:
         ds.metadata.long_description_url = "https://localhost.local/null"
     
         logging.info("Submitting...")
-        client = FractalClient(server_uri, verify=False)
+        client = FractalClient(fractal_uri, verify=False)
         ds.submit(client=client)
         logging.info("Submitted!")
     
@@ -85,13 +85,13 @@ class OptimizationExecutor:
     
         return Molecule.from_qcschema(record)
     
-    def export_molecule_data(self, server_uri, output_directory, dataset_name="Benchmark Optimizations",
+    def export_molecule_data(self, fractal_uri, output_directory, dataset_name="Benchmark Optimizations",
                              delete_existing=False, keep_existing=False):
         """Export all molecule data from target QCFractal server to the given directory.
     
         Parameters
         ----------
-        server_uri : str
+        fractal_uri : str
             Target QCFractal server URI.
         output_directory : str
             Directory path to deposit exported data.
@@ -108,7 +108,7 @@ class OptimizationExecutor:
         punit = pint.UnitRegistry()
     
         # get dataset
-        client = FractalClient(server_uri, verify=False)
+        client = FractalClient(fractal_uri, verify=False)
         optds = client.get_collection("OptimizationDataset", dataset_name)
         optds.status()
     
@@ -180,21 +180,21 @@ class OptimizationExecutor:
     
                 mol.to_file(outfile, file_format='sdf')
     
-    def get_optimization_status(self, server_uri, dataset_name="Benchmark Optimizations", client=None):
+    def get_optimization_status(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None):
         """Get status of optimization for each molecule ID
     
         """
         if client is None:
-            client = FractalClient(server_uri, verify=False)
+            client = FractalClient(fractal_uri, verify=False)
     
         optds = client.get_collection("OptimizationDataset", dataset_name)
         optds.status()
         return optds.df.sort_index(ascending=True)
 
-    def set_optimization_priority(self, server_uri, priority, dataset_name="Benchmark Optimizations"):
+    def set_optimization_priority(self, fractal_uri, priority, dataset_name="Benchmark Optimizations"):
         from qcportal.models.task_models import PriorityEnum
 
-        client = FractalClient(server_uri, verify=False)
+        client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
         optds.status()
@@ -205,10 +205,11 @@ class OptimizationExecutor:
                         "low": PriorityEnum.LOW}
 
         for opt in opts:
-            client.modify_tasks(operation='modify', base_result=opt.id, new_priority=priority_map[priority])
+            if opt.status != 'COMPLETE':
+                client.modify_tasks(operation='modify', base_result=opt.id, new_priority=priority_map[priority])
 
     
-    def errorcycle_optimizations(self, server_uri):
+    def errorcycle_optimizations(self, fractal_uri):
         """Error cycle optimizations that have failed.
     
         """
@@ -249,7 +250,7 @@ class OptimizationExecutor:
                                  'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
     
         client = server.client()
-        server_uri = server.get_address()
+        fractal_uri = server.get_address()
     
         # get paths to submit, using output directory contents to inform choice
         # for the given specs, if *any* expected output files are not present, we submit corresponding input file
@@ -262,13 +263,13 @@ class OptimizationExecutor:
                     input_paths.append(input_file)
     
         # submit molecules
-        self.submit_molecules(server_uri, input_paths, season, dataset_name=dataset_name)
+        self.submit_molecules(fractal_uri, input_paths, season, dataset_name=dataset_name)
     
         while not self.stop:
-            df = self.get_optimization_status(server_uri, dataset_name, client=client)
+            df = self.get_optimization_status(fractal_uri, dataset_name, client=client)
     
             # write out what we can
-            self.export_molecule_data(server_uri, output_directory, dataset_name=dataset_name,
+            self.export_molecule_data(fractal_uri, output_directory, dataset_name=dataset_name,
                     delete_existing=False, keep_existing=True)
     
             # break if complete
@@ -280,5 +281,5 @@ class OptimizationExecutor:
             sleep(10)
     
         # one final export, just in case some completed since last write
-        self.export_molecule_data(server_uri, output_directory, dataset_name=dataset_name, 
+        self.export_molecule_data(fractal_uri, output_directory, dataset_name=dataset_name, 
                 delete_existing=False, keep_existing=True)

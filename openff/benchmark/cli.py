@@ -18,30 +18,30 @@ def optimize():
     pass
 
 @optimize.command()
-@click.option('--server-uri', default="localhost:7777")
+@click.option('--fractal-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
 #@click.option('--replace', is_flag=True)
 @click.option('--season', required=True)
 @click.argument('input-path', nargs=-1)
-def submit_molecules(server_uri, input_path, season, dataset_name):
+def submit_molecules(fractal_uri, input_path, season, dataset_name):
     from .geometry_optimizations.compute import OptimizationExecutor
 
     optexec = OptimizationExecutor()
     optexec.submit_molecules(
-            server_uri, input_path, season, dataset_name)
+            fractal_uri, input_path, season, dataset_name)
 
 @optimize.command()
-def submit_compute(server_uri, input_path):
+def submit_compute(fractal_uri, input_path):
     pass
 
 @optimize.command()
-@click.option('--server-uri', default="localhost:7777")
+@click.option('--fractal-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
 @click.option('--delete-existing', is_flag=True)
 @click.option('--keep-existing', is_flag=True,
               help="Keep using existing output directory if it exists, but do not rewrite results for IDs already present")
 @click.option('-o', '--output-directory', default='3-export-compute')
-def export(server_uri, output_directory, dataset_name, delete_existing, keep_existing):
+def export(fractal_uri, output_directory, dataset_name, delete_existing, keep_existing):
     import os
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -53,34 +53,34 @@ def export(server_uri, output_directory, dataset_name, delete_existing, keep_exi
 
     optexec = OptimizationExecutor()
     optexec.export_molecule_data(
-            server_uri, output_directory, dataset_name, delete_existing, keep_existing)
+            fractal_uri, output_directory, dataset_name, delete_existing, keep_existing)
 
 @optimize.command()
-@click.option('--server-uri', default="localhost:7777")
+@click.option('--fractal-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
-def status(server_uri, dataset_name):
+def status(fractal_uri, dataset_name):
     import pandas as pd
     from .geometry_optimizations.compute import OptimizationExecutor
 
     optexec = OptimizationExecutor()
-    optdf = optexec.get_optimization_status(server_uri, dataset_name)
+    optdf = optexec.get_optimization_status(fractal_uri, dataset_name)
 
     pd.options.display.max_rows = len(optdf)
 
     print(optdf.applymap(lambda x: x.status.value))
 
 @optimize.command()
-@click.option('--server-uri', default="localhost:7777")
+@click.option('--fractal-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
 @click.argument('priority', nargs=1)
-def set_priority(server_uri, dataset_name, priority):
+def set_priority(fractal_uri, dataset_name, priority):
     from .geometry_optimizations.compute import OptimizationExecutor
 
     if priority not in ('high', 'normal', 'low'):
         raise ValueError("PRIORITY must be one of 'high', 'normal', or 'low'")
 
     optexec = OptimizationExecutor()
-    optexec.set_optimization_priority(server_uri, priority, dataset_name)
+    optexec.set_optimization_priority(fractal_uri, priority, dataset_name)
 
 
 @optimize.command()
@@ -125,10 +125,10 @@ def execute(input_path, output_directory, season, ncores, delete_existing, keep_
 
     def handle_signal(sig, frame):
         optexec.stop = True
-        #server_uri = server.get_address()
+        #fractal_uri = server.get_address()
 
         ## one final export of data
-        #optcompute.export_molecule_data(server_uri, output_directory,
+        #optcompute.export_molecule_data(fractal_uri, output_directory,
         #        dataset_name=dataset_name, delete_existing=False, keep_existing=True)
 
         ## stop server
