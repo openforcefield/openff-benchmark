@@ -265,8 +265,8 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
                                                                min_rmsd=1)
                 group2idx2mols2confs[group_id][mol_idx] = output_confs
             except Exception as e:
-                logging.info(f'Error [{e}] for molecule {mol_id}. Writing to error_mols')
                 mol_id = f'{group_id}-{mol_idx}'
+                logging.info(f'Error [{e}] for molecule {mol_id}. Writing to error_mols')
                 try:
                     for conf_idx in group2idx2mols2confs[group_id][mol_idx]:
                         conf_file = f'{mol_id}-{int(conf_idx):02d}.sdf'
@@ -274,13 +274,12 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
                         conf_mol.to_file(os.path.join(error_dir, conf_file), file_format='sdf')
                 except Exception as e2:
                     logging.info(f'Unable to write all error structures to file. Encountered error [{e}]')
-                    e = str(e) + '\n' + str(e2)
+                    e = str(e) + '\n Then, when trying to write out the conformers:\n' + str(e2)
                     
                 with open(os.path.join(error_dir, f'{mol_id}.txt'), 'w') as of:
                     of.write(str(e))
                 del group2idx2mols2confs[group_id][mol_idx]
                 continue
-            # TODO: Add tqdm progress bar
 
     # Write outputs
     #for group_id in group2idx2mols2confs:
