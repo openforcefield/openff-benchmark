@@ -223,6 +223,29 @@ def generate_conformers(input_directory, output_directory, delete_existing):
     generate_conformers(input_directory,
                         output_directory,
                         delete_existing=delete_existing)
+
+
+@preprocess.command()
+@click.argument("input_directory")
+@click.argument("forcefield_name")
+@click.option("-o", "--output_directory",
+              default="3-coverage_report",
+              help="The directory for output files.")
+@click.option("-p", "--processors",
+              default=None,
+              type=click.INT)
+def coverage_report(input_directory, forcefield_name, output_directory, processors):
+    """
+    Generate a coverage report for the set of validated input molecules.
+    """
+    from openff.benchmark.utils.coverage_report import generate_coverage_report
+    import json
+    import os
+
+    report = generate_coverage_report(input_molecules=input_directory, forcefield_name=forcefield_name, processors=processors, output_directory=output_directory)
+    data = json.dumps(report, indent=2)
+    with open(os.path.join(output_directory, "coverage_report.json"), "w") as reporter:
+        reporter.write(data)
     
 if __name__ == "__main__":
     cli()
