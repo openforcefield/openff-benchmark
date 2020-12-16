@@ -74,6 +74,7 @@ def status(fractal_uri, dataset_name):
 @click.option('--dataset-name', required=True)
 @click.argument('priority', nargs=1)
 def set_priority(fractal_uri, dataset_name, priority):
+
     from .geometry_optimizations.compute import OptimizationExecutor
 
     if priority not in ('high', 'normal', 'low'):
@@ -109,6 +110,7 @@ def execute_from_server():
 @click.argument('input-path', nargs=-1)
 def execute(input_path, output_directory, season, ncores, delete_existing, keep_existing):
     import signal
+    import psutil
 
     from qcfractal import FractalSnowflakeHandler
 
@@ -125,14 +127,6 @@ def execute(input_path, output_directory, season, ncores, delete_existing, keep_
 
     def handle_signal(sig, frame):
         optexec.stop = True
-        #fractal_uri = server.get_address()
-
-        ## one final export of data
-        #optcompute.export_molecule_data(fractal_uri, output_directory,
-        #        dataset_name=dataset_name, delete_existing=False, keep_existing=True)
-
-        ## stop server
-        #server.stop()
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
@@ -140,6 +134,11 @@ def execute(input_path, output_directory, season, ncores, delete_existing, keep_
     optexec.execute_optimization_from_molecules(
             server, input_path, output_directory, season,
             delete_existing=delete_existing, keep_existing=keep_existing)
+
+    parent = psutil.Process(server._qcfractal_proc.pid)
+    for child in parent.children(recursive=True):
+        child.kill()
+    parent.kill()
 
     server.stop()
 
