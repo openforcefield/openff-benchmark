@@ -238,6 +238,8 @@ class OptimizationExecutor:
     
         """
         from time import sleep
+
+        from tqdm import trange
     
         # fail early if output_directory already exists and we aren't deleting it
         if os.path.isdir(output_directory):
@@ -264,7 +266,11 @@ class OptimizationExecutor:
     
         # submit molecules
         self.submit_molecules(fractal_uri, input_paths, season, dataset_name=dataset_name)
+
+        df = self.get_optimization_status(fractal_uri, dataset_name, client=client)
+        progbar = trange(df.size)
     
+        complete = 0
         while not self.stop:
             df = self.get_optimization_status(fractal_uri, dataset_name, client=client)
     
@@ -273,9 +279,11 @@ class OptimizationExecutor:
                     delete_existing=False, keep_existing=True)
     
             # break if complete
-            complete = df.applymap(lambda x: x.status.value == 'COMPLETE').sum().sum()
-            total = df.size
-            print(f"{complete}/{total} COMPLETE", end='\r')
+            complete_i = df.applymap(lambda x: x.status.value == 'COMPLETE').sum().sum()
+            progbar.update(complete_i-complete)
+            complete = complete_i
+            #total = df.size
+            #print(f"{complete}/{total} COMPLETE", end='\r')
             if complete == df.size:
                 break
             sleep(10)
