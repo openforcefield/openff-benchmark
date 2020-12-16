@@ -33,151 +33,6 @@ def test_dont_overwrite_output_directory(tmpdir):
                                 )
 
 
-# Graph inputs w/o conformers
-# class TestGraphInputsWOConformers:
-#     # single file single mol
-#     def test_single_file_single_mol(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_mols = [get_data_file_path('input_single_mol.sdf')]
-#             validate_and_assign(input_mols,
-#                                 '',
-#                                 'BBB',
-#                                 test_dir,
-#                                 )
-#             output_files = glob.glob(os.path.join(test_dir, '*'))
-#             output_files = [os.path.basename(fname) for fname in output_files]
-#             assert 'BBB-00000.smi' in output_files
-#             assert len(output_files) == 1
-        
-#     # single file multi mol
-#     def test_single_file_multi_mol(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             #raise Exception(inspect.stack()[0].function)
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_mols = [get_data_file_path('input_multi_mol.sdf')]
-#             validate_and_assign(input_mols,
-#                                 '',
-#                                 'BBB',
-#                                 test_dir,
-#                                 )
-#             output_files = glob.glob(os.path.join(test_dir, '*'))
-#             output_files = [os.path.basename(fname) for fname in output_files]
-#             assert 'BBB-00000.smi' in output_files
-#             assert 'BBB-00003.smi' in output_files
-#             assert len(output_files) == 4
-        
-#     # multi file single mol
-#     def test_multi_file_single_mol(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             #raise Exception(inspect.stack()[0].function)
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_mols = [get_data_file_path('input_single_mol.sdf'),
-#                           get_data_file_path('input_one_stereoisomer.sdf')]
-#             validate_and_assign(input_mols,
-#                                 '',
-#                                 'BBB',
-#                                 test_dir,
-#                                 )
-#             output_files = glob.glob(os.path.join(test_dir, '*'))
-#             output_files = [os.path.basename(fname) for fname in output_files]
-#             assert 'BBB-00000.smi' in output_files
-#             assert 'BBB-00001.smi' in output_files
-#             assert len(output_files) == 2
-        
-#     # multi file multi mol
-#     def test_multi_file_multi_mol(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             #raise Exception(inspect.stack()[0].function)
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_mols = [get_data_file_path('input_multi_mol.sdf'),
-#                           get_data_file_path('input_all_stereoisomers.sdf')]
-#             validate_and_assign(input_mols,
-#                                 '',
-#                                 'BBB',
-#                                 test_dir,
-#                                 )
-#             output_files = glob.glob(os.path.join(test_dir, '*'))
-#             output_files = [os.path.basename(fname) for fname in output_files]
-#             assert 'BBB-00000.smi' in output_files
-#             assert 'BBB-00011.smi' in output_files
-#             assert len(output_files) == 12
-        
-#     # single file multi mol duplicates (error)
-#     def test_single_file_multi_mol_duplicate_error(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             #raise Exception(inspect.stack()[0].function)
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_mols = [get_data_file_path('input_duplicates.sdf')]
-#             with pytest.raises(Exception, match='Duplicate'):
-#                 validate_and_assign(input_mols,
-#                                     '',
-#                                     'BBB',
-#                                     test_dir
-#                                     )
-            
-#     # multi file multi mol duplicates (error)
-#     def test_multi_file_multi_mol_duplicate_error(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             #raise Exception(inspect.stack()[0].function)
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_mols = [get_data_file_path('input_one_stereoisomer.sdf'),
-#                           get_data_file_path('input_all_stereoisomers.sdf')]
-#             with pytest.raises(Exception, match='Duplicate'):
-#                 validate_and_assign(input_mols,
-#                                     '',
-#                                     'BBB',
-#                                     test_dir,
-#                                     )
-            
-#     # input undefined stereochemistry (error)
-#     def test_undefined_stereochemistry(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             #raise Exception(inspect.stack()[0].function)
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_mols = [get_data_file_path('input_2d.sdf')]
-#             with pytest.raises(Exception, match='stereo'):
-#                 validate_and_assign(input_mols,
-#                                     '',
-#                                     'BBB',
-#                                     test_dir,
-#                                     )
-
 # Conformers w/o graphs
 class Test3dInputsWOGraphs:
     # single file single mol
@@ -328,9 +183,9 @@ BBB""" in file_text
             #assert 'BBB-00000.smi' in output_files
             #assert 'BBB-00007.smi' in output_files
             assert 'BBB-00000-00.sdf' in output_files
-            assert 'BBB-00000-01.sdf' in output_files
-            assert 'BBB-00001-00.sdf' in output_files
-            assert 'BBB-00001-01.sdf' not in output_files
+            assert 'BBB-00000-01.sdf' not in output_files
+            assert 'BBB-00007-00.sdf' in output_files
+            assert 'BBB-00008-00.sdf' not in output_files
             assert len(output_files) == 8
 
 #
