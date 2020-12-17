@@ -232,14 +232,16 @@ class OptimizationExecutor:
         return in_out_path_map
     
     def execute_optimization_from_molecules(
-            self, server, input_paths, output_directory, season,
+            self, input_paths, output_directory, season, ncores=1,
             dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=False):
         """Execute optimization from the given SDF molecules locally on this host.
     
         """
         from time import sleep
+        import psutil
 
         from tqdm import trange
+        from qcfractal import FractalSnowflakeHandler
     
         # fail early if output_directory already exists and we aren't deleting it
         if os.path.isdir(output_directory):
@@ -251,6 +253,9 @@ class OptimizationExecutor:
                 raise Exception(f'Output directory {output_directory} already exists. '
                                  'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
     
+        # start up Snowflake
+        server = FractalSnowflakeHandler(ncores=ncores)
+
         client = server.client()
         fractal_uri = server.get_address()
     
@@ -291,3 +296,11 @@ class OptimizationExecutor:
         # one final export, just in case some completed since last write
         self.export_molecule_data(fractal_uri, output_directory, dataset_name=dataset_name, 
                 delete_existing=False, keep_existing=True)
+
+        # stop the server and all its processes
+        parent = psutil.Process(server._qcfractal_proc.pid)
+        for child in parent.children(recursive=True):
+            child.kill()
+        parent.kill()
+
+        server.stop()

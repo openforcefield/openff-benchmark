@@ -107,23 +107,17 @@ def execute_from_server():
 @click.option('--keep-existing', is_flag=True,
               help="Keep using existing output directory if it exists, but do not recalculate results for IDs already present")
 @click.option('-o', '--output-directory', default='3-export-compute')
-@click.argument('input-path', nargs=-1)
-def execute(input_path, output_directory, season, ncores, delete_existing, keep_existing):
+@click.argument('input-paths', nargs=-1)
+def execute(input_paths, output_directory, season, ncores, delete_existing, keep_existing):
     import signal
-    import psutil
-
-    from qcfractal import FractalSnowflakeHandler
 
     from .geometry_optimizations.compute import OptimizationExecutor
 
     optexec = OptimizationExecutor()
+    dataset_name='Benchmark Scratch'
 
     if keep_existing and delete_existing:
         raise ValueError("Cannot use both `--delete-existing` and `--keep-existing`; choose one or neither.")
-
-    # start up Snowflake
-    server = FractalSnowflakeHandler(ncores=ncores)
-    dataset_name='Benchmark Scratch'
 
     def handle_signal(sig, frame):
         optexec.stop = True
@@ -132,15 +126,8 @@ def execute(input_path, output_directory, season, ncores, delete_existing, keep_
     signal.signal(signal.SIGTERM, handle_signal)
 
     optexec.execute_optimization_from_molecules(
-            server, input_path, output_directory, season,
+            input_paths, output_directory, season, ncores=ncores,
             delete_existing=delete_existing, keep_existing=keep_existing)
-
-    parent = psutil.Process(server._qcfractal_proc.pid)
-    for child in parent.children(recursive=True):
-        child.kill()
-    parent.kill()
-
-    server.stop()
 
 
 @cli.group()
