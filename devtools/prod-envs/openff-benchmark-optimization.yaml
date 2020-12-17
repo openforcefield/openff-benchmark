@@ -10,6 +10,7 @@ dependencies:
   - pip
   - qcfractal =0.15.1
   - qcengine =0.17.0
+  - gau2grid =2.0.3
 
   # Storage dependencies
   - alembic

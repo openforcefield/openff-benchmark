@@ -241,7 +241,7 @@ class OptimizationExecutor:
         import psutil
 
         from tqdm import trange
-        from qcfractal import FractalSnowflakeHandler
+        from qcfractal import FractalSnowflake
     
         # fail early if output_directory already exists and we aren't deleting it
         if os.path.isdir(output_directory):
@@ -254,7 +254,7 @@ class OptimizationExecutor:
                                  'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
     
         # start up Snowflake
-        server = FractalSnowflakeHandler(ncores=ncores)
+        server = FractalSnowflake(max_workers=ncores)
 
         client = server.client()
         fractal_uri = server.get_address()
@@ -298,9 +298,9 @@ class OptimizationExecutor:
                 delete_existing=False, keep_existing=True)
 
         # stop the server and all its processes
-        parent = psutil.Process(server._qcfractal_proc.pid)
-        for child in parent.children(recursive=True):
-            child.kill()
-        parent.kill()
+        #parent = psutil.Process(server._qcfractal_proc.pid)
+        #for child in parent.children(recursive=True):
+        #    child.kill()
+        #parent.kill()
 
         server.stop()
