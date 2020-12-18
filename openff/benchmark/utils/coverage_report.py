@@ -8,9 +8,30 @@ import glob
 import os
 import tqdm
 import shutil
+import logging
+
+logger = logging.getLogger('openforcefield.utils.toolkits')
+prev_log_level = logger.getEffectiveLevel()
+logger.setLevel(logging.ERROR)
+
+from openforcefield.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+logger.setLevel(prev_log_level)
+
+oetk_loaded = False
+for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
+    if isinstance(tkw, OpenEyeToolkitWrapper):
+        oetk_loaded = True
+if oetk_loaded:
+    GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
 
-def generate_coverage_report(input_molecules: Union[List[str], str], forcefield_name, output_directory: str = "2-coverage-report", processors: Optional[int] = None, delete_existing: bool = False) -> Dict[str, Dict[str, int]]:
+
+def generate_coverage_report(input_molecules: Union[List[str], str],
+                             forcefield_name,
+                             processors: Optional[int] = None,
+                            ) -> Dict[str, Dict[str, int]]:
     """
     For the given set of molecules produce a coverage report of the smirks parameters used in typing the molecule.
     Also try and produce charges for the molecules as some may have missing bccs.
@@ -25,25 +46,18 @@ def generate_coverage_report(input_molecules: Union[List[str], str], forcefield_
 
     Returns
     -------
-        coverage_report: A dictionary split into parameter types which lists the number of occurrences of each parameter.
+    coverage_report: A dictionary split into parameter types which lists the number of occurrences of each parameter.
+    success_mols: A list of openforcefield.topology.Molecule objects that were successful in this step
+    error_mols: A list of tuples (Molecule, Exception) of molecules that failed this step
     """
-    # make the file if needed
-    try:
-        os.makedirs(os.path.join(output_directory, "error_mols"))
-    except OSError:
-        if delete_existing:
-            shutil.rmtree(output_directory)
-            os.makedirs(os.path.join(output_directory, "error_mols"))
-        else:
-            raise Exception(f'Output directory {output_directory} already exists. '
-                             'Specify `delete_existing=True` to remove.')
 
     if isinstance(input_molecules, list):
         input_files = input_molecules
     else:
         # check if its a dir then look for sdfs
         if os.path.isdir(input_molecules):
-            input_files = glob.glob(os.path.join(input_molecules, "*.sdf"))
+            # Search for the 00th conformer so we dont double-count any moleucles
+            input_files = glob.glob(os.path.join(input_molecules, "*00.sdf"))
         else:
             input_files = [input_molecules, ]
 
@@ -67,7 +81,14 @@ def generate_coverage_report(input_molecules: Union[List[str], str], forcefield_
 
     # make the forcefield
     ff = ForceField(forcefield_name)
+    # For speed, don't test charge assignment for now
+    ff.deregister_parameter_handler('ToolkitAM1BCC')
+    ff.get_parameter_handler('ChargeIncrementModel',
+                             {'partial_charge_method':'formal_charge',
+                              'version':'0.3'})
     # now run coverage on each molecule
+    success_mols = []
+    error_mols = []
     if processors is None or processors > 1:
         from multiprocessing import Pool
 
@@ -80,34 +101,37 @@ def generate_coverage_report(input_molecules: Union[List[str], str], forcefield_
                     ncols=80,
                     desc="{:30s}".format("Generating Coverage"),
             ):
-                work = work.get()
-                mol = work["molecule"]
-                if "error" not in work:
-                    update_coverage(work)
-                    mol.to_file(os.path.join(output_directory, mol.name + ".sdf"), "sdf")
+                report, e = work.get()
+                molecule = report["molecule"]
+                if e is None:
+                    update_coverage(report)
+                    success_mols.append(molecule)
+                #except Exception as e:
                 else:
-                    # Do we want the coverage for molecules that fail as well
-                    mol.to_file(os.path.join(output_directory, "error_mols", mol.name + ".sdf"), "sdf")
+                    error_mols.append((molecule, e))
 
     else:
         for molecule in tqdm.tqdm(molecules,
                                   total=len(molecules),
                                   ncols=80,
                                   desc="{:30s}".format("Generating Coverage")):
-            report = single_molecule_coverage(molecule, ff)
+            #try:
+            report, e = single_molecule_coverage(molecule, ff)
             # update the master coverage dict
             mol: Molecule = report["molecule"]
-            if "error" not in report:
+            if e is None:
                 update_coverage(report)
-                mol.to_file(os.path.join(output_directory, mol.name + ".sdf"), "sdf")
+                success_mols.append(mol)
+            #except Exception as e:
             else:
-                # Do we want the coverage for molecules that fail as well
-                mol.to_file(os.path.join(output_directory, "error_mols", mol.name + ".sdf"), "sdf")
+                error_mols.append((molecule, e))
 
-    return coverage
+    return coverage, success_mols, error_mols
 
 
-def single_molecule_coverage(molecule: Molecule, forcefield: ForceField) -> Dict[str, Dict[str, int]]:
+def single_molecule_coverage(molecule: Molecule,
+                             forcefield: ForceField):
+    #-> Dict[str, Dict[str, int]], List[Molecule], List[Molecule, Exception]
     """
     For a single molecule generate a coverage report and try to build an openmm system this will also highlight any missing parameters and dificulties with charging the molecule.
 
@@ -118,23 +142,27 @@ def single_molecule_coverage(molecule: Molecule, forcefield: ForceField) -> Dict
 
     Returns
     -------
-        report: A dictionary of the coverage report along with any errors produced when trying to make an openmm system.
+    report: dict
+        A dictionary of the coverage report 
+    e: Exception or None. 
+        The exception raised in this step, if any. 
+        If not None, it should be assumed that coverage is invalid.
     """
 
     coverage = {"Angles": {}, "Bonds": {}, "ProperTorsions": {}, "ImproperTorsions": {}, "vdW": {}}
-    labels = forcefield.label_molecules(molecule.to_topology())[0]
-    for param_type, params in labels.items():
-        for param in params.values():
-            if param.id not in coverage[param_type]:
-                coverage[param_type][param.id] = 1
-            else:
-                coverage[param_type][param.id] += 1
-    # now generate a system this will catch any missing parameters
-    # and molecules that can not be charged
-    try:
-        _ = forcefield.create_openmm_system(molecule.to_topology())
-    except Exception as e:
-        coverage["error"] = e
-
     coverage["molecule"] = molecule
-    return coverage
+    try:
+        labels = forcefield.label_molecules(molecule.to_topology())[0]
+        for param_type, params in labels.items():
+            for param in params.values():
+                if param.id not in coverage[param_type]:
+                    coverage[param_type][param.id] = 1
+                else:
+                    coverage[param_type][param.id] += 1
+        # now generate a system this will catch any missing parameters
+        # and molecules that can not be charged
+        _ = forcefield.create_openmm_system(molecule.to_topology())
+        return coverage, None
+    except Exception as e:
+        return coverage, e
+
