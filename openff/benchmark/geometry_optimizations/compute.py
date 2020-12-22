@@ -208,11 +208,37 @@ class OptimizationExecutor:
             if opt.status != 'COMPLETE':
                 client.modify_tasks(operation='modify', base_result=opt.id, new_priority=priority_map[priority])
 
-    
-    def errorcycle_optimizations(self, fractal_uri):
-        """Error cycle optimizations that have failed.
+    def errorcycle_optimizations(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+            compute_specs=None, molids=None):
+        """Restart optimizations that have failed.
+
+        Parameters
+        ----------
+        compute_specs : list
+            List of compute specs to error cycle only.
+        molids : list
+            List of molecule ids to error cycle only.
     
         """
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+
+        df = optds.df
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[molids]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
+        for opt in df.values.flatten():
+            if opt.status == 'ERROR':
+                print(f"Restarted ERRORed optimization `{opt.id}`")
+                client.modify_tasks(operation='restart', base_result=opt.id)
+
     
     def execute_optimization_from_server(self, molecule_id, push_complete=False):
         """Execute optimization from the given molecule locally on this host.

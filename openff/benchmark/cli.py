@@ -85,15 +85,26 @@ def set_priority(fractal_uri, dataset_name, priority):
 
 
 @optimize.command()
-@click.option('--mode',
-              type=click.Choice(['singleshot', 'service']),
-              default='singleshot',
-              help="If 'singleshot', runs once and exits; if 'service', runs in a loop")
-@click.option('--sleep-time', default=3600, help="Time in seconds to sleep when in 'service' mode")
-@click.option('--only-compute', default=None, help="Comma-separated compute spec names to limit errorcycling to")
+@click.option('--fractal-uri', default="localhost:7777")
+@click.option('--dataset-name', required=True)
+@click.option('--only', default=None, help="Comma-separated compute spec names to limit errorcycling to")
+@click.option('-w', '--watch', default=None, help="Run in 'watch' mode with interval in seconds between cycles")
 @click.argument('molids', nargs=-1)
-def errorcycle(molids, mode, sleep_time, only_compute):
-    pass
+def errorcycle(molids, fractal_uri, dataset_name, watch, only):
+    from time import sleep
+    from .geometry_optimizations.compute import OptimizationExecutor
+    optexec = OptimizationExecutor()
+
+    if only is not None:
+        only = only.split(',')
+
+    if watch is not None:
+        while True:
+            optexec.errorcycle_optimizations(fractal_uri, dataset_name, only=only, molids=molids)
+            sleep(watch)
+    else:
+        optexec.errorcycle_optimizations(fractal_uri, dataset_name, only=only, molids=molids)
+
 
 @optimize.command()
 def execute_from_server():
