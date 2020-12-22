@@ -180,16 +180,26 @@ class OptimizationExecutor:
     
                 mol.to_file(outfile, file_format='sdf')
     
-    def get_optimization_status(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None):
+    def get_optimization_status(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+            compute_specs=None, molids=None):
         """Get status of optimization for each molecule ID
     
         """
         if client is None:
             client = FractalClient(fractal_uri, verify=False)
-    
+
         optds = client.get_collection("OptimizationDataset", dataset_name)
         optds.status()
-        return optds.df.sort_index(ascending=True)
+        
+        df = optds.df.sort_index(ascending=True)
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
+        return df
 
     def set_optimization_priority(self, fractal_uri, priority, dataset_name="Benchmark Optimizations"):
         from qcportal.models.task_models import PriorityEnum
@@ -214,10 +224,10 @@ class OptimizationExecutor:
 
         Parameters
         ----------
-        compute_specs : list
-            List of compute specs to error cycle only.
-        molids : list
-            List of molecule ids to error cycle only.
+        compute_specs : iterable 
+            Iterable of compute specs to error cycle only.
+        molids : iterable 
+            Iterable of molecule ids to error cycle only.
     
         """
         if client is None:
@@ -228,17 +238,10 @@ class OptimizationExecutor:
 
         df = optds.df
 
-        if (molids is not None) and (len(molids) != 0):
-            df = df.loc[molids]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
-
         for opt in df.values.flatten():
             if opt.status == 'ERROR':
                 print(f"Restarted ERRORed optimization `{opt.id}`")
                 client.modify_tasks(operation='restart', base_result=opt.id)
-
     
     def execute_optimization_from_server(self, molecule_id, push_complete=False):
         """Execute optimization from the given molecule locally on this host.

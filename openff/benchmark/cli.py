@@ -31,7 +31,7 @@ def submit_molecules(fractal_uri, input_path, season, dataset_name):
             fractal_uri, input_path, season, dataset_name)
 
 @optimize.command()
-def submit_compute(fractal_uri, input_path):
+def submit_compute(fractal_uri, dataset_name, spec_name, method, basis, program):
     pass
 
 @optimize.command()
@@ -58,16 +58,23 @@ def export(fractal_uri, output_directory, dataset_name, delete_existing, keep_ex
 @optimize.command()
 @click.option('--fractal-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
-def status(fractal_uri, dataset_name):
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.argument('molids', nargs=-1)
+def status(molids, fractal_uri, dataset_name, compute_specs):
+    from time import sleep
+
     import pandas as pd
     from .geometry_optimizations.compute import OptimizationExecutor
 
     optexec = OptimizationExecutor()
-    optdf = optexec.get_optimization_status(fractal_uri, dataset_name)
 
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
+
+    optdf = optexec.get_optimization_status(fractal_uri, dataset_name, compute_specs=compute_specs, molids=molids)
     pd.options.display.max_rows = len(optdf)
-
     print(optdf.applymap(lambda x: x.status.value))
+
 
 @optimize.command()
 @click.option('--fractal-uri', default="localhost:7777")
@@ -87,28 +94,29 @@ def set_priority(fractal_uri, dataset_name, priority):
 @optimize.command()
 @click.option('--fractal-uri', default="localhost:7777")
 @click.option('--dataset-name', required=True)
-@click.option('--only', default=None, help="Comma-separated compute spec names to limit errorcycling to")
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit errorcycling to")
 @click.option('-w', '--watch', default=None, help="Run in 'watch' mode with interval in seconds between cycles")
 @click.argument('molids', nargs=-1)
-def errorcycle(molids, fractal_uri, dataset_name, watch, only):
+def errorcycle(molids, fractal_uri, dataset_name, watch, compute_specs):
     from time import sleep
     from .geometry_optimizations.compute import OptimizationExecutor
+
     optexec = OptimizationExecutor()
 
-    if only is not None:
-        only = only.split(',')
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
 
     if watch is not None:
         while True:
-            optexec.errorcycle_optimizations(fractal_uri, dataset_name, only=only, molids=molids)
+            optexec.errorcycle_optimizations(fractal_uri, dataset_name, compute_specs=compute_specs, molids=molids)
             sleep(watch)
     else:
-        optexec.errorcycle_optimizations(fractal_uri, dataset_name, only=only, molids=molids)
+        optexec.errorcycle_optimizations(fractal_uri, dataset_name, compute_specs=compute_specs, molids=molids)
 
 
-@optimize.command()
-def execute_from_server():
-    pass
+#@optimize.command()
+#def execute_from_server():
+#    pass
 
 @optimize.command()
 @click.option('--season', required=True)
