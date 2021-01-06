@@ -30,7 +30,8 @@ class OptimizationExecutor:
                 conformer=mol.properties['conformer_index'])
         return id
     
-    def submit_molecules(self, fractal_uri, input_paths, season, dataset_name="Benchmark Optimizations"):
+    def submit_molecules(self, fractal_uri, input_paths, season,
+            dataset_name="Benchmark Optimizations", recursive=False):
         """Submit SDF molecules from given directory to the target QCFractal server.
     
         Parameters
@@ -38,17 +39,19 @@ class OptimizationExecutor:
         fractal_uri : str
             Target QCFractal server URI.
         input_paths : iterable of Path-like
-            Paths to SDF files or directories; if directories, all files SDF files in are loaded, recursively.
+            Paths to SDF files or directories; for directories, all SDF files are loaded.
         season : str
             Benchmark season identifier. Indicates the mix of compute specs to utilize.
         dataset_name : str
             Dataset name to use for submission on the QCFractal server.
+        recursive : bool
+            If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
         from qcsubmit.factories import OptimizationDataset, OptimizationDatasetFactory
     
         # extract molecules from SDF inputs
-        mols = mols_from_paths(input_paths)
+        mols = mols_from_paths(input_paths, recursive=recursive)
     
         # TODO: check existence of dataset, consult with JH on best way to add to existing
     
@@ -276,17 +279,23 @@ class OptimizationExecutor:
             
         return errors
 
-    def list_datasets(self, fractal_uri, client=None):
-
+    def list_optimization_datasets(self, fractal_uri, client=None):
         if client is None:
             client = FractalClient(fractal_uri, verify=False)
 
         datasets = client.list_collections('OptimizationDataset')
 
         return datasets
+
+    def delete_optimization_datasets(self, fractal_uri, dataset_names, client=None):
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        for dataset_name in dataset_names:
+            client.delete_collection('OptimizationDataset', dataset_name)
     
-    def _source_specs_output_paths(self, input_paths, specs, output_directory):
-        mols = mols_from_paths(input_paths, sourcefile_keys=True)
+    def _source_specs_output_paths(self, input_paths, specs, output_directory, recursive):
+        mols = mols_from_paths(input_paths, sourcefile_keys=True, recursive=recursive)
     
         in_out_path_map = defaultdict(list)
         for sourcefile, mol in mols.items():
@@ -298,7 +307,8 @@ class OptimizationExecutor:
     
     def execute_optimization_from_molecules(
             self, input_paths, output_directory, season, ncores=1,
-            dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=True):
+            dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=True,
+            recursive=False):
         """Execute optimization from the given SDF molecules locally on this host.
 
         Parameters
@@ -317,6 +327,8 @@ class OptimizationExecutor:
             If True, keep existing files in export directory.
             Files corresponding to server data will not be re-exported.
             Relies *only* on filepaths of existing files for determining match.
+        recursive : bool
+            If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
         from time import sleep
@@ -344,7 +356,8 @@ class OptimizationExecutor:
         # get paths to submit, using output directory contents to inform choice
         # for the given specs, if *any* expected output files are not present, we submit corresponding input file
         if keep_existing:
-            in_out_path_map = self._source_specs_output_paths(input_paths, SEASONS[season], output_directory)
+            in_out_path_map = self._source_specs_output_paths(
+                    input_paths, SEASONS[season], output_directory, recursive=recursive)
     
             input_paths = []
             for input_file, output_files in in_out_path_map.items():

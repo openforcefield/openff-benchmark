@@ -19,16 +19,16 @@ def optimize():
 
 @optimize.command()
 @click.option('-u', '--fractal-uri', default="localhost:7777")
-@click.option('-d', '--dataset-name', required=True)
-#@click.option('--replace', is_flag=True)
+@click.option('-d', '--dataset-name', required=True, help="Dataset name to submit molecules under")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
 @click.option('-s', '--season', required=True)
 @click.argument('input-path', nargs=-1)
-def submit_molecules(fractal_uri, input_path, season, dataset_name):
+def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
     from .geometry_optimizations.compute import OptimizationExecutor
 
     optexec = OptimizationExecutor()
     optexec.submit_molecules(
-            fractal_uri, input_path, season, dataset_name)
+            fractal_uri, input_path, season, dataset_name, recursive=recursive)
 
 @optimize.command()
 def submit_compute(fractal_uri, dataset_name, spec_name, method, basis, program):
@@ -75,7 +75,6 @@ def status(molids, fractal_uri, dataset_name, compute_specs):
 @click.option('-d', '--dataset-name', required=True)
 @click.argument('priority', nargs=1)
 def set_priority(fractal_uri, dataset_name, priority):
-
     from .geometry_optimizations.compute import OptimizationExecutor
 
     if priority not in ('high', 'normal', 'low'):
@@ -143,9 +142,17 @@ def list_datasets(fractal_uri):
 
     optexec = OptimizationExecutor()
 
-    datasets = optexec.list_datasets(fractal_uri)
+    datasets = optexec.list_optimization_datasets(fractal_uri)
     print("\n".join(datasets.reset_index()['name'].tolist()))
 
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.argument('dataset-name', nargs=-1)
+def delete_datasets(fractal_uri, dataset_name):
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+    datasets = optexec.delete_optimization_datasets(fractal_uri, dataset_name)
 
 #@optimize.command()
 #def execute_from_server():
@@ -160,9 +167,10 @@ def list_datasets(fractal_uri):
 @click.option('--ncores', default=2)
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to include")
 @click.option('-o', '--output-directory', default='3-export-compute')
 @click.argument('input-paths', nargs=-1)
-def execute(input_paths, output_directory, season, ncores, delete_existing):
+def execute(input_paths, output_directory, season, ncores, delete_existing, recursive):
     import os
     import signal
     import warnings
@@ -183,7 +191,8 @@ def execute(input_paths, output_directory, season, ncores, delete_existing):
 
     optexec.execute_optimization_from_molecules(
             input_paths, output_directory, season, ncores=ncores,
-            delete_existing=delete_existing)
+            delete_existing=delete_existing,
+            recursive=recursive)
 
 
 @cli.group()
