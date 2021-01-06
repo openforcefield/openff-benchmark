@@ -30,8 +30,7 @@ class OptimizationExecutor:
                 conformer=mol.properties['conformer_index'])
         return id
     
-    def submit_molecules(self, fractal_uri, input_paths, season, dataset_name="Benchmark Optimizations", 
-            replace=True):
+    def submit_molecules(self, fractal_uri, input_paths, season, dataset_name="Benchmark Optimizations"):
         """Submit SDF molecules from given directory to the target QCFractal server.
     
         Parameters
@@ -86,7 +85,7 @@ class OptimizationExecutor:
         return Molecule.from_qcschema(record)
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name="Benchmark Optimizations",
-                             delete_existing=False, keep_existing=False):
+                             delete_existing=False, keep_existing=True):
         """Export all molecule data from target QCFractal server to the given directory.
     
         Parameters
@@ -99,6 +98,10 @@ class OptimizationExecutor:
             Dataset name to extract from the QCFractal server.
         delete_existing : bool (False)
             If True, delete existing directory if present.
+        keep_existing : bool (True)
+            If True, keep existing files in export directory.
+            Files corresponding to server data will not be re-exported.
+            Relies *only* on filepaths of existing files for determining match.
     
         """
         from openforcefield.topology.molecule import unit
@@ -248,6 +251,39 @@ class OptimizationExecutor:
     
         """
         pass
+
+    def get_optimization_tracebacks(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+            compute_specs=None, molids=None):
+
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+        
+        df = optds.df.sort_index(ascending=True)
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
+        errors = df.applymap(lambda x: x.get_error().error_message if x.status == 'ERROR' else None)
+
+        # filter down to only those rows with errors
+        errors = errors.dropna(how='all')
+            
+        return errors
+
+    def list_datasets(self, fractal_uri, client=None):
+
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        datasets = client.list_collections('OptimizationDataset')
+
+        return datasets
     
     def _source_specs_output_paths(self, input_paths, specs, output_directory):
         mols = mols_from_paths(input_paths, sourcefile_keys=True)
@@ -262,8 +298,25 @@ class OptimizationExecutor:
     
     def execute_optimization_from_molecules(
             self, input_paths, output_directory, season, ncores=1,
-            dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=False):
+            dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=True):
         """Execute optimization from the given SDF molecules locally on this host.
+
+        Parameters
+        ----------
+        input_paths : iterable of Path-like
+            Paths to SDF files or directories; if directories, all files SDF files in are loaded, recursively.
+        output_directory : str
+            Directory path to deposit exported data.
+        season : str
+            Benchmark season identifier. Indicates the mix of compute specs to utilize.
+        dataset_name : str
+            Dataset name to extract from the QCFractal server.
+        delete_existing : bool (False)
+            If True, delete existing directory if present.
+        keep_existing : bool (True)
+            If True, keep existing files in export directory.
+            Files corresponding to server data will not be re-exported.
+            Relies *only* on filepaths of existing files for determining match.
     
         """
         from time import sleep

@@ -18,10 +18,10 @@ def optimize():
     pass
 
 @optimize.command()
-@click.option('--fractal-uri', default="localhost:7777")
-@click.option('--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
 #@click.option('--replace', is_flag=True)
-@click.option('--season', required=True)
+@click.option('-s', '--season', required=True)
 @click.argument('input-path', nargs=-1)
 def submit_molecules(fractal_uri, input_path, season, dataset_name):
     from .geometry_optimizations.compute import OptimizationExecutor
@@ -35,34 +35,28 @@ def submit_compute(fractal_uri, dataset_name, spec_name, method, basis, program)
     pass
 
 @optimize.command()
-@click.option('--fractal-uri', default="localhost:7777")
-@click.option('--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
 @click.option('--delete-existing', is_flag=True)
-@click.option('--keep-existing', is_flag=True,
-              help="Keep using existing output directory if it exists, but do not rewrite results for IDs already present")
 @click.option('-o', '--output-directory', default='3-export-compute')
-def export(fractal_uri, output_directory, dataset_name, delete_existing, keep_existing):
+def export(fractal_uri, output_directory, dataset_name, delete_existing):
     import os
+    import warnings
     from .geometry_optimizations.compute import OptimizationExecutor
 
-    if keep_existing and delete_existing:
-        raise ValueError("Cannot use both `--delete-existing` and `--keep-existing`; choose one or neither.")
-
-    if not (delete_existing or keep_existing) and os.path.exists(output_directory):
-        raise ValueError(f"Output directory {output_directory} exists; specify `--delete-existing` `--keep-existing` to proceed.")
+    if (not delete_existing) and os.path.exists(output_directory):
+        warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
 
     optexec = OptimizationExecutor()
     optexec.export_molecule_data(
-            fractal_uri, output_directory, dataset_name, delete_existing, keep_existing)
+            fractal_uri, output_directory, dataset_name, delete_existing)
 
 @optimize.command()
-@click.option('--fractal-uri', default="localhost:7777")
-@click.option('--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
 @click.argument('molids', nargs=-1)
 def status(molids, fractal_uri, dataset_name, compute_specs):
-    from time import sleep
-
     import pandas as pd
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -77,8 +71,8 @@ def status(molids, fractal_uri, dataset_name, compute_specs):
 
 
 @optimize.command()
-@click.option('--fractal-uri', default="localhost:7777")
-@click.option('--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
 @click.argument('priority', nargs=1)
 def set_priority(fractal_uri, dataset_name, priority):
 
@@ -92,8 +86,8 @@ def set_priority(fractal_uri, dataset_name, priority):
 
 
 @optimize.command()
-@click.option('--fractal-uri', default="localhost:7777")
-@click.option('--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit errorcycling to")
 @click.option('-w', '--watch', default=None, help="Run in 'watch' mode with interval in seconds between cycles")
 @click.argument('molids', nargs=-1)
@@ -114,29 +108,72 @@ def errorcycle(molids, fractal_uri, dataset_name, watch, compute_specs):
         optexec.errorcycle_optimizations(fractal_uri, dataset_name, compute_specs=compute_specs, molids=molids)
 
 
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.argument('molids', nargs=-1)
+def traceback(molids, fractal_uri, dataset_name, compute_specs):
+    import pandas as pd
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
+
+    tracebacks = optexec.get_optimization_tracebacks(fractal_uri,
+                                                     dataset_name, 
+                                                     compute_specs=compute_specs, 
+                                                     molids=molids)
+    for index, row in tracebacks.iterrows():
+        print('\n' + index)
+        for column in row.index:
+            print('-' * len(index))
+            print('#', column, '\n')
+            print(row[column])
+        print('==============')
+
+
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+def list_datasets(fractal_uri):
+    import pandas as pd
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+
+    datasets = optexec.list_datasets(fractal_uri)
+    print("\n".join(datasets.reset_index()['name'].tolist()))
+
+
 #@optimize.command()
 #def execute_from_server():
 #    pass
 
+#@optimize.command()
+#def debug_from_server():
+#    pass
+
 @optimize.command()
-@click.option('--season', required=True)
+@click.option('-s', '--season', required=True)
 @click.option('--ncores', default=2)
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
-@click.option('--keep-existing', is_flag=True,
-              help="Keep using existing output directory if it exists, but do not recalculate results for IDs already present")
 @click.option('-o', '--output-directory', default='3-export-compute')
 @click.argument('input-paths', nargs=-1)
-def execute(input_paths, output_directory, season, ncores, delete_existing, keep_existing):
+def execute(input_paths, output_directory, season, ncores, delete_existing):
+    import os
     import signal
+    import warnings
 
     from .geometry_optimizations.compute import OptimizationExecutor
 
+    if (not delete_existing) and os.path.exists(output_directory):
+        warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
+
     optexec = OptimizationExecutor()
     dataset_name='Benchmark Scratch'
-
-    if keep_existing and delete_existing:
-        raise ValueError("Cannot use both `--delete-existing` and `--keep-existing`; choose one or neither.")
 
     def handle_signal(sig, frame):
         optexec.stop = True
@@ -146,7 +183,7 @@ def execute(input_paths, output_directory, season, ncores, delete_existing, keep
 
     optexec.execute_optimization_from_molecules(
             input_paths, output_directory, season, ncores=ncores,
-            delete_existing=delete_existing, keep_existing=keep_existing)
+            delete_existing=delete_existing)
 
 
 @cli.group()
