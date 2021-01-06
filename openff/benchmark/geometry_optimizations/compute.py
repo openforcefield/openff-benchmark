@@ -217,9 +217,9 @@ class OptimizationExecutor:
                         "normal": PriorityEnum.NORMAL,
                         "low": PriorityEnum.LOW}
 
-        for opt in opts:
-            if opt.status != 'COMPLETE':
-                client.modify_tasks(operation='modify', base_result=opt.id, new_priority=priority_map[priority])
+        client.modify_tasks(operation='modify',
+                            base_result=[opt.id for opt in opts if opt.status != 'COMPLETE'],
+                            new_priority=priority_map[priority])
 
     def errorcycle_optimizations(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
             compute_specs=None, molids=None):
