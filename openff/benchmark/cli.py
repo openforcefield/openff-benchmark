@@ -161,6 +161,14 @@ def compare_forcefields(input_path, ref_method, output_directory):
 
 @report.command()
 @click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref_method', default='default', required=True)
+@click.option('--output_directory', default='./results', required=True)
+def match_minima(input_path, ref_method, output_directory):
+    from .analysis import analysis
+    analysis.match_minima(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
 def plots(input_path):
     from .analysis import draw
     draw.plot_compare_ffs(input_path)
