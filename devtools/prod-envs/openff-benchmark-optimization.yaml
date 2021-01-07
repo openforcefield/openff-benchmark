@@ -10,6 +10,7 @@ dependencies:
   - pip
   - qcfractal =0.15.1
   - qcengine =0.17.0
+  - gau2grid =2.0.3
 
   # Storage dependencies
   - alembic
@@ -32,7 +33,8 @@ dependencies:
   - gcp
     
   # MM calculations
-  - openforcefield =0.8.0
+  - openforcefield =0.8.2
+  - rdkit =2020.09
   - openforcefields =1.3.0
   - openmm =7.4.2
   - openmmforcefields =0.8.0

@@ -30,8 +30,8 @@ class OptimizationExecutor:
                 conformer=mol.properties['conformer_index'])
         return id
     
-    def submit_molecules(self, fractal_uri, input_paths, season, dataset_name="Benchmark Optimizations", 
-            replace=True):
+    def submit_molecules(self, fractal_uri, input_paths, season,
+            dataset_name="Benchmark Optimizations", recursive=False):
         """Submit SDF molecules from given directory to the target QCFractal server.
     
         Parameters
@@ -39,17 +39,19 @@ class OptimizationExecutor:
         fractal_uri : str
             Target QCFractal server URI.
         input_paths : iterable of Path-like
-            Paths to SDF files or directories; if directories, all files SDF files in are loaded, recursively.
+            Paths to SDF files or directories; for directories, all SDF files are loaded.
         season : str
             Benchmark season identifier. Indicates the mix of compute specs to utilize.
         dataset_name : str
             Dataset name to use for submission on the QCFractal server.
+        recursive : bool
+            If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
         from qcsubmit.factories import OptimizationDataset, OptimizationDatasetFactory
     
         # extract molecules from SDF inputs
-        mols = mols_from_paths(input_paths)
+        mols = mols_from_paths(input_paths, recursive=recursive)
     
         # TODO: check existence of dataset, consult with JH on best way to add to existing
     
@@ -86,7 +88,7 @@ class OptimizationExecutor:
         return Molecule.from_qcschema(record)
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name="Benchmark Optimizations",
-                             delete_existing=False, keep_existing=False):
+                             delete_existing=False, keep_existing=True):
         """Export all molecule data from target QCFractal server to the given directory.
     
         Parameters
@@ -99,6 +101,10 @@ class OptimizationExecutor:
             Dataset name to extract from the QCFractal server.
         delete_existing : bool (False)
             If True, delete existing directory if present.
+        keep_existing : bool (True)
+            If True, keep existing files in export directory.
+            Files corresponding to server data will not be re-exported.
+            Relies *only* on filepaths of existing files for determining match.
     
         """
         from openforcefield.topology.molecule import unit
@@ -180,16 +186,26 @@ class OptimizationExecutor:
     
                 mol.to_file(outfile, file_format='sdf')
     
-    def get_optimization_status(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None):
+    def get_optimization_status(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+            compute_specs=None, molids=None):
         """Get status of optimization for each molecule ID
     
         """
         if client is None:
             client = FractalClient(fractal_uri, verify=False)
-    
+
         optds = client.get_collection("OptimizationDataset", dataset_name)
         optds.status()
-        return optds.df.sort_index(ascending=True)
+        
+        df = optds.df.sort_index(ascending=True)
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
+        return df
 
     def set_optimization_priority(self, fractal_uri, priority, dataset_name="Benchmark Optimizations"):
         from qcportal.models.task_models import PriorityEnum
@@ -204,24 +220,82 @@ class OptimizationExecutor:
                         "normal": PriorityEnum.NORMAL,
                         "low": PriorityEnum.LOW}
 
-        for opt in opts:
-            if opt.status != 'COMPLETE':
-                client.modify_tasks(operation='modify', base_result=opt.id, new_priority=priority_map[priority])
+        client.modify_tasks(operation='modify',
+                            base_result=[opt.id for opt in opts if opt.status != 'COMPLETE'],
+                            new_priority=priority_map[priority])
 
-    
-    def errorcycle_optimizations(self, fractal_uri):
-        """Error cycle optimizations that have failed.
+    def errorcycle_optimizations(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+            compute_specs=None, molids=None):
+        """Restart optimizations that have failed.
+
+        Parameters
+        ----------
+        compute_specs : iterable 
+            Iterable of compute specs to error cycle only.
+        molids : iterable 
+            Iterable of molecule ids to error cycle only.
     
         """
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+
+        df = optds.df
+
+        for opt in df.values.flatten():
+            if opt.status == 'ERROR':
+                print(f"Restarted ERRORed optimization `{opt.id}`")
+                client.modify_tasks(operation='restart', base_result=opt.id)
     
     def execute_optimization_from_server(self, molecule_id, push_complete=False):
         """Execute optimization from the given molecule locally on this host.
     
         """
         pass
+
+    def get_optimization_tracebacks(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+            compute_specs=None, molids=None):
+
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+        
+        df = optds.df.sort_index(ascending=True)
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
+        errors = df.applymap(lambda x: x.get_error().error_message if x.status == 'ERROR' else None)
+
+        # filter down to only those rows with errors
+        errors = errors.dropna(how='all')
+            
+        return errors
+
+    def list_optimization_datasets(self, fractal_uri, client=None):
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        datasets = client.list_collections('OptimizationDataset')
+
+        return datasets
+
+    def delete_optimization_datasets(self, fractal_uri, dataset_names, client=None):
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        for dataset_name in dataset_names:
+            client.delete_collection('OptimizationDataset', dataset_name)
     
-    def _source_specs_output_paths(self, input_paths, specs, output_directory):
-        mols = mols_from_paths(input_paths, sourcefile_keys=True)
+    def _source_specs_output_paths(self, input_paths, specs, output_directory, recursive):
+        mols = mols_from_paths(input_paths, sourcefile_keys=True, recursive=recursive)
     
         in_out_path_map = defaultdict(list)
         for sourcefile, mol in mols.items():
@@ -232,14 +306,36 @@ class OptimizationExecutor:
         return in_out_path_map
     
     def execute_optimization_from_molecules(
-            self, server, input_paths, output_directory, season,
-            dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=False):
+            self, input_paths, output_directory, season, ncores=1,
+            dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=True,
+            recursive=False):
         """Execute optimization from the given SDF molecules locally on this host.
+
+        Parameters
+        ----------
+        input_paths : iterable of Path-like
+            Paths to SDF files or directories; if directories, all files SDF files in are loaded, recursively.
+        output_directory : str
+            Directory path to deposit exported data.
+        season : str
+            Benchmark season identifier. Indicates the mix of compute specs to utilize.
+        dataset_name : str
+            Dataset name to extract from the QCFractal server.
+        delete_existing : bool (False)
+            If True, delete existing directory if present.
+        keep_existing : bool (True)
+            If True, keep existing files in export directory.
+            Files corresponding to server data will not be re-exported.
+            Relies *only* on filepaths of existing files for determining match.
+        recursive : bool
+            If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
         from time import sleep
+        import psutil
 
         from tqdm import trange
+        from qcfractal import FractalSnowflake
     
         # fail early if output_directory already exists and we aren't deleting it
         if os.path.isdir(output_directory):
@@ -251,13 +347,17 @@ class OptimizationExecutor:
                 raise Exception(f'Output directory {output_directory} already exists. '
                                  'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
     
+        # start up Snowflake
+        server = FractalSnowflake(max_workers=ncores)
+
         client = server.client()
         fractal_uri = server.get_address()
     
         # get paths to submit, using output directory contents to inform choice
         # for the given specs, if *any* expected output files are not present, we submit corresponding input file
         if keep_existing:
-            in_out_path_map = self._source_specs_output_paths(input_paths, SEASONS[season], output_directory)
+            in_out_path_map = self._source_specs_output_paths(
+                    input_paths, SEASONS[season], output_directory, recursive=recursive)
     
             input_paths = []
             for input_file, output_files in in_out_path_map.items():
@@ -291,3 +391,11 @@ class OptimizationExecutor:
         # one final export, just in case some completed since last write
         self.export_molecule_data(fractal_uri, output_directory, dataset_name=dataset_name, 
                 delete_existing=False, keep_existing=True)
+
+        # stop the server and all its processes
+        #parent = psutil.Process(server._qcfractal_proc.pid)
+        #for child in parent.children(recursive=True):
+        #    child.kill()
+        #parent.kill()
+
+        server.stop()
