@@ -19,7 +19,7 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdMolAlign
 
-from . import metrics, readwrite
+from . import metrics, readwrite, draw
 
 
 def get_ref_confs(dataframe):
@@ -39,8 +39,9 @@ def ref_to_ref_confs(dataframe, ref_confs):
     for mid in dataframe.molecule_index.unique():
         confs = dataframe.loc[dataframe.molecule_index==mid]
         ref_conf = ref_confs[mid]
+        ref_energy = confs.loc[ref_conf, 'final_energy']
         for i, row in confs.iterrows():
-            dataframe.loc[i, 'final_energy'] -= dataframe.loc[ref_conf, 'final_energy']
+            dataframe.loc[i, 'final_energy'] = row['final_energy'] - ref_energy
             
 def calc_tfd(reference, result):
     for i, row in reference.iterrows():
@@ -73,21 +74,22 @@ def match_minima(input_path, ref_method, output_directory="./results"):
     assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
     
     ref_confs = get_ref_confs(dataframes[ref_method])
-
+    ref_to_ref_confs(dataframes[ref_method], ref_confs)
     os.makedirs(output_directory, exist_ok=True)
+    matches = {}
     for m in dataframes:
-        if m == ref_method:
-            continue
+        # if m == ref_method:
+        #     continue
         match = compare_conformers(dataframes[ref_method], dataframes[m], 1.0)
-        new_ref_confs = {i: match[ match['Ref_mol']== ref_conf ]['FF_mol'].values[0] for i, ref_conf in ref_confs.items() }
+        new_ref_confs = {i: match[ match['name'] == ref_conf ]['ff_mol_name'].values[0] for i, ref_conf in ref_confs.items() }
         ref_to_ref_confs(dataframes[m], new_ref_confs)
         for i, row in match.iterrows():
-            match.loc[i, 'tfd'] = metrics.calc_tfd(dataframes[ref_method].loc[row['Ref_mol'], 'mol'].to_rdkit(), dataframes[m].loc[row['FF_mol'], 'mol'].to_rdkit())
-            match.loc[i, 'dde'] = dataframes[m].loc[row['FF_mol'], 'final_energy'] - dataframes[ref_method].loc[row['Ref_mol'], 'final_energy']
-
-        match.to_csv(os.path.join(output_directory, f"match_{m}.csv"),
-                     index=False, 
-                     float_format='%15.8e'
+            match.loc[i, 'tfd'] = metrics.calc_tfd(dataframes[ref_method].loc[row['name'], 'mol'].to_rdkit(), dataframes[m].loc[row['ff_mol_name'], 'mol'].to_rdkit())
+            match.loc[i, 'dde'] = dataframes[m].loc[row['ff_mol_name'], 'final_energy'] - dataframes[ref_method].loc[row['name'], 'final_energy']
+        matches[m] = match
+        readwrite.write_results(match, 
+                                os.path.join(output_directory, f"matched_{m}.csv"), 
+                                columns=['name', 'group_name', 'molecule_index', 'conformer_index', 'ff_mol_name', 'rmsd', 'tfd', 'dde']
         )
 
 def compare_conformers(reference, result, rmsd_cutoff):
@@ -113,7 +115,7 @@ def compare_conformers(reference, result, rmsd_cutoff):
 
     """
     
-    conformer_match=[]
+    conformer_match = reference.copy()
     for mid in reference.molecule_index.unique():
         ref_confs = reference.loc[reference.molecule_index==mid]
         query_confs = result.loc[result.molecule_index==mid]
@@ -124,84 +126,12 @@ def compare_conformers(reference, result, rmsd_cutoff):
                 rms_matrix[i][j] = rmsd
         for ref, rms_list in rms_matrix.items():
             conf = min(rms_list, key=rms_list.get)
-            conformer_match.append([ref, conf, rms_list[conf]])
+            conformer_match.loc[ref, 'ff_mol_name'] = conf
+            conformer_match.loc[ref, 'rmsd'] = rms_list[conf]
 
-    match = pd.DataFrame(conformer_match, columns=['Ref_mol', 'FF_mol', 'rmsd'])
-
-    return match
+    return conformer_match
 
 
-    # assess each file against reference
-    for ff_label, ff_dict in in_dict.items():
-        sdf_query = ff_dict['sdfile']
-        sdf_tag = ff_dict['sdtag']
-
-        # load molecules from open reference and query files
-        print(f"\n\nOpening reference file {sdf_ref}")
-        mols_ref = reader.read_mols(sdf_ref)
-
-        print(f"Opening query file {sdf_query} for [ {ff_label} ] energies")
-        mols_query = reader.read_mols(sdf_query)
-
-        # loop over each molecule in reference and query files
-        for rmol in mols_ref:
-            mol_name = rmol.GetTitle()
-            ref_nconfs = rmol.NumConfs()
-            run_match = False
-
-            for qmol in mols_query:
-
-                # same mol titles should mean same molecular identity;
-                # when same molecular identity found, break out of loop to
-                # start matching conformers
-                if rmol.GetTitle() == qmol.GetTitle():
-                    run_match = True
-                    break
-
-            # create entry for this mol in mol_dict if not already present
-            # energies [i][j] will be 2d list of ith method and jth conformer
-            if mol_name not in mol_dict:
-                mol_dict[mol_name] = {'energies': [], 'indices': []}
-
-            # no same molecules were found bt ref and query methods
-            # for N reference minima of each mol, P matching indices for each ref minimia
-            if not run_match:
-                print(f"No \"{mol_name}\" molecule found in {sdf_query}")
-
-                # fill in -2 error values for conformer indices
-                mol_dict[mol_name]['indices'].append([-2] * ref_nconfs)
-
-                # fill in nan values for conformer energies and ref_nconfs
-                mol_dict[mol_name]['energies'].append([np.nan] * ref_nconfs)
-
-                # reset mols_query generator
-                mols_query = reader.read_mols(sdf_query)
-
-                # continue with the next rmol
-                continue
-
-            # get data from specified sd tag for all conformers
-            data_confs = reader.get_sd_list(qmol, sdf_tag)
-
-            # format sd tag data to float types
-            float_data_confs = list(map(float, data_confs))
-
-            # store sd data from tags into dictionary
-            mol_dict[mol_name]['energies'].append(float_data_confs)
-
-            # don't run match if query method is same as reference method
-            # keep this section after sd tag extraction of energies
-            if sdf_query == sdf_ref:
-                print("Skipping comparison against self.")
-                mol_dict[mol_name]['indices'].append([-1] * ref_nconfs)
-                continue
-
-            # run the match here
-            # get indices of qmol conformers that match rmol conformers
-            molIndices = compare_two_mols(rmol, qmol, rmsd_cutoff)
-            mol_dict[mol_name]['indices'].append(molIndices)
-
-    return mol_dict
 
 def main(input_path, ref_method, output_directory="./results"):
     """
@@ -240,6 +170,7 @@ def main(input_path, ref_method, output_directory="./results"):
     assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
     
     ref_confs = get_ref_confs(dataframes[ref_method])
+    ref_to_ref_confs(dataframes[ref_method], ref_confs)
 
     os.makedirs(output_directory, exist_ok=True)
     for m in dataframes:
