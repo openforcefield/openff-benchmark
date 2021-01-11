@@ -31,7 +31,7 @@ class OptimizationExecutor:
         return id
     
     def submit_molecules(self, fractal_uri, input_paths, season,
-            dataset_name="Benchmark Optimizations", recursive=False):
+            dataset_name, recursive=False):
         """Submit SDF molecules from given directory to the target QCFractal server.
     
         Parameters
@@ -87,7 +87,7 @@ class OptimizationExecutor:
     
         return Molecule.from_qcschema(record)
     
-    def export_molecule_data(self, fractal_uri, output_directory, dataset_name="Benchmark Optimizations",
+    def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
                              delete_existing=False, keep_existing=True):
         """Export all molecule data from target QCFractal server to the given directory.
     
@@ -186,9 +186,9 @@ class OptimizationExecutor:
     
                 mol.to_file(outfile, file_format='sdf')
     
-    def get_optimization_status(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+    def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
-        """Get status of optimization for each molecule ID
+        """Get status of optimization for each molecule ID.
     
         """
         if client is None:
@@ -207,7 +207,7 @@ class OptimizationExecutor:
 
         return df
 
-    def set_optimization_priority(self, fractal_uri, priority, dataset_name="Benchmark Optimizations"):
+    def set_optimization_priority(self, fractal_uri, priority, dataset_name):
         from qcportal.models.task_models import PriorityEnum
 
         client = FractalClient(fractal_uri, verify=False)
@@ -224,14 +224,14 @@ class OptimizationExecutor:
                             base_result=[opt.id for opt in opts if opt.status != 'COMPLETE'],
                             new_priority=priority_map[priority])
 
-    def errorcycle_optimizations(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+    def errorcycle_optimizations(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
         """Restart optimizations that have failed.
 
         Parameters
         ----------
         compute_specs : iterable 
-            Iterable of compute specs to error cycle only.
+            Iterable of compute spec names to error cycle only.
         molids : iterable 
             Iterable of molecule ids to error cycle only.
     
@@ -244,6 +244,12 @@ class OptimizationExecutor:
 
         df = optds.df
 
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
         for opt in df.values.flatten():
             if opt.status == 'ERROR':
                 print(f"Restarted ERRORed optimization `{opt.id}`")
@@ -255,7 +261,40 @@ class OptimizationExecutor:
         """
         pass
 
-    def get_optimization_tracebacks(self, fractal_uri, dataset_name="Benchmark Optimizations", client=None,
+    def debug_optimization_from_server(self, fractal_uri, dataset_name, client=None,
+            compute_specs=None, molids=None):
+        """Execute optimization from the given molecule locally on this host.
+
+        Will not send results back to the server; this is purely for debugging.
+
+        TODO: make this send results back to server using same API as manager does.
+              then merge with `execute_...` above.
+    
+        """
+        import qcengine
+
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+
+        df = optds.df
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
+        results = []
+        for opt in df.values.flatten():
+            task = client.query_tasks(base_result=opt.id)[0]
+            results.append(qcengine.compute_procedure(*task.spec.args))
+
+        return results
+
+    def get_optimization_tracebacks(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
 
         if client is None:
@@ -285,7 +324,7 @@ class OptimizationExecutor:
 
         datasets = client.list_collections('OptimizationDataset')
 
-        return datasets
+        return datasets.reset_index()['name'].to_list()
 
     def delete_optimization_datasets(self, fractal_uri, dataset_names, client=None):
         if client is None:
