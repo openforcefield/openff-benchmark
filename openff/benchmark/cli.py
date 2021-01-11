@@ -13,7 +13,6 @@ def cli():
 @cli.group()
 def optimize():
     """Execute benchmarking geometry optimizations.
-
     """
     pass
 
@@ -68,6 +67,50 @@ def status(molids, fractal_uri, dataset_name, compute_specs):
     optdf = optexec.get_optimization_status(fractal_uri, dataset_name, compute_specs=compute_specs, molids=molids)
     pd.options.display.max_rows = len(optdf)
     print(optdf.applymap(lambda x: x.status.value))
+
+
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-f', '--frequency', default=10, help="Time in seconds between updates")
+@click.option('-d', '--dataset-name', default=None)
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+def progress(fractal_uri, frequency, dataset_name, compute_specs):
+    from time import sleep
+    from tqdm import trange
+
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
+
+    optexec = OptimizationExecutor()
+    if dataset_name is None:
+        datasets = optexec.list_optimization_datasets(fractal_uri=fractal_uri)
+    else:
+        datasets = [dataset_name]
+
+    dfs = []
+    for dataset in datasets:
+        dfs.append(optexec.get_optimization_status(fractal_uri=fractal_uri,
+                                                   dataset_name=dataset,
+                                                   compute_specs=compute_specs))
+
+    complete = sum([len([opt for opt in df.values.flatten() if opt.status == 'COMPLETE']) for df in dfs])
+    progbar = trange(sum([df.size for df in dfs]), initial=complete)
+
+    while True:
+        dfs = []
+        for dataset in datasets:
+            dfs.append(optexec.get_optimization_status(
+                fractal_uri=fractal_uri, dataset_name=dataset, compute_specs=compute_specs))
+
+        complete_i = sum([len([opt for opt in df.values.flatten() if opt.status == 'COMPLETE']) for df in dfs])
+        progbar.update(complete_i - complete)
+        progbar.refresh()
+
+        complete = complete_i
+
+        sleep(frequency)
 
 
 @optimize.command()
@@ -143,7 +186,7 @@ def list_datasets(fractal_uri):
     optexec = OptimizationExecutor()
 
     datasets = optexec.list_optimization_datasets(fractal_uri)
-    print("\n".join(datasets.reset_index()['name'].tolist()))
+    print("\n".join(datasets))
 
 @optimize.command()
 @click.option('-u', '--fractal-uri', default="localhost:7777")
@@ -154,13 +197,30 @@ def delete_datasets(fractal_uri, dataset_name):
     optexec = OptimizationExecutor()
     datasets = optexec.delete_optimization_datasets(fractal_uri, dataset_name)
 
-#@optimize.command()
-#def execute_from_server():
-#    pass
 
-#@optimize.command()
-#def debug_from_server():
-#    pass
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.argument('molids', nargs=-1)
+def debug_from_server(molids, fractal_uri, dataset_name, compute_specs):
+    import json
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
+
+    results = optexec.debug_optimization_from_server(fractal_uri,
+                                                     dataset_name,
+                                                     compute_specs=compute_specs,
+                                                     molids=molids)
+
+    # export and read back into JSON for final output
+    results_processed = [json.loads(res.json()) for res in results]
+    print(json.dumps(results_processed))
+
 
 @optimize.command()
 @click.option('-s', '--season', required=True)
@@ -198,7 +258,6 @@ def execute(input_paths, output_directory, season, ncores, delete_existing, recu
 @cli.group()
 def preprocess():
     """Prepare input molecules for compute.
-
     """
     pass
 
