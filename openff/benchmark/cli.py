@@ -264,6 +264,7 @@ def preprocess():
 
 @preprocess.command()
 @click.option('--delete-existing', is_flag=True)
+@click.option('--add', is_flag=True)
 @click.option('-o', '--output-directory',
               default='1-validate_and_assign', 
               help='Directory to put output files. If this directory does not exist, one will be created.')
@@ -272,7 +273,7 @@ def preprocess():
               help='Group name for assigning IDs to the molecules.')
 @click.argument('input-3d-molecules',
                 nargs=-1)
-def validate(input_3d_molecules, output_directory, group_name, delete_existing):
+def validate(input_3d_molecules, output_directory, group_name, delete_existing, add):
     """
     Validate and assign identifiers to molecules.
 
@@ -283,7 +284,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing):
 
       * "GGG-MMMMM-CC.sdf": Files containing one validated molecule each, where G is the group name, M is the molecule ID, and C is the conformer index
 
-      * "error_mols": A directory where molecule that do not pass validation are stored
+      * "error_mols": A subdirectory where molecule that do not pass validation are stored
 
       * "log.txt": Debugging info
 
@@ -291,7 +292,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing):
 
     At least one 3D geometry of each molecule must be provided.
     The "group name" becomes the first three characters of the validated file names. 
-    Multiple confomers of the same molecule will be automatically detected and grouped under a single molecule ID.
+    Multiple conformers of the same molecule will be automatically detected and grouped under a single molecule ID.
     The definition of "identical molecule" is whether RDKit assigns them the same canonical, isomeric, explicit hydrogen SMILES. 
     When molecules are grouped, their RMSD (accounting for symmetry automorphs) is tested. 
     If two inputs are within 0.1 A by RMSD, the second is considered an error and sent to the error_mols directory.
@@ -299,14 +300,82 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing):
     The order of atoms may change during this step.
     
     
-    This command also attempts to detect technical issues that could prevent the files from working with the OpenFF toolkit. Files that will cause problems in subsequent steps are routed to the "error_mols" subdirectory of the output directory. Where possible, these cases write both an SDF file of the molecule (with key-value paris indicating the file the structure came from), and a correspondingly-named txt file containing more details about the error.
+    This command also attempts to detect technical issues that could prevent the files from working with the OpenFF toolkit.
+    Files that will cause problems in subsequent steps are routed to the "error_mols" subdirectory of the output directory.
+    Where possible, these cases write both an SDF file of the molecule (with key-value pairs indicating the file the structure came from),
+    and a correspondingly-named txt file containing more details about the error.
     """
     from .utils.validate_and_assign_ids import validate_and_assign
-    validate_and_assign(input_3d_molecules,
-                        group_name,
-                        output_directory,
-                        delete_existing=delete_existing)
+    import glob
+    import os
+    import shutil
+    import numpy as np
 
+    existing_output_mols = []
+    name_assignments = []
+
+    #try:
+    if not(os.path.exists(output_directory)):
+        os.makedirs(output_directory)
+    #except OSError:
+    else:
+        if delete_existing:
+            shutil.rmtree(output_directory)
+            os.makedirs(os.path.join(output_directory, "error_mols"))
+        elif add:
+            existing_output_mols = glob.glob(os.path.join(output_directory, '*.sdf'))
+            name_assignments = np.loadtxt(os.path.join(output_directory, 'name_assignments.csv'))
+        else:
+            raise Exception(f'Output directory {output_directory} already exists. '
+                             'Specify `delete_existing=True` to remove.')
+
+    output = validate_and_assign(input_3d_molecules,
+                                 group_name,
+                                 existing_output_mols,
+                                 name_assignments,
+                                 delete_existing=delete_existing)
+
+    success_mols, error_mols, name_assignments = output
+
+    # Write successfully processed mols
+    for success_mol in success_mols:
+        success_mol.to_file(os.path.join(output_directory, success_mol.name + ".sdf"), "sdf")
+    # Write errored mols
+    #for error_mol, e in error_mols:
+    #    error_mol.to_file(os.path.join(output_directory, "error_mols", error_mol.name + ".sdf"), "sdf")
+    #    with open(os.path.join(output_directory, "error_mols", error_mol.name + ".txt"), 'w') as of:
+    #        of.write(e)
+
+    # Create error directory
+    error_dir = os.path.join(output_directory, 'error_mols')
+    os.makedirs(error_dir)
+
+    # Write error mols
+    for idx, (filename, error_mol, exception) in enumerate(error_mols):
+        output_mol_file = os.path.join(error_dir, f'error_mol_{idx}.sdf')
+        try:
+            error_mol.to_file(output_mol_file, file_format='sdf')
+        except Exception as e:
+            exception = str(exception)
+            exception += "\n Then failed when trying to write mol to error directory with "
+            exception += str(e)
+        output_summary_file = os.path.join(error_dir, f'error_mol_{idx}.txt')
+        with open(output_summary_file, 'w') as of:
+            of.write(f'source: {filename}\n')
+            of.write(f'error text: {exception}\n')
+
+    # Write name assignments
+    #out_file_name = os.path.join(output_directory, 'name_assignments.csv')
+    import csv
+    with open(os.path.join(output_directory, 'name_assignments.csv'), 'w', newline='') as of:
+        csvw = csv.writer(of)
+
+    #np.savetxt(out_file_name, np.array(name_assignments))
+        #of.write('orig_name,orig_file,orig_file_index,out_file_name\n')
+        for name_assignment in name_assignments:
+            csvw.writerow(name_assignment)
+        #    of.write(','.join([str(i) for i in name_assignment]))
+        #    of.write('\n')
 
 @preprocess.command()
 @click.option('--delete-existing', is_flag=True)
