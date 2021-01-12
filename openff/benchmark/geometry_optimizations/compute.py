@@ -262,7 +262,7 @@ class OptimizationExecutor:
         pass
 
     def debug_optimization_from_server(self, fractal_uri, dataset_name, client=None,
-            compute_specs=None, molids=None):
+            compute_specs=None, molids=None, scratch_directory=None):
         """Execute optimization from the given molecule locally on this host.
 
         Will not send results back to the server; this is purely for debugging.
@@ -272,6 +272,14 @@ class OptimizationExecutor:
     
         """
         import qcengine
+
+        # if scratch_directory specified, keep output with `messy=True`
+        if scratch_directory is not None:
+            scratch_directory = os.path.abspath(scratch_directory)
+            os.makedirs(scratch_directory, exist_ok=True)
+            messy = True
+        else:
+            messy = False
 
         if client is None:
             client = FractalClient(fractal_uri, verify=False)
@@ -290,7 +298,39 @@ class OptimizationExecutor:
         results = []
         for opt in df.values.flatten():
             task = client.query_tasks(base_result=opt.id)[0]
-            results.append(qcengine.compute_procedure(*task.spec.args))
+
+            local_options = dict(scratch_directory=scratch_directory)
+
+            #local_options['messy'] = messy
+
+            results.append(qcengine.compute_procedure(
+                *task.spec.args, local_options=local_options))
+
+        return results
+
+    def get_optimization_from_server(self, fractal_uri, dataset_name, client=None,
+            compute_specs=None, molids=None):
+        """Get full optimization data from the given molecules.
+    
+        """
+
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+
+        df = optds.df
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
+        results = []
+        for opt in df.values.flatten():
+            results.append(opt)
 
         return results
 

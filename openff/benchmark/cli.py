@@ -202,8 +202,9 @@ def delete_datasets(fractal_uri, dataset_name):
 @click.option('-u', '--fractal-uri', default="localhost:7777")
 @click.option('-d', '--dataset-name', required=True)
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.option('-o', '--scratch-directory', default=None, help="Directory to use as scratch space; outputs will be retained there.")
 @click.argument('molids', nargs=-1)
-def debug_from_server(molids, fractal_uri, dataset_name, compute_specs):
+def debug_from_server(molids, fractal_uri, dataset_name, compute_specs, scratch_directory):
     import json
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -215,11 +216,37 @@ def debug_from_server(molids, fractal_uri, dataset_name, compute_specs):
     results = optexec.debug_optimization_from_server(fractal_uri,
                                                      dataset_name,
                                                      compute_specs=compute_specs,
+                                                     molids=molids,
+                                                     scratch_directory=scratch_directory)
+
+    # export and read back into JSON for final output
+    results_processed = [json.loads(res.json()) for res in results]
+    print(json.dumps(results_processed))
+
+
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.argument('molids', nargs=-1)
+def extract(molids, fractal_uri, dataset_name, compute_specs):
+    import json
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
+
+    results = optexec.get_optimization_from_server(fractal_uri,
+                                                     dataset_name,
+                                                     compute_specs=compute_specs,
                                                      molids=molids)
 
     # export and read back into JSON for final output
     results_processed = [json.loads(res.json()) for res in results]
     print(json.dumps(results_processed))
+
 
 
 @optimize.command()
