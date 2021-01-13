@@ -25,7 +25,7 @@ dependencies:
   - tqdm
 
   # MM calculations
-  - openforcefield =0.8.2
+  - openforcefield =0.8.3
 
 
 
