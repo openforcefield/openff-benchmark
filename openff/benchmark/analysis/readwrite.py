@@ -30,7 +30,9 @@ if oetk_loaded:
 
 def read_sdfs(path):
     mols = []
-    if os.path.isdir(path):
+    if (os.path.exists(path) and path.split('.')[-1] == 'sdf' ):
+        mols.append(Molecule.from_file(path, 'SDF', allow_undefined_stereo=True))
+    elif os.path.isdir(path):
         for root, dirs, files in os.walk(path):
             for file in files:
                 file_name = os.path.join(root, file)

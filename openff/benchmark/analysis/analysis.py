@@ -18,14 +18,14 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdMolAlign
+from tqdm import tqdm
 
-from . import metrics, readwrite, draw
-
+from . import metrics, readwrite
 
 def get_ref_confs(dataframe):
     ref_confs = {}
     dataframe.loc[:,'ref_conf'] = False
-    for mid in dataframe.molecule_index.unique():
+    for mid in tqdm(dataframe.molecule_index.unique(), desc='Finding reference molecules'):
         confs = dataframe.loc[dataframe.molecule_index==mid]
         if confs.shape[0] == 1:
             ref_conf = confs.name[0]
@@ -36,7 +36,7 @@ def get_ref_confs(dataframe):
     return ref_confs
 
 def ref_to_ref_confs(dataframe, ref_confs):
-    for mid in dataframe.molecule_index.unique():
+    for mid in tqdm(dataframe.molecule_index.unique(), desc='Referencing energies'):
         confs = dataframe.loc[dataframe.molecule_index==mid]
         ref_conf = ref_confs[mid]
         ref_energy = confs.loc[ref_conf, 'final_energy']
@@ -44,11 +44,11 @@ def ref_to_ref_confs(dataframe, ref_confs):
             dataframe.loc[i, 'final_energy'] = row['final_energy'] - ref_energy
             
 def calc_tfd(reference, result):
-    for i, row in reference.iterrows():
+    for i, row in tqdm(reference.iterrows(), desc='Calculating TFD'):
         result.loc[i, 'tfd'] = metrics.calc_tfd(row['mol'].to_rdkit(), result.loc[i, 'mol'].to_rdkit())
 
 def calc_rmsd(reference, result):
-    for i, row in reference.iterrows():
+    for i, row in tqdm(reference.iterrows(), desc='Calculating RMSD'):
         result.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(row['mol'].to_rdkit(), result.loc[i, 'mol'].to_rdkit())
         
 def calc_dde(reference, result):
@@ -116,7 +116,7 @@ def compare_conformers(reference, result, rmsd_cutoff):
     """
     
     conformer_match = reference.copy()
-    for mid in reference.molecule_index.unique():
+    for mid in tqdm(reference.molecule_index.unique(), desc='Matching conformers'):
         ref_confs = reference.loc[reference.molecule_index==mid]
         query_confs = result.loc[result.molecule_index==mid]
         rms_matrix = {i: {} for i, ref_row in ref_confs.iterrows()}
@@ -153,7 +153,7 @@ def main(input_path, ref_method, output_directory="./results"):
     """
     mols = {}
     dataframes = {}
-    for path in input_path:
+    for path in tqdm(input_path, desc='Reading files'):
         # read in molecules
         m_mols = readwrite.read_sdfs(path)
 
@@ -173,7 +173,7 @@ def main(input_path, ref_method, output_directory="./results"):
     ref_to_ref_confs(dataframes[ref_method], ref_confs)
 
     os.makedirs(output_directory, exist_ok=True)
-    for m in dataframes:
+    for m in tqdm(dataframes, desc='Processing data'):
         ref_to_ref_confs(dataframes[m], ref_confs)
         calc_rmsd(dataframes[ref_method], dataframes[m])
         calc_tfd(dataframes[ref_method], dataframes[m])

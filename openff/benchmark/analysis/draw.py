@@ -345,21 +345,27 @@ def draw_density2d(
     plt.xticks(fontsize=size1)
     plt.yticks(fontsize=size1)
 
-    if x_range is not None:
-        plt.xlim(x_range[0], x_range[1])
-
-    if y_range is not None:
-        plt.ylim(y_range[0], y_range[1])
+    if x_range is None:
+        x_range = (0, x_data.max())
+    plt.xlim(x_range[0], x_range[1])
+    if y_range is None:
+        yabs = y_data.abs().max()
+        y_range = (-yabs, yabs)
+    plt.ylim(y_range[0], y_range[1])
 
     # remove any nans from x_data, such as TFD score for urea-like mols
-    nan_inds = np.isnan(x_data)
-    x_data = x_data[~nan_inds]
+    nan_inds = x_data.isna()
+    x_data = x_data.dropna()
     y_data = y_data[~nan_inds]
-#    print(f"\nNumber of data points in FF scatter plot: {len(x_data)}")
+#    print('nan', x_data.isna().sum(), y_data.isna().sum())
+#    print('xd', x_data, x_data.max(), x_data.min())
+#    print('yd', y_data, y_data.max(), y_data.min())
+#    print(f"\nNumber of data points in FF scatter plot: {len(x_data)} {len(y_data)}")
 
     # compute histogram in 2d
     data, x_e, y_e = np.histogram2d(x_data, y_data, bins=bins)
-
+ #   print('data', data, data.min(), data.max())
+ #   print('e', x_e, y_e)
     # plot colored 2d histogram if z_interp not specified
     if not z_interp:
         extent = [x_e[0], x_e[-1], y_e[0], y_e[-1]]
@@ -384,10 +390,11 @@ def draw_density2d(
         method="splinef2d",
         bounds_error=False,
     )
+#    print(z, z.max(), z.min())
 
     # sort the points by density, so that the densest points are plotted last
     idx = z.argsort()
-    x, y, z = x_data[idx], y_data[idx], z[idx]
+    x, y, z = x_data.reindex(index=idx), y_data.reindex(index=idx), z[idx]
 
     # print(
     #     f"{title} ranges of data in density plot:\n\t\tmin\t\tmax"
@@ -397,8 +404,11 @@ def draw_density2d(
     #     f"\nz'\t{np.nanmin(z):10.4f}\t{np.nanmax(z):10.4f} (interpolated)"
     # )
 
-    # add dummy points of user-specified min/max z for uniform color scaling
-    # similar to using vmin/vmax in pyplot pcolor
+
+    if z_range is None:
+        z_range=(0, np.max(z))
+    # # add dummy points of user-specified min/max z for uniform color scaling
+    # # similar to using vmin/vmax in pyplot pcolor
     x = np.append(x, [-1, -1])
     y = np.append(y, [0, 0])
     z = np.append(z, [z_range[0], z_range[1]])
@@ -416,7 +426,8 @@ def draw_density2d(
     colorbar_and_finish(size1, out_file)
 
 
-def plot_compare_ffs(results_dir, ref_method):
+def plot_compare_ffs(results_dir, ref_method, output_directory):
+    os.makedirs(output_directory, exist_ok=True)
     results = {}
     for path in results_dir:
         if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
@@ -430,8 +441,8 @@ def plot_compare_ffs(results_dir, ref_method):
                         method = '.'.join(file.split('.')[:-1])
                         results[method] = pd.read_csv(path)
 
-    plot_violin_signed(results)
-    plot_mol_minima(results, ref_method)
+    plot_violin_signed(results, out_file=os.path.join(output_directory, 'violin.svg'))
+    plot_mol_minima(results, ref_method,  out_file=os.path.join(output_directory, 'minimaE.png'))
 
     for method, result in results.items():
         # ddE vs RMSD scatter
@@ -440,7 +451,7 @@ def plot_compare_ffs(results_dir, ref_method):
                      method,
                      'rmsd',
                      'dde',
-                     f'fig_{method}_scatter_rmsd_dde.png',
+                     os.path.join(output_directory, f'fig_{method}_scatter_rmsd_dde.png'),
                      what_for="talk"
                      )
         draw_scatter(result.loc[:, 'tfd'],
@@ -448,7 +459,7 @@ def plot_compare_ffs(results_dir, ref_method):
                      method,
                      'tfd',
                      'dde',
-                     f'fig_{method}_scatter_tfd_dde.png',
+                     os.path.join(output_directory, f'fig_{method}_scatter_tfd_dde.png'),
                      what_for="talk"
                      )
         
@@ -459,11 +470,11 @@ def plot_compare_ffs(results_dir, ref_method):
             method,
             'rmsd',
             'dde',
-            f'fig_{method}_density_rmsd_dde_linear.png',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_linear.png'),
             what_for="talk",
-            x_range=(0,3.7),
-            y_range=(-30,30),
-            z_range=(-260,5200),
+            # x_range=(0,3.7),
+            # y_range=(-30,30),
+            # z_range=(-260,5200),
             z_interp=True,
             symlog=False
         )
@@ -473,11 +484,11 @@ def plot_compare_ffs(results_dir, ref_method):
             method,
             'tfd',
             'dde',
-            f'fig_{method}_density_rmsd_dde_linear.png',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_linear.png'),
             what_for="talk",
-            x_range=(0,0.8),
-            y_range=(-30,30),
-            z_range=(-302,7060),
+            # x_range=(0,0.8),
+            # y_range=(-30,30),
+            # z_range=(-302,7060),
             z_interp=True,
             symlog=False
         )
@@ -488,11 +499,11 @@ def plot_compare_ffs(results_dir, ref_method):
             method,
             'rmsd',
             'dde',
-            f'fig_{method}_density_rmsd_dde_log.png',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_log.png'),
             what_for="talk",
-            x_range=(0,3.7),
-            y_range=(-30,30),
-            z_range=(-260,5200),
+            # x_range=(0,3.7),
+            # y_range=(-30,30),
+            # z_range=(-260,5200),
             z_interp=True,
             symlog=True
         )
@@ -502,11 +513,11 @@ def plot_compare_ffs(results_dir, ref_method):
             method,
             'tfd',
             'dde',
-            f'fig_{method}_density_rmsd_dde_log.png',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_log.png'),
             what_for="talk",
-            x_range=(0,0.8),
-            y_range=(-30,30),
-            z_range=(-302,7060),
+            # x_range=(0,0.8),
+            # y_range=(-30,30),
+            # z_range=(-302,7060),
             z_interp=True,
             symlog=True
         )
@@ -519,7 +530,7 @@ def plot_compare_ffs(results_dir, ref_method):
                 f"{method2} vs. {method}",
                 f"RMSD {method} ($\AA$)",
                 f"RMSD {method2} ($\AA$)",
-                f"fig_scatter_rmsd_{method2}_{method}.png",
+                os.path.join(output_directory, f"fig_scatter_rmsd_{method2}_{method}.png"),
                 "paper"
             )
 
@@ -529,7 +540,7 @@ def plot_compare_ffs(results_dir, ref_method):
                 f"{method2} vs. {method}",
                 f"TFD {method}",
                 f"TFD {method2}",
-                f"fig_scatter_tfd_{method2}_{method}.png",
+                os.path.join(output_directory, f"fig_scatter_tfd_{method2}_{method}.png"),
                 "paper"
             )
 
@@ -539,7 +550,7 @@ def plot_compare_ffs(results_dir, ref_method):
                 f"{method2} vs. {method}",
                 f"ddE {method} (kcal/mol)",
                 f"ddE {method2} (kcal/mol)",
-                f"fig_scatter_dde_{method2}_{method}.png",
+                os.path.join(output_directory, f"fig_scatter_dde_{method2}_{method}.png"),
                 "paper"
             )
             
@@ -548,7 +559,7 @@ def plot_compare_ffs(results_dir, ref_method):
         results,
         'dde',
         'ddE (kcal/mol)',
-        out_file=f'fig_ridge_dde.png',
+        out_file=os.path.join(output_directory, f'fig_ridge_dde.png'),
         what_for="talk",
         bw="hist",
         same_subplot=True,
@@ -559,7 +570,7 @@ def plot_compare_ffs(results_dir, ref_method):
         results,
         'rmsd',
         'RMSD ($\AA$)',
-        out_file=f'fig_ridge_rmsd.png',
+        out_file=os.path.join(output_directory, f'fig_ridge_rmsd.png'),
         what_for="talk",
         bw="hist",
         same_subplot=True,
@@ -570,7 +581,7 @@ def plot_compare_ffs(results_dir, ref_method):
         results,
         'tfd',
         'TFD',
-        out_file=f'fig_ridge_tfd.png',
+        out_file=os.path.join(output_directory, f'fig_ridge_tfd.png'),
         what_for="talk",
         bw="hist",
         same_subplot=True,
@@ -581,7 +592,7 @@ def plot_compare_ffs(results_dir, ref_method):
 
 
 
-def plot_violin_signed(dataframes, what_for='talk'):
+def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
     """
     Generate violin plots of the mean signed errors
     of force field energies with respect to QM energies.
@@ -659,7 +670,7 @@ def plot_violin_signed(dataframes, what_for='talk'):
                                )
                      )
 
-    fig.write_image(f'violin.svg')
+    fig.write_image(out_file)
     # replot the median point for larger marker, zorder to plot points on top
     # xlocs = ax.get_xticks()
     # for i, x in enumerate(xlocs):
@@ -776,7 +787,7 @@ def plot_mol_rmses(mol_name, rmses, xticklabels, eff_nconfs, ref_nconfs, what_fo
     plt.close(plt.gcf())
 
 
-def plot_mol_minima(dataframes, ref_method, what_for='talk', selected=None):
+def plot_mol_minima(dataframes, ref_method, out_file='minimaE.png', what_for='talk', selected=None):
     """
     Generate line plot of conformer energies of all methods (single molecule).
 
@@ -816,7 +827,7 @@ def plot_mol_minima(dataframes, ref_method, what_for='talk', selected=None):
         mol_name = list(ref_confs['name'])[0]
         plttitle = f"Relative Energies of {mol_name} Minima"
         ylabel = "ddE (kcal/mol)"
-        figname = f"minimaE_{mol_name}.png"
+        figname = f"{out_file[:-4]}_{mol_name}{out_file[-4:]}"
         xlabs = ref_confs['conformer_index']
 
         # create figure

@@ -44,8 +44,8 @@ def calc_tfd(ref_mol, query_mol):
     qsmiles = Chem.MolToSmiles(query_mol)
     if rsmiles != qsmiles:
         print(
-            f"- WARNING: The reference mol '{ref_mol.GetTitle()}' and "
-            f"query mol '{query_mol.GetTitle()}' do NOT have the same "
+            f"- WARNING: The reference mol {ref_mol.GetProp('_Name')} and "
+            f"query mol {query_mol.GetProp('_Name')} do NOT have the same "
             f"SMILES strings as determined by RDKit MolToSmiles. "
             f"\n {rsmiles}\n {qsmiles}"
         )
@@ -58,7 +58,7 @@ def calc_tfd(ref_mol, query_mol):
         # triggered for molecules such as urea
         except IndexError:
             print(
-                f"- Error calculating TFD on molecule '{ref_mol.GetTitle()}'."
+                f"- Error calculating TFD on molecule {ref_mol.GetProp('_Name')}."
                 " Possibly no non-terminal rotatable bonds found."
             )
             tfd = np.nan
