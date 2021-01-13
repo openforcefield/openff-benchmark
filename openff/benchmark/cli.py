@@ -4,6 +4,25 @@ Top-level `openff-benchmark` cli entrypoint.
 """
 
 import click
+import logging
+
+# Deregister OpenEye for any ToolkitRegistry calls that happen in this file
+logger = logging.getLogger('openforcefield.utils.toolkits')
+prev_log_level = logger.getEffectiveLevel()
+logger.setLevel(logging.ERROR)
+
+from openforcefield.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+logger.setLevel(prev_log_level)
+
+oetk_loaded = False
+for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
+    if isinstance(tkw, OpenEyeToolkitWrapper):
+        oetk_loaded = True
+if oetk_loaded:
+    GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
+
 
 @click.group()
 def cli():
@@ -321,7 +340,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     else:
         if delete_existing:
             shutil.rmtree(output_directory)
-            os.makedirs(os.path.join(output_directory, "error_mols"))
+            os.makedirs(output_directory)
         elif add:
             existing_output_mols = glob.glob(os.path.join(output_directory, '*.sdf'))
             name_assignments = np.loadtxt(os.path.join(output_directory, 'name_assignments.csv'))
@@ -333,18 +352,13 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
                                  group_name,
                                  existing_output_mols,
                                  name_assignments,
-                                 delete_existing=delete_existing)
+                                 delete_existing)
 
     success_mols, error_mols, name_assignments = output
 
     # Write successfully processed mols
     for success_mol in success_mols:
         success_mol.to_file(os.path.join(output_directory, success_mol.name + ".sdf"), "sdf")
-    # Write errored mols
-    #for error_mol, e in error_mols:
-    #    error_mol.to_file(os.path.join(output_directory, "error_mols", error_mol.name + ".sdf"), "sdf")
-    #    with open(os.path.join(output_directory, "error_mols", error_mol.name + ".txt"), 'w') as of:
-    #        of.write(e)
 
     # Create error directory
     error_dir = os.path.join(output_directory, 'error_mols')
@@ -368,10 +382,9 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     #out_file_name = os.path.join(output_directory, 'name_assignments.csv')
     import csv
     with open(os.path.join(output_directory, 'name_assignments.csv'), 'w', newline='') as of:
+        of.write('orig_name,orig_file,orig_file_index,out_file_name\n')
         csvw = csv.writer(of)
-
-    #np.savetxt(out_file_name, np.array(name_assignments))
-        #of.write('orig_name,orig_file,orig_file_index,out_file_name\n')
+        #np.savetxt(out_file_name, np.array(name_assignments))
         for name_assignment in name_assignments:
             csvw.writerow(name_assignment)
         #    of.write(','.join([str(i) for i in name_assignment]))
@@ -397,11 +410,78 @@ def generate_conformers(input_directory, output_directory, delete_existing):
     
 
     """
+    from openforcefield.topology import Molecule
     from openff.benchmark.utils.generate_conformers import generate_conformers
+    import glob
+    import os
+    import shutil
+    import re
 
-    generate_conformers(input_directory,
-                        output_directory,
-                        delete_existing=delete_existing)
-    
+
+    try:
+        os.makedirs(output_directory)
+    except OSError:
+        if delete_existing:
+            shutil.rmtree(output_directory)
+            os.makedirs(output_directory)
+        else:
+            raise Exception(f'Output directory {output_directory} already exists. '
+                             'Specify `delete_existing=True` to remove.')
+
+    input_3d_files = glob.glob(os.path.join(input_directory,'*.sdf'))
+
+    group2idx2mols2confs = {}
+
+    for input_3d_file in input_3d_files:
+        # try:
+        # We have to allow undefined stereo here because of some silliness with
+        # RDKitToolkitWrapper percieveing stereo around terminal ethene groups
+        # Note: Allowing undefined stereo shouldn't be necessary any more, ever since the 0.8.2 release
+        # See https://github.com/openforcefield/openff-toolkit/pull/786
+        mol = Molecule.from_file(input_3d_file, allow_undefined_stereo=True)
+        # except:
+        #    raise Exception(input_3d_file)
+        match = re.findall('([a-zA-Z0-9]{3})-([0-9]{5})-([0-9]{2}).sdf',
+                           input_3d_file)
+        assert len(match) == 1
+        group_id = match[0][0]
+        mol_idx = match[0][1]
+        conf_id = match[0][2]
+        if group_id not in group2idx2mols2confs:
+            group2idx2mols2confs[group_id] = {}
+        if mol_idx not in group2idx2mols2confs[group_id]:
+            group2idx2mols2confs[group_id][mol_idx] = {}
+        assert conf_id not in group2idx2mols2confs[group_id][mol_idx]
+
+        group2idx2mols2confs[group_id][mol_idx][conf_id] = mol
+        # raise Exception((group_id, mol_id))
+
+    outputs = generate_conformers(group2idx2mols2confs)
+    success_mols, error_mols = outputs
+
+    # Write successfully processed mols
+    for success_mol in success_mols:
+        success_mol.to_file(os.path.join(output_directory, success_mol.name + ".sdf"), "sdf")
+
+    # Create error directory
+    error_dir = os.path.join(output_directory, 'error_mols')
+    os.makedirs(error_dir)
+
+    # Write error mols
+    for error_mol, exception in error_mols:
+        output_mol_file = os.path.join(error_dir, f'{error_mol.name}.sdf')
+        try:
+            error_mol.to_file(output_mol_file, file_format='sdf')
+        except Exception as e:
+            exception = str(exception)
+            exception += "\n Then failed when trying to write mol to error directory with "
+            exception += str(e)
+        output_summary_file = os.path.join(error_dir, f'{error_mol.name}.txt')
+        with open(output_summary_file, 'w') as of:
+            of.write(f'source: {error_mol.name}\n')
+            of.write(f'error text: {exception}\n')
+
+
+
 if __name__ == "__main__":
     cli()

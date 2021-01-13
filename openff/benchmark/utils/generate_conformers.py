@@ -9,6 +9,7 @@ from rdkit import Chem
 from simtk import unit
 import numpy as np
 from tqdm import tqdm
+import io
 
 off_logger = logging.getLogger('openforcefield.utils.toolkits')
 prev_log_level = off_logger.getEffectiveLevel()
@@ -204,55 +205,18 @@ def gen_confs_preserving_orig_confs(conformer_mols,
         
     
 
-def generate_conformers(input_directory, output_directory, delete_existing=False):
+def generate_conformers(group2idx2mols2confs):
 
-    try:
-        os.makedirs(output_directory)
-    except OSError:
-        if delete_existing:
-            shutil.rmtree(output_directory)
-            os.makedirs(output_directory)
-        else:
-            raise Exception(f'Output directory {output_directory} already exists. '
-                             'Specify `delete_existing=True` to remove.')
-
-    logging.basicConfig(filename=os.path.join(output_directory,'log.txt'),
-                        level=logging.DEBUG)
-
-    input_3d_files = glob.glob(os.path.join(input_directory,'*.sdf'))
-    input_graph_files = glob.glob(os.path.join(input_directory,'*.smi'))
-
-    group2idx2mols2confs = {}
-        
-
-    for input_3d_file in input_3d_files:
-        #try:
-        # We have to allow undefined stereo here because of some silliness with
-        # RDKitToolkitWrapper percieveing stereo around terminal ethene groups
-        mol = Molecule.from_file(input_3d_file, allow_undefined_stereo=True)
-        #except:
-        #    raise Exception(input_3d_file)
-        match = re.findall('([a-zA-Z0-9]{3})-([0-9]{5})-([0-9]{2}).sdf',
-                           input_3d_file)
-        assert len(match) == 1
-        group_id = match[0][0]
-        mol_idx = match[0][1]
-        conf_id = match[0][2]
-        if group_id not in group2idx2mols2confs:
-            group2idx2mols2confs[group_id] = {}
-        if mol_idx not in group2idx2mols2confs[group_id]:
-            group2idx2mols2confs[group_id][mol_idx] = {}
-        assert conf_id not in group2idx2mols2confs[group_id][mol_idx]
-            
-        group2idx2mols2confs[group_id][mol_idx][conf_id] = mol
-        #raise Exception((group_id, mol_id))
+    #logging.basicConfig(filename=os.path.join(output_directory,'log.txt'),
+    #                    level=logging.DEBUG)
 
     # Generate new conformers
     print('Generating new conformers')
 
     # TODO: Make tests for error logic
-    error_dir = os.path.join(output_directory, 'error_mols')
-    os.makedirs(error_dir)
+
+    success_mols = []
+    error_mols = []
 
     sorted_group_ids = sorted(list(group2idx2mols2confs.keys()))
     for group_id in sorted_group_ids:
@@ -272,13 +236,14 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
                     for conf_idx in group2idx2mols2confs[group_id][mol_idx]:
                         conf_file = f'{mol_id}-{int(conf_idx):02d}.sdf'
                         conf_mol = group2idx2mols2confs[group_id][mol_idx][conf_idx]
-                        conf_mol.to_file(os.path.join(error_dir, conf_file), file_format='sdf')
+                        error_mols.append((conf_mol, e))
+                        #conf_mol.to_file(os.path.join(error_dir, conf_file), file_format='sdf')
                 except Exception as e2:
                     logging.info(f'Unable to write all error structures to file. Encountered error [{e}]')
                     e = str(e) + '\n Then, when trying to write out the conformers:\n' + str(e2)
-                    
-                with open(os.path.join(error_dir, f'{mol_id}.txt'), 'w') as of:
-                    of.write(str(e))
+                    error_mols.append((Molecule(), e))
+                #with open(os.path.join(error_dir, f'{mol_id}.txt'), 'w') as of:
+                #    of.write(str(e))
                 del group2idx2mols2confs[group_id][mol_idx]
                 continue
 
@@ -286,16 +251,31 @@ def generate_conformers(input_directory, output_directory, delete_existing=False
     #for group_id in group2idx2mols2confs:
     #    for mol_idx in group2idx2mols2confs[group_id]:
             for conf_idx in group2idx2mols2confs[group_id][mol_idx]:
-                mol_name = f'{group_id}-{int(mol_idx):05d}'
+                mol_name = f'{group_id}-{int(mol_idx):05d}-{int(conf_idx):02d}'
                 this_conf = group2idx2mols2confs[group_id][mol_idx][conf_idx]
                 this_conf.properties['group_name'] = group_id
                 this_conf.properties['molecule_index'] = mol_idx
                 this_conf.name = mol_name
                 
                 this_conf.properties['conformer_index'] = conf_idx
-                out_file_name = f'{this_conf.name}-{int(conf_idx):02d}.sdf'
-                this_conf.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
+                out_file_name = f'{this_conf.name}.sdf'
 
-    #for (group_id, mol_idx), e in error_mols:
+                # Ensure this conformer is loadable
+                import tempfile
+                try:
+                    # Do a roundtrip save/load to ensure this won't crash in subsequent steps
+                    with tempfile.TemporaryFile('w') as tmp:
+                        sio = io.StringIO()
+                        this_conf.to_file(sio, file_format='sdf')
+                        sio.seek(0)
+                        bio = io.BytesIO(sio.read().encode('utf8'))
+                    test_loaded_mol = Molecule.from_file(bio, file_format='sdf')
+                    test_loaded_mol.to_rdkit()
+                    success_mols.append(this_conf)
+                except Exception as e:
+                    error_mols.append((this_conf, e))
+                #this_conf.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
+
+    return success_mols, error_mols
 
         

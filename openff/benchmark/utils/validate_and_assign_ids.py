@@ -15,15 +15,14 @@ from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolki
 
 logger.setLevel(prev_log_level)
 
-
-
 oetk_loaded = False
 for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
     if isinstance(tkw, OpenEyeToolkitWrapper):
         oetk_loaded = True
 if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
-    
+
+
 def validate_and_assign(input_3d_files,
                         group_name,
                         existing_output_mols,
@@ -75,7 +74,8 @@ def validate_and_assign(input_3d_files,
                 mol.to_file(sio, file_format='sdf')
                 sio.seek(0)
                 bio = io.BytesIO(sio.read().encode('utf8'))
-                Molecule.from_file(bio, file_format='sdf')
+                test_loaded_mol = Molecule.from_file(bio, file_format='sdf')
+                test_loaded_mol.to_rdkit()
             except Exception as e:
                 error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, e))
                 continue
