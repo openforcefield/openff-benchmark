@@ -340,8 +340,12 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing):
 @click.option('-o', '--output-directory',
               default='2-generate_conformers', 
               help='Directory for output files. If this directory does not exist, one will be created.')
+@click.option("--processors",
+              default=None,
+              type=click.INT,
+              help="The number of processors that can be used when generating the conformers, if nothing is supplied all will be used.")
 @click.argument('input-directory')
-def generate_conformers(input_directory, output_directory, delete_existing):
+def generate_conformers(input_directory, output_directory, delete_existing, processors):
     """Generate additional conformers for validated molecules.
 
     INPUT-DIRECTORY should contain validated molecules;
@@ -359,7 +363,7 @@ def generate_conformers(input_directory, output_directory, delete_existing):
 
     generate_conformers(input_directory,
                         output_directory,
-                        delete_existing=delete_existing)
+                        delete_existing=delete_existing, processors=processors)
     
 if __name__ == "__main__":
     cli()
