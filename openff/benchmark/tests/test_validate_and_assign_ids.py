@@ -86,6 +86,7 @@ BBB""" in file_text
             assert len(output_files) == 4
         
     # single file multi conformer
+    @pytest.mark.xfail
     def test_single_file_multi_conformer(self, tmpdir):
         with tmpdir.as_cwd():
             test_dir = '1-validate_and_assign_graphs_and_confs'
