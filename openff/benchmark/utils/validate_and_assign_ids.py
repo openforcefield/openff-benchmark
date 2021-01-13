@@ -1,12 +1,10 @@
 from tqdm import tqdm
-import glob
 import os
 import logging
 import io
 import copy
 import shutil
 from openff.benchmark.utils.generate_conformers import align_offmol_conformers, greedy_conf_deduplication
-from rdkit import Chem
 
 logger = logging.getLogger('openforcefield.utils.toolkits')
 prev_log_level = logger.getEffectiveLevel()
@@ -17,35 +15,35 @@ from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolki
 
 logger.setLevel(prev_log_level)
 
-
-from .io import mols_from_paths
-
-#logger = logging.logger()
-
 oetk_loaded = False
 for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
     if isinstance(tkw, OpenEyeToolkitWrapper):
         oetk_loaded = True
 if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
-    
-def validate_and_assign(#input_graph_files,
-                        input_3d_files,
-                        group_name,
-                        output_directory='1-validate_and_assign',
-                        delete_existing=False):
-    
-    try:
-        os.makedirs(output_directory)
-    except OSError:
-        if delete_existing:
-            shutil.rmtree(output_directory)
-            os.makedirs(output_directory)
-        else:
-            raise Exception(f'Output directory {output_directory} already exists. '
-                             'Specify `delete_existing=True` to remove.')
 
-    logging.basicConfig(filename=os.path.join(output_directory,'log.txt'),
+
+def validate_and_assign(input_3d_files,
+                        group_name,
+                        existing_output_mols,
+                        #output_directory='1-validate_and_assign',
+                        name_assignments,
+                        delete_existing=False):
+    """
+
+    Parameters
+    ----------
+    input_3d_files : iterable of string
+        Names of SDF files which contain one or more molecules
+    group_name :
+    existing_output_mols :
+    name_assignments :
+    delete_existing :
+
+    """
+    
+
+    logging.basicConfig(filename=os.path.join('log.txt'),
                         level=logging.DEBUG)
     #this_logger = logging.getLogger(__name__)
         
@@ -76,7 +74,8 @@ def validate_and_assign(#input_graph_files,
                 mol.to_file(sio, file_format='sdf')
                 sio.seek(0)
                 bio = io.BytesIO(sio.read().encode('utf8'))
-                Molecule.from_file(bio, file_format='sdf')
+                test_loaded_mol = Molecule.from_file(bio, file_format='sdf')
+                test_loaded_mol.to_rdkit()
             except Exception as e:
                 error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, e))
                 continue
@@ -142,7 +141,9 @@ def validate_and_assign(#input_graph_files,
     # Assign names and write out files
     # Preserve a mapping of input filename/mol index to output name
     name_assignments = []
-    print("Assigning IDs and writing out validated files")
+    success_mols = []
+
+    print("Assigning IDs and preparing molecules for output")
     for unique_mol_index, smiles in tqdm(enumerate(smiles2mol.keys())):
         mol_name = f'{group_name}-{unique_mol_index:05d}'
         smiles2mol[smiles].properties['group_name'] = group_name
@@ -155,9 +156,12 @@ def validate_and_assign(#input_graph_files,
         mol_copy.properties.pop('original_file_indices')
         mol_copy.properties.pop('original_names')
 
-        # Write conformers
+    # Write conformers
+    #print("Writing out validated files")
+    #for unique_mol_index, smiles in tqdm(enumerate(smiles2mol.keys())):
         for conf_index, conformer in enumerate(smiles2mol[smiles].conformers):
-            out_file_name = f'{mol_copy.name}-{conf_index:02d}.sdf'
+            mol_copy2 = copy.deepcopy(mol_copy)
+            mol_copy2.name = f'{mol_copy.name}-{conf_index:02d}'
 
             orig_file = smiles2mol[smiles].properties['original_files'][conf_index]
             orig_file_index = smiles2mol[smiles].properties['original_file_indices'][conf_index]
@@ -165,40 +169,19 @@ def validate_and_assign(#input_graph_files,
             msg = f'Molecule with name {orig_name} from '
             msg += f'file:position {orig_file}:{orig_file_index}'
             msg += f' has passed validation '
-            msg += f'and is being written to file {out_file_name}.'
+            msg += f'and is being renamed to {mol_copy2.name}.'
             logging.info(msg)
 
-            name_assignments.append((orig_name, orig_file, orig_file_index, out_file_name))
-            mol_copy._conformers = None
-            mol_copy.add_conformer(conformer)
-            mol_copy.properties['conformer_index'] = conf_index
-            mol_copy.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
+            name_assignments.append((orig_name, orig_file, orig_file_index, mol_copy2.name))
+            mol_copy2._conformers = None
+            mol_copy2.add_conformer(conformer)
+            mol_copy2.properties['conformer_index'] = conf_index
+            success_mols.append(mol_copy2)
+            #mol_copy.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
 
-    # Write name assignments
-    with open(os.path.join(output_directory, 'name_assignments.csv'), 'w') as of:
-        of.write('orig_name,orig_file,orig_file_index,out_file_name\n')
-        for name_assignment in name_assignments:
-            of.write(','.join([str(i) for i in name_assignment]))
-            of.write('\n')
+    return success_mols, error_mols, name_assignments
 
-    # Create error directory
-    error_dir = os.path.join(output_directory, 'error_mols')
-    os.makedirs(error_dir)
 
-    
-    # Write error mols
-    for idx, (filename, error_mol, exception) in enumerate(error_mols):
-        output_mol_file = os.path.join(error_dir, f'error_mol_{idx}.sdf')
-        try:
-            error_mol.to_file(output_mol_file, file_format='sdf')
-        except Exception as e:
-            exception = str(exception)
-            exception += "\n Then failed when trying to write mol to error directory with "
-            exception += str(e)
-        output_summary_file = os.path.join(error_dir, f'error_mol_{idx}.txt')
-        with open(output_summary_file, 'w') as of:
-            of.write(f'source: {filename}\n')
-            of.write(f'error text: {exception}\n')
                   
         
     

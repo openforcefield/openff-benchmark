@@ -34,7 +34,9 @@ def test_execute_optimization_from_molecules(tmpdir):
 
         input_mols = [get_data_file_path('ethane.sdf')]
 
-        compute.execute_optimization_from_molecules(
+        optexec = compute.OptimizationExecutor()
+
+        optexec.execute_optimization_from_molecules(
                 input_mols, 
                 '3-export-compute',
                 '1:1',
