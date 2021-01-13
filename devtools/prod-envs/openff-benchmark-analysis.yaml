@@ -32,6 +32,13 @@ dependencies:
   # compute backends
   - dask-jobqueue
 
-  # submission
+  # pulling data
   - qcportal
   - qcsubmit =0.1.1
+
+  # analysis
+  - numpy
+  - pint
+  - itertools
+  - matplotlib
+  - seaborn
