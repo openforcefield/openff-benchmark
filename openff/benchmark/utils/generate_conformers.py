@@ -59,7 +59,7 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
         for i in range(rdmol.GetNumConformers()):
             for j in range(i+1, rdmol.GetNumConformers()):
                 #print(i,j)
-                rmsd = Chem.rdMolAlign.CalcRMS(rdmol,
+                rmsd = Chem.rdMolAlign.GetBestRMS(rdmol,
                                                rdmol,
                                                prbId=j,
                                                refId=i)
