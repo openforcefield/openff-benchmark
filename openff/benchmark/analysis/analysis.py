@@ -16,6 +16,8 @@ Version: Dec 1 2020
 import os
 import numpy as np
 import pandas as pd
+import warnings
+
 from rdkit import Chem
 from rdkit.Chem import rdMolAlign
 from tqdm import tqdm
@@ -168,7 +170,16 @@ def main(input_path, ref_method, output_directory="./results"):
         dataframes[method] = readwrite.mols_to_dataframe(mols[method])
 
     assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
-    
+
+    index_intersect = dataframes[ref_method].index
+    for m in tqdm(dataframes, desc='Checking input'):
+        index_intersect = index_intersect.intersection(dataframes[m].index)
+    for m, df in tqdm(dataframes.items(), desc='Checking input'):
+        dataframes[m] = df.loc[index_intersect]
+        if dataframes[m].shape != df.shape:
+            warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
+
+
     ref_confs = get_ref_confs(dataframes[ref_method])
     ref_to_ref_confs(dataframes[ref_method], ref_confs)
 
