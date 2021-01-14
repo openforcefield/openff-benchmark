@@ -235,13 +235,12 @@ def draw_ridgeplot(
 
     temp = []
     for method, result in dataframes.items():
-        df = pd.DataFrame(result, columns=[x_label])
-        df["method"] = method
-        temp.append(df)
+        result = result.rename(columns={key: x_label})
+        result["method"] = method
+        temp.append(result)
 
     # list of dataframes concatenated to single dataframe
     df = pd.concat(temp, ignore_index=True)
-    #    print(method_labels)
     g = sns.FacetGrid(
         df, row="method", hue="method", aspect=10, height=ridgedict["h"], palette=colors
     )
@@ -258,12 +257,11 @@ def draw_ridgeplot(
                 "align": "mid",
             }
             g.map(
-                sns.distplot,
+                sns.displot,
                 x_label,
-                hist=True,
-                kde=False,
+                kind="hist",
                 bins=15,
-                norm_hist=True,
+                stat="probability",
                 hist_kws=histoptions,
             )
         else:
@@ -288,20 +286,18 @@ def draw_ridgeplot(
     # draw outline around densities; can also single outline color: color="k"
     if bw == "hist":
         histoptions = {
-            "histtype": "step",
+            "element": "step",
             "alpha": 1.0,
             "linewidth": ridgedict["lw"],
-            "range": hist_range,
-            "align": "mid",
+            "fill": False,
+            "binrange": hist_range,
         }
         g.map(
-            sns.distplot,
+            sns.histplot,
             x_label,
-            hist=True,
-            kde=False,
             bins=15,
-            norm_hist=True,
-            hist_kws=histoptions,
+            stat="probability",
+            **histoptions,
         )
 
     else:
