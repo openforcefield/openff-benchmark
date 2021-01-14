@@ -17,7 +17,6 @@ from scipy.interpolate import interpn
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
-from plotly import graph_objects as go
 
 def draw_scatter(
     x_data, y_data, method_label, x_label, y_label, out_file, what_for="talk"
@@ -359,64 +358,6 @@ def draw_ridgeplot(
     plt.clf()
 
 
-
-    # Initialize the FacetGrid object
-#    my_cmap = "tab10"
-#    sns.palplot(sns.color_palette(my_cmap))
-#    colors = sns.color_palette(my_cmap)
-
-
-    # fig = go.Figure()
-    # for method, result in dataframes.items():
-    #     if bw == "hist":
-    #         hist = np.histogram(result[key], bins=15, range=hist_range, density=True)
-    #         fig.add_trace(
-    #             go.Scatter(
-    #                 x=hist[1],
-    #                 y=hist[0]+[hist[0][-1]],
-    #                 name=method,
-    #                 mode='lines',
-    #                 line=dict(
-    #                     width=ridgedict["lw"],
-    #                     shape='hv'
-    #                 ),
-    #             )
-    #         )
-    #     elif bw == "kde":
-    #         fig.add_trace(
-    #             go.Violin(
-    #                 x=result[key],
-    #                 line_width=ridgedict["lw"]
-    #             )
-    #         )
-            
-
-    # if bw == "kde":
-    #     fig.update_traces(
-    #         orientation="h",
-    #         side="positive",
-    #         points=False
-    #         )
-
-    # fig.update_layout(
-    #     xaxis=dict(
-    #         title=dict(
-    #             text=x_label,
-    #             font_size=ridgedict["xfontsize"]
-    #             ),
-    #         range=hist_range
-    #         ),
-    #     shapes=[
-    #         dict(
-    #             type= 'line',
-    #             yref= 'paper', y0= 0, y1= 1,
-    #             xref= 'x', x0= 0, x1= 0
-    #         )
-    #     ]
-    # )
-    
-    # fig.write_image(out_file)
-    
 
 def draw_density2d(
     x_data,
@@ -769,106 +710,82 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
         "paper" or "talk"
 
     """
+
+    # create dataframe from list of lists
+    df = pd.DataFrame({method: result.loc[:, 'dde[kcal/mol]'] for method, result in dataframes.items()})
+
+    medians = df.median(axis=0)
+
+    # reshape for grouped violin plots
+    df = df.melt(value_vars=list(df.columns))
+    df = df.dropna()
     
-#     # print stats on number of datapoints in each method
-#     temp = msds.T
-#     for l, m in zip(temp, ff_list):
-#         print(f"Total number of unique molecules: {l.shape}")
-#         print(f"Count of non-nan molecules for {m}: {np.count_nonzero(~np.isnan(l))}")
+    # set grid background style
+    sns.set(style="whitegrid")
 
-#     # create dataframe from list of lists
-#     df = pd.DataFrame.from_records(msds, columns=ff_list)
-#     medians = df.median(axis=0)
+    if what_for == 'paper':
+#        f, ax = plt.subplots(figsize=(2, 5))
+        f, ax = plt.subplots(figsize=(8, 5))
+        large_font = 10
+        small_font = 8
+        lw = 1
+        med_pt = 5
+        xrot = 45
+        xha = 'right'
+    elif what_for == 'talk':
+        f, ax = plt.subplots(figsize=(10, 8))
+        large_font = 16
+        small_font = 14
+        lw = 2
+        med_pt = 10
+        xrot = 0
+        xha = 'center'
 
-#     # reshape for grouped violin plots
-#     df = df.melt(value_vars=list(df.columns))
-#     df = df.dropna()
-    
-#     # set grid background style
-#     sns.set(style="whitegrid")
+        # overlapping violins
+        #lw=1.0
+        #f, ax = plt.subplots(figsize=(4, 8))
 
-#     if what_for == 'paper':
-# #        f, ax = plt.subplots(figsize=(2, 5))
-#         f, ax = plt.subplots(figsize=(8, 5))
-#         large_font = 10
-#         small_font = 8
-#         lw = 1
-#         med_pt = 5
-#         xrot = 45
-#         xha = 'right'
-#     elif what_for == 'talk':
-#         f, ax = plt.subplots(figsize=(10, 8))
-#         large_font = 16
-#         small_font = 14
-#         lw = 2
-#         med_pt = 10
-#         xrot = 0
-#         xha = 'center'
+    my_cmap = "tab10"
+    colors = sns.color_palette(my_cmap)
 
-#         # overlapping violins
-#         #lw=1.0
-#         #f, ax = plt.subplots(figsize=(4, 8))
+    # show each distribution with both violins and points
+    ax = sns.violinplot(x='variable', y='value', data=df, inner="box",
+                        palette=colors, size=5, aspect=3, linewidth=lw)
 
-#     my_cmap = "tab10"
-#     colors = sns.color_palette(my_cmap)
-
-#     # show each distribution with both violins and points
-#     ax = sns.violinplot(x='variable', y='value', data=df, inner="box",
-#                         palette=colors, size=5, aspect=3, linewidth=lw)
-    fig = go.Figure()
-    for method, result in dataframes.items():
-        fig.add_trace(go.Violin(x0=method,
-                                y=result.loc[:,'dde[kcal/mol]'],
-                                hovertext=method,
-#                               legendgroup=idx, 
-    #                             alignmentgroup=idx,
-#                                offsetgroup=idx,
-#                                scalegroup=idx, 
-                                name=method,
-                                showlegend = False,
-#                                marker_color=clrs[i]
-                               )
-                     )
-    fig.update_layout(
-        dict(
-            yaxis_title='ddE [kcal/mol]'
-            )
-    )
-    fig.write_image(out_file)
     # replot the median point for larger marker, zorder to plot points on top
-    # xlocs = ax.get_xticks()
-    # for i, x in enumerate(xlocs):
-    #     plt.scatter(x, medians[i], marker='o', color='white', s=med_pt, zorder=100)
+    xlocs = ax.get_xticks()
+    for i, x in enumerate(xlocs):
+        plt.scatter(x, medians[i], marker='o', color='white', s=med_pt, zorder=100)
 
-    # # represent the y-data on log scale
-    # plt.yscale('symlog')
+    # represent the y-data on log scale
+    plt.yscale('symlog')
 
-    # # set alpha transparency
-    # plt.setp(ax.collections, alpha=0.8)
+    # set alpha transparency
+    plt.setp(ax.collections, alpha=0.8)
 
-    # # hide vertical plot boundaries
-    # sns.despine(left=True)
+    # hide vertical plot boundaries
+    sns.despine(left=True)
 
-    # # add labels and adjust font sizes
-    # ax.set_xlabel("")
-    # ax.set_ylabel("mean signed deviation (kcal/mol)", size=large_font)
-    # plt.xticks(fontsize=small_font, rotation=xrot, ha=xha)
+    # add labels and adjust font sizes
+    ax.set_xlabel("")
+    ax.set_ylabel("ddE [kcal/mol]", size=large_font)
+    plt.xticks(fontsize=small_font, rotation=xrot, ha=xha)
 
-    # # settings for overlapping violins
-    # # plt.xticks([])
-    # # locs, labels = plt.yticks(fontsize=large_font)
-    # # plt.yticks(locs, [])
-    # # plt.xlim(-1, 1)
-    # # ax.set_ylabel("", size=large_font)
+    # settings for overlapping violins
+    # plt.xticks([])
+    # locs, labels = plt.yticks(fontsize=large_font)
+    # plt.yticks(locs, [])
+    # plt.xlim(-1, 1)
+    # ax.set_ylabel("", size=large_font)
 
-    # # save and close figure
-    # plt.savefig('violin.svg', dpi=600, bbox_inches='tight')
-    # #plt.show()
-    # plt.clf()
-    # plt.close(plt.gcf())
+    # save and close figure
+    plt.savefig(out_file, dpi=600, bbox_inches='tight')
+    #plt.show()
+    plt.clf()
+    plt.close(plt.gcf())
 
-    # # reset plot parameters (white grid)
-    # sns.reset_orig()
+    # reset plot parameters (white grid)
+    sns.reset_orig()
 
 
 
