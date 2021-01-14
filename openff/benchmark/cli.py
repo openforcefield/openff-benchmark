@@ -544,6 +544,53 @@ def generate_conformers(input_directory, output_directory, delete_existing):
             of.write(f'error text: {exception}\n')
 
 
+@preprocess.command()
+@click.argument("input_directory")
+@click.argument("forcefield_name")
+@click.option("-o", "--output_directory",
+              default="3-coverage_report",
+              help="The directory for output files.")
+@click.option("-p", "--processors",
+              default=None,
+              type=click.INT)
+@click.option('--delete-existing', is_flag=True)
+def coverage_report(input_directory, forcefield_name, output_directory, processors, delete_existing):
+    """
+    Generate a coverage report for the set of validated input molecules.
+    """
+    from openff.benchmark.utils.coverage_report import generate_coverage_report
+    import json
+    import os
+    import shutil
+
+    try:
+        os.makedirs(output_directory)
+    except OSError:
+        if delete_existing:
+            shutil.rmtree(output_directory)
+            os.makedirs(os.path.join(output_directory, "error_mols"))
+        else:
+            raise Exception(f'Output directory {output_directory} already exists. '
+                             'Specify `delete_existing=True` to remove.')
+
+    report, success_mols, error_mols = generate_coverage_report(input_molecules=input_directory,
+                                      forcefield_name=forcefield_name,
+                                      processors=processors,
+                                      #output_directory=output_directory
+                                      )
+    # Write successfully processed mols
+    for success_mol in success_mols:
+        success_mol.to_file(os.path.join(output_directory, success_mol.name + ".sdf"), "sdf")
+    # Write errored mols
+    for error_mol, e in error_mols:
+        error_mol.to_file(os.path.join(output_directory, "error_mols", error_mol.name + ".sdf"), "sdf")
+        with open(os.path.join(output_directory, "error_mols", error_mol.name + ".txt"), 'w') as of:
+            of.write(e)
+    # Write coverage report
+    data = json.dumps(report, indent=2)
+    with open(os.path.join(output_directory, "coverage_report.json"), "w") as reporter:
+        reporter.write(data)
+    
 
 if __name__ == "__main__":
     cli()
