@@ -59,18 +59,21 @@ def calc_dde(reference, result):
 def match_minima(input_path, ref_method, output_directory="./results"):
     mols = {}
     dataframes = {}
-    for path in input_path:
+    for path in tqdm(input_path, desc='Reading files'):
         # read in molecules
         m_mols = readwrite.read_sdfs(path)
 
-        # specify method of molecules
-        method = m_mols[0].properties['method']
         # assert that all molecules of path are from the same method
         for mol in m_mols:
-            assert mol.properties["method"] == method, f"Molecules of different methods in path {path}."
-
-        # append method, mols and dataframes
-        mols[method] = m_mols
+            # specify method of molecules
+            method = mol.properties['method']
+            if method in mols:
+                mols[method].append(mol)
+            else:
+                mols[method] = [ mol ]
+                
+    # convert molecules to dataframes
+    for method in mols:
         dataframes[method] = readwrite.mols_to_dataframe(mols[method])
 
     assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
