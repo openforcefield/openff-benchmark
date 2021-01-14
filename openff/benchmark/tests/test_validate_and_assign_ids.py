@@ -20,9 +20,7 @@ def test_openeye_deregistered():
 def test_dont_overwrite_output_directory(tmpdir):
     with tmpdir.as_cwd():
         test_dir = '1-validate_and_assign_graphs_and_confs'
-        if os.path.exists(test_dir):
-            shutil.rmtree(test_dir)
-        input_mols = [get_data_file_path('input_single_mol.sdf')]
+        input_mols = [get_data_file_path('input_single_mol_rigid.sdf')]
         response = runner.invoke(cli, ["preprocess", "validate",
                                        "-g", "BBB",
                                        "-o", test_dir,
@@ -36,14 +34,29 @@ def test_dont_overwrite_output_directory(tmpdir):
                                            *input_mols],
                                      catch_exceptions=False)
 
+def test_do_overwrite_output_directory(tmpdir):
+    with tmpdir.as_cwd():
+        test_dir = '1-validate_and_assign_graphs_and_confs'
+        input_mols = [get_data_file_path('input_single_mol_rigid.sdf')]
+        response = runner.invoke(cli, ["preprocess", "validate",
+                                       "-g", "BBB",
+                                       "-o", test_dir,
+                                       *input_mols],
+                                 catch_exceptions=False)
 
+        response = runner.invoke(cli, ["preprocess", "validate",
+                                       "-g", "BBB",
+                                       "-o", test_dir,
+                                       "--delete-existing",
+                                       *input_mols],
+                                 catch_exceptions=False)
 class TestCLI:
     # single file single mol
     def test_single_file_single_mol(self, tmpdir):
         with tmpdir.as_cwd():
             test_dir = os.path.join('1-validate_and_assign_graphs_and_confs')
 
-            input_mols = [get_data_file_path('input_single_mol.sdf')]
+            input_mols = [get_data_file_path('input_single_mol_rigid.sdf')]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
                                            "-o", test_dir,
@@ -71,7 +84,7 @@ BBB""" in file_text
             test_dir = '1-validate_and_assign_graphs_and_confs'
             if os.path.exists(test_dir):
                 shutil.rmtree(test_dir)
-            input_mols = [get_data_file_path('input_multi_mol.sdf')]
+            input_mols = [get_data_file_path('input_one_stereoisomer_and_multi_conf_flexible.sdf')]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
                                            "-o", test_dir,
@@ -81,10 +94,13 @@ BBB""" in file_text
             output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
             output_files = [os.path.basename(fname) for fname in output_files]
 
-            assert 'BBB-00000-00.sdf' in output_files
-            assert 'BBB-00003-00.sdf' in output_files
-            assert len(output_files) == 4
-        
+            assert sorted(output_files) == ['BBB-00000-00.sdf',
+                                            'BBB-00001-00.sdf',
+                                            'BBB-00001-01.sdf',
+                                            'BBB-00001-02.sdf',
+                                            'BBB-00001-03.sdf',
+                                            'BBB-00001-04.sdf']
+
     # single file multi conformer
     @pytest.mark.xfail
     def test_single_file_multi_conformer(self, tmpdir):
@@ -92,7 +108,7 @@ BBB""" in file_text
             test_dir = '1-validate_and_assign_graphs_and_confs'
             if os.path.exists(test_dir):
                 shutil.rmtree(test_dir)
-            input_mols = [get_data_file_path('input_duplicates.sdf')]
+            input_mols = [get_data_file_path('input_multi_conf_flexible.sdf')]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
                                            "-o", test_dir,
@@ -112,7 +128,7 @@ BBB""" in file_text
             if os.path.exists(test_dir):
                 shutil.rmtree(test_dir)
             #os.makedirs(test_dir)
-            input_mols = [get_data_file_path('input_single_mol.sdf'),
+            input_mols = [get_data_file_path('input_single_mol_flexible.sdf'),
                           get_data_file_path('input_one_stereoisomer.sdf')]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
@@ -135,7 +151,7 @@ BBB""" in file_text
             if os.path.exists(test_dir):
                 shutil.rmtree(test_dir)
             #os.makedirs(test_dir)
-            input_mols = [get_data_file_path('input_multi_mol.sdf'),
+            input_mols = [get_data_file_path('input_multi_conf_flexible.sdf'),
                           get_data_file_path('input_all_stereoisomers.sdf')]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
@@ -154,12 +170,12 @@ BBB""" in file_text
     # multi file multi mol duplicates (ok)
     def test_multi_file_multi_mol_duplicates(self, tmpdir):
         with tmpdir.as_cwd():
-            #raise Exception(inspect.stack()[0])
+            # raise Exception(inspect.stack()[0])
             test_dir = '1-validate_and_assign_graphs_and_confs'
-            #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
+            # test_dir = 'test_multi_molecule_multi_sdf_graph_input'
             if os.path.exists(test_dir):
                 shutil.rmtree(test_dir)
-            #os.makedirs(test_dir)
+            # os.makedirs(test_dir)
             input_mols = [get_data_file_path('input_one_stereoisomer.sdf'),
                           get_data_file_path('input_all_stereoisomers.sdf')]
             response = runner.invoke(cli, ["preprocess", "validate",
@@ -177,80 +193,30 @@ BBB""" in file_text
             assert 'BBB-00008-00.sdf' not in output_files
             assert len(output_files) == 8
 
-#
-# Conformers w graphs
-# class TestGraphAnd3dInputs:
-#     # no overlap
-#     def test_no_overlap(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_graphs = [get_data_file_path('input_single_mol.sdf')]
-#             input_3ds = [get_data_file_path('input_one_stereoisomer.sdf')]
-#             validate_and_assign(input_graphs,
-#                                 input_3ds,
-#                                 'BBB',
-#                                 test_dir,
-#                                 )
-#             output_files = glob.glob(os.path.join(test_dir, '*'))
-#             output_files = [os.path.basename(fname) for fname in output_files]
-#             assert 'BBB-00000.smi' in output_files
-#             assert 'BBB-00000-00.sdf' not in output_files
-#             assert 'BBB-00001.smi' in output_files
-#             assert 'BBB-00001-00.sdf' in output_files
-#             assert len(output_files) == 3
-        
-#     # graphs superset of conformers
-#     def test_graphs_superset_of_conformers(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_graphs = [get_data_file_path('input_single_mol.sdf'),
-#                             get_data_file_path('input_one_stereoisomer.sdf')]
-#             input_3ds = [get_data_file_path('input_one_stereoisomer.sdf')]
-#             validate_and_assign(input_graphs,
-#                                 input_3ds,
-#                                 'BBB',
-#                                 test_dir,
-#                                 )
-#             output_files = glob.glob(os.path.join(test_dir, '*'))
-#             output_files = [os.path.basename(fname) for fname in output_files]
-#             assert 'BBB-00000.smi' in output_files
-#             assert 'BBB-00000-00.sdf' not in output_files
-#             assert 'BBB-00001.smi' in output_files
-#             assert 'BBB-00001-00.sdf' in output_files
-#             assert len(output_files) == 3
-        
-#     # conformers superset of graphs
-#     def test_conformers_superset_of_graphs(self, tmpdir):
-#         with tmpdir.as_cwd():
-#             test_name = f'{self.__class__.__name__}.{inspect.stack()[0].function}'
-#             test_dir = os.path.join(test_name, '1-validate_and_assign_graphs_and_confs')
-#             #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
-#             if os.path.exists(test_dir):
-#                 shutil.rmtree(test_dir)
-#             #os.makedirs(test_dir)
-#             input_graphs = [get_data_file_path('input_single_mol.sdf')]
-#             input_3ds = [get_data_file_path('input_one_stereoisomer.sdf'),
-#                          get_data_file_path('input_single_mol.sdf')]
-#             validate_and_assign(input_graphs,
-#                                 input_3ds,
-#                                 'BBB',
-#                                 test_dir,
-#                                 )
-#             output_files = glob.glob(os.path.join(test_dir, '*'))
-#             output_files = [os.path.basename(fname) for fname in output_files]
-#             assert 'BBB-00000.smi' in output_files
-#             assert 'BBB-00000-00.sdf' in output_files
-#             assert 'BBB-00001.smi' in output_files
-#             assert 'BBB-00001-00.sdf' in output_files
-#             assert len(output_files) == 4
-        
+    def test_add(self, tmpdir):
+
+        with tmpdir.as_cwd():
+            #raise Exception(inspect.stack()[0])
+            test_dir = '1-validate_and_assign_graphs_and_confs'
+            #test_dir = 'test_multi_molecule_multi_sdf_graph_input'
+            if os.path.exists(test_dir):
+                shutil.rmtree(test_dir)
+            #os.makedirs(test_dir)
+            input_mols = [get_data_file_path('input_one_stereoisomer.sdf')]
+            response = runner.invoke(cli, ["preprocess", "validate",
+                                           "-g", "BBB",
+                                           "-o", test_dir,
+                                           *input_mols],
+                                     catch_exceptions=False)
+            input_mols2 = [get_data_file_path('input_all_stereoisomers.sdf')]
+            response = runner.invoke(cli, ["preprocess", "validate",
+                                           "--add",
+                                           "-g", "BBB",
+                                           "-o", test_dir,
+                                           *input_mols2],
+                                     catch_exceptions=False)
+
+            output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
+            output_files = [os.path.basename(fname) for fname in output_files]
+            error_files = glob.glob(os.path.join(test_dir, 'error_mols', '*.sdf'))
+            error_files = [os.path.basename(fname) for fname in error_files]
