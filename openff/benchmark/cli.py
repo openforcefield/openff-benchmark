@@ -301,6 +301,40 @@ def execute(input_paths, output_directory, season, ncores, delete_existing, recu
             recursive=recursive)
 
 
+
+@cli.group()
+def report():
+    """Analyze the results and create plots
+
+    """
+    pass
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref_method', default='default', required=True)
+@click.option('--output_directory', default='./results', required=True)
+def compare_forcefields(input_path, ref_method, output_directory):
+    from .analysis import analysis
+    analysis.main(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref_method', default='default', required=True)
+@click.option('--output_directory', default='./results', required=True)
+def match_minima(input_path, ref_method, output_directory):
+    from .analysis import analysis
+    analysis.match_minima(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref-method', default='default', required=True)
+@click.option('--output_directory', default='./plots', required=True)
+def plots(input_path, ref_method, output_directory):
+    from .analysis import draw
+    draw.plot_compare_ffs(input_path, ref_method, output_directory)
+
+
+
 @cli.group()
 def preprocess():
     """Prepare input molecules for compute.
@@ -416,6 +450,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
             csvw.writerow(name_assignment)
         #    of.write(','.join([str(i) for i in name_assignment]))
         #    of.write('\n')
+
 
 @preprocess.command()
 @click.option('--delete-existing', is_flag=True)
