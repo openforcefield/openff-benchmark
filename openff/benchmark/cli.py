@@ -4,6 +4,25 @@ Top-level `openff-benchmark` cli entrypoint.
 """
 
 import click
+import logging
+
+# Deregister OpenEye for any ToolkitRegistry calls that happen in this file
+logger = logging.getLogger('openforcefield.utils.toolkits')
+prev_log_level = logger.getEffectiveLevel()
+logger.setLevel(logging.ERROR)
+
+from openforcefield.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+
+logger.setLevel(prev_log_level)
+
+oetk_loaded = False
+for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
+    if isinstance(tkw, OpenEyeToolkitWrapper):
+        oetk_loaded = True
+if oetk_loaded:
+    GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
+
 
 @click.group()
 def cli():
@@ -202,8 +221,9 @@ def delete_datasets(fractal_uri, dataset_name):
 @click.option('-u', '--fractal-uri', default="localhost:7777")
 @click.option('-d', '--dataset-name', required=True)
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.option('-o', '--scratch-directory', default=None, help="Directory to use as scratch space; outputs will be retained there.")
 @click.argument('molids', nargs=-1)
-def debug_from_server(molids, fractal_uri, dataset_name, compute_specs):
+def debug_from_server(molids, fractal_uri, dataset_name, compute_specs, scratch_directory):
     import json
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -215,11 +235,37 @@ def debug_from_server(molids, fractal_uri, dataset_name, compute_specs):
     results = optexec.debug_optimization_from_server(fractal_uri,
                                                      dataset_name,
                                                      compute_specs=compute_specs,
+                                                     molids=molids,
+                                                     scratch_directory=scratch_directory)
+
+    # export and read back into JSON for final output
+    results_processed = [json.loads(res.json()) for res in results]
+    print(json.dumps(results_processed))
+
+
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.argument('molids', nargs=-1)
+def extract(molids, fractal_uri, dataset_name, compute_specs):
+    import json
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
+
+    results = optexec.get_optimization_from_server(fractal_uri,
+                                                     dataset_name,
+                                                     compute_specs=compute_specs,
                                                      molids=molids)
 
     # export and read back into JSON for final output
     results_processed = [json.loads(res.json()) for res in results]
     print(json.dumps(results_processed))
+
 
 
 @optimize.command()
@@ -298,6 +344,7 @@ def preprocess():
 
 @preprocess.command()
 @click.option('--delete-existing', is_flag=True)
+@click.option('--add', is_flag=True)
 @click.option('-o', '--output-directory',
               default='1-validate_and_assign', 
               help='Directory to put output files. If this directory does not exist, one will be created.')
@@ -306,7 +353,7 @@ def preprocess():
               help='Group name for assigning IDs to the molecules.')
 @click.argument('input-3d-molecules',
                 nargs=-1)
-def validate(input_3d_molecules, output_directory, group_name, delete_existing):
+def validate(input_3d_molecules, output_directory, group_name, delete_existing, add):
     """
     Validate and assign identifiers to molecules.
 
@@ -317,7 +364,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing):
 
       * "GGG-MMMMM-CC.sdf": Files containing one validated molecule each, where G is the group name, M is the molecule ID, and C is the conformer index
 
-      * "error_mols": A directory where molecule that do not pass validation are stored
+      * "error_mols": A subdirectory where molecule that do not pass validation are stored
 
       * "log.txt": Debugging info
 
@@ -325,7 +372,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing):
 
     At least one 3D geometry of each molecule must be provided.
     The "group name" becomes the first three characters of the validated file names. 
-    Multiple confomers of the same molecule will be automatically detected and grouped under a single molecule ID.
+    Multiple conformers of the same molecule will be automatically detected and grouped under a single molecule ID.
     The definition of "identical molecule" is whether RDKit assigns them the same canonical, isomeric, explicit hydrogen SMILES. 
     When molecules are grouped, their RMSD (accounting for symmetry automorphs) is tested. 
     If two inputs are within 0.1 A by RMSD, the second is considered an error and sent to the error_mols directory.
@@ -333,13 +380,77 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing):
     The order of atoms may change during this step.
     
     
-    This command also attempts to detect technical issues that could prevent the files from working with the OpenFF toolkit. Files that will cause problems in subsequent steps are routed to the "error_mols" subdirectory of the output directory. Where possible, these cases write both an SDF file of the molecule (with key-value paris indicating the file the structure came from), and a correspondingly-named txt file containing more details about the error.
+    This command also attempts to detect technical issues that could prevent the files from working with the OpenFF toolkit.
+    Files that will cause problems in subsequent steps are routed to the "error_mols" subdirectory of the output directory.
+    Where possible, these cases write both an SDF file of the molecule (with key-value pairs indicating the file the structure came from),
+    and a correspondingly-named txt file containing more details about the error.
     """
     from .utils.validate_and_assign_ids import validate_and_assign
-    validate_and_assign(input_3d_molecules,
-                        group_name,
-                        output_directory,
-                        delete_existing=delete_existing)
+    import glob
+    import os
+    import shutil
+    import numpy as np
+
+    existing_output_mols = []
+    name_assignments = []
+
+    #try:
+    if not(os.path.exists(output_directory)):
+        os.makedirs(output_directory)
+    #except OSError:
+    else:
+        if delete_existing:
+            shutil.rmtree(output_directory)
+            os.makedirs(output_directory)
+        elif add:
+            existing_output_mols = glob.glob(os.path.join(output_directory, '*.sdf'))
+            name_assignments = np.loadtxt(os.path.join(output_directory, 'name_assignments.csv'))
+        else:
+            raise Exception(f'Output directory {output_directory} already exists. '
+                             'Specify `delete_existing=True` to remove.')
+
+    output = validate_and_assign(input_3d_molecules,
+                                 group_name,
+                                 existing_output_mols,
+                                 name_assignments,
+                                 delete_existing)
+
+    success_mols, error_mols, name_assignments = output
+
+    # Write successfully processed mols
+    for success_mol in success_mols:
+        success_mol.to_file(os.path.join(output_directory, success_mol.name + ".sdf"), "sdf")
+
+    # Create error directory
+    error_dir = os.path.join(output_directory, 'error_mols')
+    os.makedirs(error_dir)
+
+    # Write error mols
+    for idx, (filename, error_mol, exception) in enumerate(error_mols):
+        output_mol_file = os.path.join(error_dir, f'error_mol_{idx}.sdf')
+        try:
+            error_mol.to_file(output_mol_file, file_format='sdf')
+        except Exception as e:
+            exception = str(exception)
+            exception += "\n Then failed when trying to write mol to error directory with "
+            exception += str(e)
+        output_summary_file = os.path.join(error_dir, f'error_mol_{idx}.txt')
+        with open(output_summary_file, 'w') as of:
+            of.write(f'source: {filename}\n')
+            of.write(f'error text: {exception}\n')
+
+    # Write name assignments
+    #out_file_name = os.path.join(output_directory, 'name_assignments.csv')
+    import csv
+    with open(os.path.join(output_directory, 'name_assignments.csv'), 'w', newline='') as of:
+        of.write('orig_name,orig_file,orig_file_index,out_file_name\n')
+        csvw = csv.writer(of)
+        #np.savetxt(out_file_name, np.array(name_assignments))
+        for name_assignment in name_assignments:
+            csvw.writerow(name_assignment)
+        #    of.write(','.join([str(i) for i in name_assignment]))
+        #    of.write('\n')
+
 
 @preprocess.command()
 @click.option('--delete-existing', is_flag=True)
@@ -361,11 +472,78 @@ def generate_conformers(input_directory, output_directory, delete_existing):
     
 
     """
+    from openforcefield.topology import Molecule
     from openff.benchmark.utils.generate_conformers import generate_conformers
+    import glob
+    import os
+    import shutil
+    import re
 
-    generate_conformers(input_directory,
-                        output_directory,
-                        delete_existing=delete_existing)
-    
+
+    try:
+        os.makedirs(output_directory)
+    except OSError:
+        if delete_existing:
+            shutil.rmtree(output_directory)
+            os.makedirs(output_directory)
+        else:
+            raise Exception(f'Output directory {output_directory} already exists. '
+                             'Specify `delete_existing=True` to remove.')
+
+    input_3d_files = glob.glob(os.path.join(input_directory,'*.sdf'))
+
+    group2idx2mols2confs = {}
+
+    for input_3d_file in input_3d_files:
+        # try:
+        # We have to allow undefined stereo here because of some silliness with
+        # RDKitToolkitWrapper percieveing stereo around terminal ethene groups
+        # Note: Allowing undefined stereo shouldn't be necessary any more, ever since the 0.8.2 release
+        # See https://github.com/openforcefield/openff-toolkit/pull/786
+        mol = Molecule.from_file(input_3d_file, allow_undefined_stereo=True)
+        # except:
+        #    raise Exception(input_3d_file)
+        match = re.findall('([a-zA-Z0-9]{3})-([0-9]{5})-([0-9]{2}).sdf',
+                           input_3d_file)
+        assert len(match) == 1
+        group_id = match[0][0]
+        mol_idx = match[0][1]
+        conf_id = match[0][2]
+        if group_id not in group2idx2mols2confs:
+            group2idx2mols2confs[group_id] = {}
+        if mol_idx not in group2idx2mols2confs[group_id]:
+            group2idx2mols2confs[group_id][mol_idx] = {}
+        assert conf_id not in group2idx2mols2confs[group_id][mol_idx]
+
+        group2idx2mols2confs[group_id][mol_idx][conf_id] = mol
+        # raise Exception((group_id, mol_id))
+
+    outputs = generate_conformers(group2idx2mols2confs)
+    success_mols, error_mols = outputs
+
+    # Write successfully processed mols
+    for success_mol in success_mols:
+        success_mol.to_file(os.path.join(output_directory, success_mol.name + ".sdf"), "sdf")
+
+    # Create error directory
+    error_dir = os.path.join(output_directory, 'error_mols')
+    os.makedirs(error_dir)
+
+    # Write error mols
+    for error_mol, exception in error_mols:
+        output_mol_file = os.path.join(error_dir, f'{error_mol.name}.sdf')
+        try:
+            error_mol.to_file(output_mol_file, file_format='sdf')
+        except Exception as e:
+            exception = str(exception)
+            exception += "\n Then failed when trying to write mol to error directory with "
+            exception += str(e)
+        output_summary_file = os.path.join(error_dir, f'{error_mol.name}.txt')
+        with open(output_summary_file, 'w') as of:
+            of.write(f'source: {error_mol.name}\n')
+            of.write(f'error text: {exception}\n')
+
+
+
 if __name__ == "__main__":
     cli()
