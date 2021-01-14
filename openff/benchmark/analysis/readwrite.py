@@ -71,7 +71,10 @@ def write_results(dataframe, file_name, columns=['name', 'group_name', 'molecule
         dataframe['molecule_index'] = dataframe['molecule_index'].apply(lambda x: f'{x:05d}')
     if 'conformer_index' in columns:
         dataframe['conformer_index'] = dataframe['conformer_index'].apply(lambda x: f'{x:02d}')
-    dataframe[columns].to_csv(file_name, 
+    dataframe = dataframe.loc[:,columns]
+    if 'dde' in columns:
+        dataframe.rename(columns={'dde': 'dde[kcal/mol]'}, inplace=True)
+    dataframe.to_csv(file_name, 
                               index=False if 'name' in columns else True, 
                               float_format='%15.8e')
     

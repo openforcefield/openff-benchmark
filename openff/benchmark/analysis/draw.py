@@ -16,7 +16,7 @@ import pandas as pd
 from scipy.interpolate import interpn
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-#import seaborn as sns
+import seaborn as sns
 from plotly import graph_objects as go
 
 def draw_scatter(
@@ -189,6 +189,28 @@ def draw_ridgeplot(
         only needed if bw is set to 'hist'
 
     """
+    # Define and use a simple function to label the plot in axes coordinates
+    def label(x, color, label):
+        ax = plt.gca()
+
+        # set axis font size
+        if what_for == "paper":
+            fs = 14
+        elif what_for == "talk":
+            fs = 14
+
+        ax.text(
+            0,
+            0.2,
+            label,
+            fontweight="bold",
+            color=color,
+            fontsize=fs,
+            ha="left",
+            va="center",
+            transform=ax.transAxes,
+        )
+
     if what_for == "paper":
         ridgedict = {
             "h": 0.9,
@@ -204,62 +226,200 @@ def draw_ridgeplot(
             "xfontsize": 16,
         }
 
+    num_methods = len(dataframes)
+
+    # Initialize the FacetGrid object
+    my_cmap = "tab10"
+    sns.palplot(sns.color_palette(my_cmap))
+    colors = sns.color_palette(my_cmap)
+
+    temp = []
+    for method, result in dataframes.items():
+        df = pd.DataFrame(result, columns=[x_label])
+        df["method"] = method
+        temp.append(df)
+
+    # list of dataframes concatenated to single dataframe
+    df = pd.concat(temp, ignore_index=True)
+    #    print(method_labels)
+    g = sns.FacetGrid(
+        df, row="method", hue="method", aspect=10, height=ridgedict["h"], palette=colors
+    )
+
+    if not same_subplot:
+
+        # draw filled-in densities
+        if bw == "hist":
+            histoptions = {
+                "histtype": "bar",
+                "alpha": 0.6,
+                "linewidth": ridgedict["lw"],
+                "range": hist_range,
+                "align": "mid",
+            }
+            g.map(
+                sns.distplot,
+                x_label,
+                hist=True,
+                kde=False,
+                bins=15,
+                norm_hist=True,
+                hist_kws=histoptions,
+            )
+        else:
+            g.map(
+                sns.kdeplot,
+                x_label,
+                clip_on=False,
+                shade=True,
+                alpha=0.5,
+                lw=ridgedict["lw"],
+                bw=bw,
+            )
+
+        # draw colored horizontal line below densities
+        g.map(plt.axhline, y=0, lw=ridgedict["lw"], clip_on=False)
+
+    else:
+
+        # draw black horizontal line below densities
+        plt.axhline(y=0, color="black")
+
+    # draw outline around densities; can also single outline color: color="k"
+    if bw == "hist":
+        histoptions = {
+            "histtype": "step",
+            "alpha": 1.0,
+            "linewidth": ridgedict["lw"],
+            "range": hist_range,
+            "align": "mid",
+        }
+        g.map(
+            sns.distplot,
+            x_label,
+            hist=True,
+            kde=False,
+            bins=15,
+            norm_hist=True,
+            hist_kws=histoptions,
+        )
+
+    else:
+        g.map(sns.kdeplot, x_label, clip_on=False, lw=ridgedict["lw"], bw=bw)
+
+    # draw a vertical line at x=0 for visual reference
+    g.map(plt.axvline, x=0, lw=ridgedict["vl"], ls="--", color="gray", clip_on=False)
+
+    # optional: add custom vertical line
+    # g.map(plt.axvline, x=0.12, lw=1, ls='--', color='gray', clip_on=False)
+
+    # add labels to each level
+    if not same_subplot:
+        g.map(label, x_label)
+
+    # else if single subplot, generate a custom legend
+    else:
+        cmap = mpl.cm.tab10
+        patches = []
+        for i, label in enumerate(dataframes):
+            patches.append(
+                mpl.patches.Patch(
+                    color=cmap(i/10),
+                    label=label,
+                )
+            )
+        plt.legend(handles=patches, fontsize=ridgedict["xfontsize"] / 1.2)
+
+    # optional: set symmetric log scale on x-axis
+    if sym_log:
+        g.set(xscale="symlog")
+
+    # Set the subplots to overlap
+    if not same_subplot:
+        g.fig.subplots_adjust(hspace=-0.45)
+    else:
+        g.fig.subplots_adjust(hspace=-1.0)
+
+    # Remove axes details that don't play well with overlap
+    g.set_titles("")
+    #    g.set(yticks=[])
+    g.despine(bottom=True)  # , left=True)
+    # ax = plt.gca()
+    # ax.spines['left'].set_visible(True)
+    # ax.spines['left'].set_position('zero')
+    # ax.set_yticks([0.4])
+    if what_for == "paper":
+        plt.gcf().set_size_inches(7, 3)
+    elif what_for == "talk":
+        plt.gcf().set_size_inches(12, 9)
+
+    # adjust font sizes
+    plt.xlabel(x_label, fontsize=ridgedict["xfontsize"])
+    plt.ylabel("Density", fontsize=ridgedict["xfontsize"])
+    plt.xticks(fontsize=ridgedict["xfontsize"])
+
+    # save with transparency for overlapping plots
+    plt.savefig(out_file, transparent=True, bbox_inches="tight")
+    plt.clf()
+
+
+
     # Initialize the FacetGrid object
 #    my_cmap = "tab10"
 #    sns.palplot(sns.color_palette(my_cmap))
 #    colors = sns.color_palette(my_cmap)
 
 
-    fig = go.Figure()
-    for method, result in dataframes.items():
-        if bw == "hist":
-            hist = np.histogram(result[key], bins=15, range=hist_range, density=True)
-            fig.add_trace(
-                go.Scatter(
-                    x=hist[1],
-                    y=hist[0]+[hist[0][-1]],
-                    name=method,
-                    mode='lines',
-                    line=dict(
-                        width=ridgedict["lw"],
-                        shape='hv'
-                    ),
-                )
-            )
-        elif bw == "kde":
-            fig.add_trace(
-                go.Violin(
-                    x=result[key],
-                    line_width=ridgedict["lw"]
-                )
-            )
+    # fig = go.Figure()
+    # for method, result in dataframes.items():
+    #     if bw == "hist":
+    #         hist = np.histogram(result[key], bins=15, range=hist_range, density=True)
+    #         fig.add_trace(
+    #             go.Scatter(
+    #                 x=hist[1],
+    #                 y=hist[0]+[hist[0][-1]],
+    #                 name=method,
+    #                 mode='lines',
+    #                 line=dict(
+    #                     width=ridgedict["lw"],
+    #                     shape='hv'
+    #                 ),
+    #             )
+    #         )
+    #     elif bw == "kde":
+    #         fig.add_trace(
+    #             go.Violin(
+    #                 x=result[key],
+    #                 line_width=ridgedict["lw"]
+    #             )
+    #         )
             
 
-    if bw == "kde":
-        fig.update_traces(
-            orientation="h",
-            side="positive",
-            points=False
-            )
+    # if bw == "kde":
+    #     fig.update_traces(
+    #         orientation="h",
+    #         side="positive",
+    #         points=False
+    #         )
 
-    fig.update_layout(
-        xaxis=dict(
-            title=dict(
-                text=x_label,
-                font_size=ridgedict["xfontsize"]
-                ),
-            range=hist_range
-            ),
-        shapes=[
-            dict(
-                type= 'line',
-                yref= 'paper', y0= 0, y1= 1,
-                xref= 'x', x0= 0, x1= 0
-            )
-        ]
-    )
+    # fig.update_layout(
+    #     xaxis=dict(
+    #         title=dict(
+    #             text=x_label,
+    #             font_size=ridgedict["xfontsize"]
+    #             ),
+    #         range=hist_range
+    #         ),
+    #     shapes=[
+    #         dict(
+    #             type= 'line',
+    #             yref= 'paper', y0= 0, y1= 1,
+    #             xref= 'x', x0= 0, x1= 0
+    #         )
+    #     ]
+    # )
     
-    fig.write_image(out_file)
+    # fig.write_image(out_file)
     
 
 def draw_density2d(
@@ -441,24 +601,28 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
                         method = '.'.join(file.split('.')[:-1])
                         results[method] = pd.read_csv(path)
 
-    plot_violin_signed(results, out_file=os.path.join(output_directory, 'violin.svg'))
     plot_mol_minima(results, ref_method,  out_file=os.path.join(output_directory, 'minimaE.png'))
+    # we do not want to plot the ref_method in the following plots
+    # remove it
+    results.pop(ref_method)
+    plot_violin_signed(results, out_file=os.path.join(output_directory, 'violin.svg'))
+
 
     for method, result in results.items():
         # ddE vs RMSD scatter
         draw_scatter(result.loc[:, 'rmsd'],
-                     result.loc[:,'dde'],
+                     result.loc[:,'dde[kcal/mol]'],
                      method,
                      'rmsd',
-                     'dde',
+                     'dde[kcal/mol]',
                      os.path.join(output_directory, f'fig_{method}_scatter_rmsd_dde.png'),
                      what_for="talk"
                      )
         draw_scatter(result.loc[:, 'tfd'],
-                     result.loc[:,'dde'],
+                     result.loc[:,'dde[kcal/mol]'],
                      method,
                      'tfd',
-                     'dde',
+                     'dde[kcal/mol]',
                      os.path.join(output_directory, f'fig_{method}_scatter_tfd_dde.png'),
                      what_for="talk"
                      )
@@ -466,10 +630,10 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
         # draw density 2D
         draw_density2d(
             result.loc[:, 'rmsd'],
-            result.loc[:,'dde'],
+            result.loc[:,'dde[kcal/mol]'],
             method,
             'rmsd',
-            'dde',
+            'dde[kcal/mol]',
             os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_linear.png'),
             what_for="talk",
             # x_range=(0,3.7),
@@ -480,10 +644,10 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
         )
         draw_density2d(
             result.loc[:, 'tfd'],
-            result.loc[:,'dde'],
+            result.loc[:,'dde[kcal/mol]'],
             method,
             'tfd',
-            'dde',
+            'dde[kcal/mol]',
             os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_linear.png'),
             what_for="talk",
             # x_range=(0,0.8),
@@ -495,10 +659,10 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
 
         draw_density2d(
             result.loc[:,'rmsd'],
-            result.loc[:,'dde'],
+            result.loc[:,'dde[kcal/mol]'],
             method,
             'rmsd',
-            'dde',
+            'dde[kcal/mol]',
             os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_log.png'),
             what_for="talk",
             # x_range=(0,3.7),
@@ -509,10 +673,10 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
         )
         draw_density2d(
             result.loc[:, 'tfd'],
-            result.loc[:,'dde'],
+            result.loc[:,'dde[kcal/mol]'],
             method,
             'tfd',
-            'dde',
+            'dde[kcal/mol]',
             os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_log.png'),
             what_for="talk",
             # x_range=(0,0.8),
@@ -545,8 +709,8 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
             )
 
             draw_corr(
-                result.loc[:, 'dde'],
-                results[method2].loc[:, 'dde'],
+                result.loc[:, 'dde[kcal/mol]'],
+                results[method2].loc[:, 'dde[kcal/mol]'],
                 f"{method2} vs. {method}",
                 f"ddE {method} (kcal/mol)",
                 f"ddE {method2} (kcal/mol)",
@@ -557,7 +721,7 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
         
     draw_ridgeplot(
         results,
-        'dde',
+        'dde[kcal/mol]',
         'ddE (kcal/mol)',
         out_file=os.path.join(output_directory, f'fig_ridge_dde.png'),
         what_for="talk",
@@ -658,7 +822,7 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
     fig = go.Figure()
     for method, result in dataframes.items():
         fig.add_trace(go.Violin(x0=method,
-                                y=result.loc[:,'dde'],
+                                y=result.loc[:,'dde[kcal/mol]'],
                                 hovertext=method,
 #                               legendgroup=idx, 
     #                             alignmentgroup=idx,
@@ -669,7 +833,11 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
 #                                marker_color=clrs[i]
                                )
                      )
-
+    fig.update_layout(
+        dict(
+            yaxis_title='ddE [kcal/mol]'
+            )
+    )
     fig.write_image(out_file)
     # replot the median point for larger marker, zorder to plot points on top
     # xlocs = ax.get_xticks()
@@ -850,7 +1018,7 @@ def plot_mol_minima(dataframes, ref_method, out_file='minimaE.png', what_for='ta
             # define x's from integer range with step 1
             xi = list(range(ref_nconfs))
             # get the relative energies of method
-            energies = dataframes[method].loc[dataframes[method].molecule_index==mid]['dde']
+            energies = dataframes[method].loc[dataframes[method].molecule_index==mid]['dde[kcal/mol]']
             # plot values
             plt.plot(xi, energies, color=colors[i], label=method,
                      marker=markers[i], markersize=mark_size, alpha=0.6)
