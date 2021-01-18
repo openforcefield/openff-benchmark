@@ -188,6 +188,7 @@ def list_datasets(fractal_uri):
     datasets = optexec.list_optimization_datasets(fractal_uri)
     print("\n".join(datasets))
 
+
 @optimize.command()
 @click.option('-u', '--fractal-uri', default="localhost:7777")
 @click.argument('dataset-name', nargs=-1)
@@ -196,32 +197,6 @@ def delete_datasets(fractal_uri, dataset_name):
 
     optexec = OptimizationExecutor()
     datasets = optexec.delete_optimization_datasets(fractal_uri, dataset_name)
-
-
-@optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
-@click.option('-d', '--dataset-name', required=True)
-@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
-@click.option('-o', '--scratch-directory', default=None, help="Directory to use as scratch space; outputs will be retained there.")
-@click.argument('molids', nargs=-1)
-def debug_from_server(molids, fractal_uri, dataset_name, compute_specs, scratch_directory):
-    import json
-    from .geometry_optimizations.compute import OptimizationExecutor
-
-    optexec = OptimizationExecutor()
-
-    if compute_specs is not None:
-        compute_specs = compute_specs.split(',')
-
-    results = optexec.debug_optimization_from_server(fractal_uri,
-                                                     dataset_name,
-                                                     compute_specs=compute_specs,
-                                                     molids=molids,
-                                                     scratch_directory=scratch_directory)
-
-    # export and read back into JSON for final output
-    results_processed = [json.loads(res.json()) for res in results]
-    print(json.dumps(results_processed))
 
 
 @optimize.command()
@@ -248,6 +223,35 @@ def extract(molids, fractal_uri, dataset_name, compute_specs):
     print(json.dumps(results_processed))
 
 
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-d', '--dataset-name', required=True)
+@click.option('-t', '--nthreads', default=2)
+@click.option('-m', '--memory', default=2)
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.option('-o', '--output-directory')
+@click.argument('molids', nargs=-1)
+def execute_from_server(molids, fractal_uri, dataset_name, compute_specs, nthreads, memory, output_directory):
+    import json
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
+
+    results = optexec.execute_optimization_from_server(fractal_uri,
+                                                       dataset_name,
+                                                       output_directory=output_directory,
+                                                       ncores=nthreads,
+                                                       memory=memory,
+                                                       compute_specs=compute_specs,
+                                                       molids=molids)
+
+    # export and read back into JSON for final output
+    results_processed = [json.loads(res.json()) for res in results]
+    print(json.dumps(results_processed))
+
 
 @optimize.command()
 @click.option('-s', '--season', required=True)
@@ -256,11 +260,11 @@ def extract(molids, fractal_uri, dataset_name, compute_specs):
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to include")
-@click.option('-o', '--output-directory', default='3-export-compute')
+@click.option('-o', '--output-directory', required=True)
 @click.argument('input-paths', nargs=-1)
 def execute(input_paths, output_directory, season, nthreads, memory, delete_existing, recursive):
     import os
-    import signal
+    import json
     import warnings
 
     from .geometry_optimizations.compute import OptimizationExecutor
@@ -269,20 +273,17 @@ def execute(input_paths, output_directory, season, nthreads, memory, delete_exis
         warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
 
     optexec = OptimizationExecutor()
-    dataset_name='Benchmark Scratch'
 
-    def handle_signal(sig, frame):
-        optexec.stop = True
-
-    signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
-
-    optexec.execute_optimization_from_molecules(
+    results = optexec.execute_optimization_from_molecules(
             input_paths, output_directory, season,
             ncores=nthreads,
             memory=memory,
             delete_existing=delete_existing,
             recursive=recursive)
+
+    # export and read back into JSON for final output
+    results_processed = [json.loads(res.json()) for res in results]
+    print(json.dumps(results_processed))
 
 
 @cli.group()

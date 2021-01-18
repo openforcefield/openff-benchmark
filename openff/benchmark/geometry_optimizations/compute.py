@@ -24,6 +24,7 @@ def _disable_openff_logger():
     from openforcefield.utils.toolkits import logger
     logger.handlers.clear()
 
+
 class OptimizationExecutor:
 
     def __init__(self):
@@ -60,26 +61,28 @@ class OptimizationExecutor:
         # extract molecules from SDF inputs
         mols = mols_from_paths(input_paths, recursive=recursive)
     
-        # TODO: check existence of dataset, consult with JH on best way to add to existing
-    
         # create OptimizationDataset with QCSubmit
         ds = OptimizationDataset(dataset_name=dataset_name)
         factory = OptimizationDatasetFactory()
     
         for mol in mols:
             id = self._mol_to_id(mol)
-    
+
             attributes = factory.create_cmiles_metadata(mol)
             ds.add_molecule(index=id, molecule=mol, attributes=attributes)
     
         ds.qc_specifications = SEASONS[season]
     
         ds.metadata.long_description_url = "https://localhost.local/null"
+
+        # add in known modifications to `OptimizationDataset` defaults
+        ds.optimization_procedure.coordsys = 'dlc'
+        ds.optimization_procedure.reset = True
     
-        logging.info("Submitting...")
+        print("Submitting...")
         client = FractalClient(fractal_uri, verify=False)
         ds.submit(client=client)
-        logging.info("Submitted!")
+        print("Submitted!")
     
     @staticmethod
     def _mol_from_qcserver(record):
@@ -275,14 +278,9 @@ class OptimizationExecutor:
                 print(f"Restarted ERRORed optimization `{opt.id}`")
                 client.modify_tasks(operation='restart', base_result=opt.id)
     
-    def execute_optimization_from_server(self, molecule_id, push_complete=False):
-        """Execute optimization from the given molecule locally on this host.
-    
-        """
-        pass
-
-    def debug_optimization_from_server(self, fractal_uri, dataset_name, client=None,
-            compute_specs=None, molids=None, scratch_directory=None):
+    def execute_optimization_from_server(self, fractal_uri, dataset_name,
+            output_directory=None, ncores=1, memory=2, client=None, compute_specs=None,
+            molids=None):
         """Execute optimization from the given molecule locally on this host.
 
         Will not send results back to the server; this is purely for debugging.
@@ -291,19 +289,15 @@ class OptimizationExecutor:
               then merge with `execute_...` above.
     
         """
-
-        # if scratch_directory specified, keep output with `messy=True`
-        if scratch_directory is not None:
-            scratch_directory = os.path.abspath(scratch_directory)
-            os.makedirs(scratch_directory, exist_ok=True)
-            messy = True
-        else:
-            messy = False
+        import numpy as np
+        import pint
+    
+        from qcsubmit.factories import OptimizationDatasetFactory
+        from openforcefield.topology import Molecule
+        from openforcefield.topology.molecule import unit
 
         if client is None:
             client = FractalClient(fractal_uri, verify=False)
-
-        local_options = dict(scratch_directory=scratch_directory)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
         optds.status()
@@ -316,11 +310,59 @@ class OptimizationExecutor:
         if compute_specs is not None:
             df = df[compute_specs]
 
-        results = []
-        for opt in df.values.flatten():
-            task = client.query_tasks(base_result=opt.id)[0]
+        local_options={"ncores": ncores,
+                       "memory": memory}
 
-            results.append(self._execute_qcengine(*task.spec.args, local_options=local_options))
+        results = []
+        for spec_name in df:
+            if output_directory is not None:
+                os.makedirs(os.path.join(output_directory, spec_name), exist_ok=True)
+
+            print("Processing spec: '{}'".format(spec_name))
+            for id, opt in df[spec_name].iteritems():
+                print("... '{}'".format(id))
+                task = client.query_tasks(base_result=opt.id)[0]
+
+                result = self._execute_qcengine(*task.spec.args, local_options=local_options)
+
+                # process final molecule
+                cmiles = result.initial_molecule.extras['canonical_isomeric_explicit_hydrogen_mapped_smiles']
+    
+                fmol = Molecule.from_smiles(cmiles, hydrogens_are_explicit=True)
+                final_qcmol = result.final_molecule
+                geometry = unit.Quantity(
+                        np.array(final_qcmol.geometry, np.float), unit.bohr
+                    )
+                fmol._add_conformer(geometry.in_units_of(unit.angstrom))
+
+                method = result.input_specification.model.method
+                basis = result.input_specification.model.basis
+                program = result.keywords['program']
+
+                fmol = self._process_final_mol(id,
+                                               fmol,
+                                               final_qcmol,
+                                               method,
+                                               basis,
+                                               program,
+                                               result.energies)
+
+                # fix to ensure output fidelity of ids; losing 02 padding on conformer
+                org, molecule, conformer = id.split('-')
+                output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
+                                                                        molecule=int(molecule),
+                                                                        conformer=int(conformer))
+
+                # subfolders for each compute spec, files named according to molecule ids
+                if output_directory is not None:
+                    outfile = "{}".format(
+                            os.path.join(output_directory, spec_name, id))
+    
+                    fmol.to_file("{}.sdf".format(outfile), file_format='sdf')
+                    with open("{}.json".format(outfile), 'w') as f:
+                        f.write(result.json())
+
+                results.append(result)
 
         return results
 
@@ -412,7 +454,7 @@ class OptimizationExecutor:
         return in_out_path_map
     
     def execute_optimization_from_molecules(
-            self, input_paths, output_directory, season, ncores=None, memory=None, 
+            self, input_paths, output_directory, season, ncores=1, memory=2, 
             delete_existing=False, keep_existing=True, recursive=False):
         """Execute optimizations from the given SDF molecules locally on this host.
 
@@ -481,10 +523,13 @@ class OptimizationExecutor:
         local_options={"ncores": ncores,
                        "memory": memory}
 
+        results = []
         for spec_name, compute_spec in SEASONS[season].items():
+            print("Processing spec: '{}'".format(spec_name))
             os.makedirs(os.path.join(output_directory, spec_name), exist_ok=True)
             for mol in mols:
                 id = self._mol_to_id(mol)
+                print("... '{}'".format(id))
 
                 input_data = self._generate_optimization_input(mol, compute_spec, factory)
 
@@ -492,10 +537,6 @@ class OptimizationExecutor:
                 result = self._execute_qcengine(input_data,
                                                 local_options=local_options)
 
-                # subfolders for each compute spec, files named according to molecule ids
-                outfile = "{}.sdf".format(
-                        os.path.join(output_directory, spec_name, id))
-    
                 # process final molecule
                 cmiles = result.initial_molecule.extras['canonical_isomeric_explicit_hydrogen_mapped_smiles']
     
@@ -514,12 +555,33 @@ class OptimizationExecutor:
                                                compute_spec['program'],
                                                result.energies)
 
-                fmol.to_file(outfile, file_format='sdf')
+                # fix to ensure output fidelity of ids; losing 02 padding on conformer
+                org, molecule, conformer = id.split('-')
+                output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
+                                                                        molecule=int(molecule),
+                                                                        conformer=int(conformer))
+
+                # subfolders for each compute spec, files named according to molecule ids
+                outfile = "{}".format(
+                        os.path.join(output_directory, spec_name, id))
+    
+                fmol.to_file("{}.sdf".format(outfile), file_format='sdf')
+                with open("{}.json".format(outfile), 'w') as f:
+                    f.write(result.json())
+
+                results.append(result)
+
+        return results
 
     @staticmethod
     def _generate_optimization_input(mol, compute_spec, factory):
+        import ast
         from qcelemental.models import OptimizationInput
 
+        # TODO: bug report in openff where `atom_map` is a string
+        if isinstance(mol.properties.get('atom_map'), str):
+            mol.properties['atom_map'] = ast.literal_eval(mol.properties['atom_map'])
+    
         attributes = factory.create_cmiles_metadata(mol)
         method = compute_spec['method']
         basis = compute_spec['basis']
@@ -528,7 +590,7 @@ class OptimizationExecutor:
         # generate optimization inputs
         input_data = OptimizationInput(
                 keywords={
-                      "coordsys": "tric",
+                      "coordsys": "dlc",
                       "enforce": 0,
                       "epsilon": 1e-05,
                       "reset": True,
@@ -660,8 +722,6 @@ class OptimizationExecutor:
             complete_i = df.applymap(lambda x: x.status.value == 'COMPLETE').sum().sum()
             progbar.update(complete_i-complete)
             complete = complete_i
-            #total = df.size
-            #print(f"{complete}/{total} COMPLETE", end='\r')
             if complete == df.size:
                 break
             sleep(10)
