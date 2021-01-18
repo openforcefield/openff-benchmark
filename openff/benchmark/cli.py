@@ -270,13 +270,14 @@ def extract(molids, fractal_uri, dataset_name, compute_specs):
 
 @optimize.command()
 @click.option('-s', '--season', required=True)
-@click.option('--ncores', default=2)
+@click.option('-t', '--nthreads', default=2)
+@click.option('-m', '--memory', default=2)
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to include")
 @click.option('-o', '--output-directory', default='3-export-compute')
 @click.argument('input-paths', nargs=-1)
-def execute(input_paths, output_directory, season, ncores, delete_existing, recursive):
+def execute(input_paths, output_directory, season, nthreads, memory, delete_existing, recursive):
     import os
     import signal
     import warnings
@@ -296,7 +297,9 @@ def execute(input_paths, output_directory, season, ncores, delete_existing, recu
     signal.signal(signal.SIGTERM, handle_signal)
 
     optexec.execute_optimization_from_molecules(
-            input_paths, output_directory, season, ncores=ncores,
+            input_paths, output_directory, season,
+            ncores=nthreads,
+            memory=memory,
             delete_existing=delete_existing,
             recursive=recursive)
 
