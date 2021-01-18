@@ -9,13 +9,20 @@ import os
 import shutil
 import logging
 from collections import defaultdict
-logging.disable(logging.WARNING) 
+
+# DO NOT USE; MESSES UP LOGGING 
+# consider overriding the loglevel of any particularly noisy loggers individual
+#logging.disable(logging.WARNING) 
 
 from qcportal import FractalClient
 
 from .seasons import SEASONS
 from ..utils.io import mols_from_paths
 
+
+def _disable_openff_logger():
+    from openforcefield.utils.toolkits import logger
+    logger.handlers.clear()
 
 class OptimizationExecutor:
 
@@ -107,12 +114,6 @@ class OptimizationExecutor:
             Relies *only* on filepaths of existing files for determining match.
     
         """
-        from openforcefield.topology.molecule import unit
-        import numpy as np
-        import pint
-    
-        punit = pint.UnitRegistry()
-    
         # get dataset
         client = FractalClient(fractal_uri, verify=False)
         optds = client.get_collection("OptimizationDataset", dataset_name)
@@ -163,28 +164,47 @@ class OptimizationExecutor:
     
                 # set conformer as final, optimized geometry
                 final_qcmol = opt.get_final_molecule()
-                geometry = unit.Quantity(
-                        np.array(final_qcmol.geometry, np.float), unit.bohr
-                    )
-                mol._add_conformer(geometry.in_units_of(unit.angstrom))
-    
-                # set molecule metadata
-                mol.name = output_id
-    
-                (mol.properties['group_name'],
-                 mol.properties['molecule_index'],
-                 mol.properties['conformer_index']) = output_id.split('-')
-    
-                # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
-                mol.properties['method'] = optentspec.qc_spec.method
-                mol.properties['basis'] = optentspec.qc_spec.basis
-                mol.properties['program'] = optentspec.qc_spec.program
-    
-                # SDF key-value pairs also used for final energies
-                mol.properties['initial_energy'] = (opt.energies[0] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
-                mol.properties['final_energy'] = (opt.energies[-1] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
-    
+
+                mol = self._process_final_mol(output_id,
+                                              mol,
+                                              final_qcmol,
+                                              optentspec.qc_spec.method,
+                                              optentspec.qc_spec.basis,
+                                              optentspec.qc_spec.program,
+                                              opt.energies
+                                              )
                 mol.to_file(outfile, file_format='sdf')
+
+    @staticmethod
+    def _process_final_mol(output_id, offmol, qcmol, method, basis, program, energies):
+        from openforcefield.topology.molecule import unit
+        import numpy as np
+        import pint
+    
+        punit = pint.UnitRegistry()
+    
+        geometry = unit.Quantity(
+                np.array(qcmol.geometry, np.float), unit.bohr
+            )
+        offmol._add_conformer(geometry.in_units_of(unit.angstrom))
+    
+        # set molecule metadata
+        offmol.name = output_id
+    
+        (offmol.properties['group_name'],
+         offmol.properties['molecule_index'],
+         offmol.properties['conformer_index']) = output_id.split('-')
+    
+        # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
+        offmol.properties['method'] = method
+        offmol.properties['basis'] = basis
+        offmol.properties['program'] = program
+    
+        # SDF key-value pairs also used for final energies
+        offmol.properties['initial_energy'] = (energies[0] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
+        offmol.properties['final_energy'] = (energies[-1] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
+
+        return offmol
     
     def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
@@ -271,7 +291,6 @@ class OptimizationExecutor:
               then merge with `execute_...` above.
     
         """
-        import qcengine
 
         # if scratch_directory specified, keep output with `messy=True`
         if scratch_directory is not None:
@@ -283,6 +302,8 @@ class OptimizationExecutor:
 
         if client is None:
             client = FractalClient(fractal_uri, verify=False)
+
+        local_options = dict(scratch_directory=scratch_directory)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
         optds.status()
@@ -299,14 +320,20 @@ class OptimizationExecutor:
         for opt in df.values.flatten():
             task = client.query_tasks(base_result=opt.id)[0]
 
-            local_options = dict(scratch_directory=scratch_directory)
-
-            #local_options['messy'] = messy
-
-            results.append(qcengine.compute_procedure(
-                *task.spec.args, local_options=local_options))
+            results.append(self._execute_qcengine(*task.spec.args, local_options=local_options))
 
         return results
+
+    def _execute_qcengine(self, input_data, procedure="geometric", local_options=None):
+        import qcengine
+
+        #local_options['messy'] = messy
+
+        #task.spec.args[0]['input_specification']['keywords']['e_convergence'] = 8
+        #task.spec.args[0]['input_specification']['keywords']['d_convergence'] = 8
+
+        return qcengine.compute_procedure(
+                input_data, procedure=procedure, local_options=local_options)
 
     def get_optimization_from_server(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
@@ -385,10 +412,12 @@ class OptimizationExecutor:
         return in_out_path_map
     
     def execute_optimization_from_molecules(
-            self, input_paths, output_directory, season, ncores=1,
-            dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=True,
-            recursive=False):
-        """Execute optimization from the given SDF molecules locally on this host.
+            self, input_paths, output_directory, season, ncores=None, memory=None, 
+            delete_existing=False, keep_existing=True, recursive=False):
+        """Execute optimizations from the given SDF molecules locally on this host.
+
+        Optimizations are performed in series for the molecules given,
+        with `ncores` and `memory` setting the resource constraints each optimization.
 
         Parameters
         ----------
@@ -398,6 +427,162 @@ class OptimizationExecutor:
             Directory path to deposit exported data.
         season : str
             Benchmark season identifier. Indicates the mix of compute specs to utilize.
+        ncores : int
+            Number of concurrent cores to use for each optimization.
+        memory : float
+            Amount of memory in GiB to allow for each optimization.
+        delete_existing : bool (False)
+            If True, delete existing directory if present.
+        keep_existing : bool (True)
+            If True, keep existing files in export directory.
+            Files corresponding to server data will not be re-exported.
+            Relies *only* on filepaths of existing files for determining match.
+        recursive : bool
+            If True, recursively load SDFs from any directories given in `input_paths`.
+    
+        """
+        _disable_openff_logger()
+
+        import numpy as np
+        import pint
+    
+        from qcsubmit.factories import OptimizationDatasetFactory
+        from openforcefield.topology import Molecule
+        from openforcefield.topology.molecule import unit
+
+        punit = pint.UnitRegistry()
+    
+        # fail early if output_directory already exists and we aren't deleting it
+        if os.path.isdir(output_directory):
+            if delete_existing:
+                shutil.rmtree(output_directory)
+            elif keep_existing:
+                pass
+            else:
+                raise Exception(f'Output directory {output_directory} already exists. '
+                                 'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
+
+        # get paths to submit, using output directory contents to inform choice
+        # for the given specs, if *any* expected output files are not present, we submit corresponding input file
+        if keep_existing:
+            in_out_path_map = self._source_specs_output_paths(
+                    input_paths, SEASONS[season], output_directory, recursive=recursive)
+    
+            input_paths = []
+            for input_file, output_files in in_out_path_map.items():
+                if not all(map(os.path.exists, output_files)):
+                    input_paths.append(input_file)
+
+
+        # extract molecules from SDF inputs
+        mols = mols_from_paths(input_paths, recursive=recursive)
+        factory = OptimizationDatasetFactory()
+
+        local_options={"ncores": ncores,
+                       "memory": memory}
+
+        for spec_name, compute_spec in SEASONS[season].items():
+            os.makedirs(os.path.join(output_directory, spec_name), exist_ok=True)
+            for mol in mols:
+                id = self._mol_to_id(mol)
+
+                input_data = self._generate_optimization_input(mol, compute_spec, factory)
+
+                # execute optimization
+                result = self._execute_qcengine(input_data,
+                                                local_options=local_options)
+
+                # subfolders for each compute spec, files named according to molecule ids
+                outfile = "{}.sdf".format(
+                        os.path.join(output_directory, spec_name, id))
+    
+                # process final molecule
+                cmiles = result.initial_molecule.extras['canonical_isomeric_explicit_hydrogen_mapped_smiles']
+    
+                fmol = Molecule.from_smiles(cmiles, hydrogens_are_explicit=True)
+                final_qcmol = result.final_molecule
+                geometry = unit.Quantity(
+                        np.array(final_qcmol.geometry, np.float), unit.bohr
+                    )
+                fmol._add_conformer(geometry.in_units_of(unit.angstrom))
+
+                fmol = self._process_final_mol(id,
+                                               fmol,
+                                               final_qcmol,
+                                               compute_spec['method'],
+                                               compute_spec['basis'],
+                                               compute_spec['program'],
+                                               result.energies)
+
+                fmol.to_file(outfile, file_format='sdf')
+
+    @staticmethod
+    def _generate_optimization_input(mol, compute_spec, factory):
+        from qcelemental.models import OptimizationInput
+
+        attributes = factory.create_cmiles_metadata(mol)
+        method = compute_spec['method']
+        basis = compute_spec['basis']
+        program = compute_spec['program']
+
+        # generate optimization inputs
+        input_data = OptimizationInput(
+                keywords={
+                      "coordsys": "tric",
+                      "enforce": 0,
+                      "epsilon": 1e-05,
+                      "reset": True,
+                      "qccnv": False,
+                      "molcnv": False,
+                      "check": 0,
+                      "trust": 0.1,
+                      "tmax": 0.3,
+                      "maxiter": 300,
+                      "convergence_set": "gau",
+                      "program": program
+                    },
+                extras={},
+                protocols={},
+                input_specification={
+                    "driver": "gradient",
+                    "model": {
+                      "method": method,
+                      "basis": basis,
+                    },
+                    "keywords": {
+                      "maxiter": 200,
+                      "scf_properties": [
+                        "dipole",
+                        "quadrupole",
+                        "wiberg_lowdin_indices",
+                        "mayer_indices"
+                      ]
+                    },
+                },
+                initial_molecule=mol.to_qcschema(extras=attributes)
+            )
+
+        return input_data
+
+    def execute_with_snowflake(
+            self, input_paths, output_directory, season, ncores=None, memory=None, 
+            dataset_name='Benchmark Scratch', delete_existing=False, keep_existing=True,
+            recursive=False):
+        """Execute optimizations from the given SDF molecules locally on this host.
+
+        Optimizations are performed in series for the molecules given,
+        with `ncores` and `memory` setting the resource constraints each optimization.
+
+        Parameters
+        ----------
+        input_paths : iterable of Path-like
+            Paths to SDF files or directories; if directories, all files SDF files in are loaded, recursively.
+        output_directory : str
+            Directory path to deposit exported data.
+        season : str
+            Benchmark season identifier. Indicates the mix of compute specs to utilize.
+        ncores : int
+            Number of concurrent cores to use for each optimization.
         dataset_name : str
             Dataset name to extract from the QCFractal server.
         delete_existing : bool (False)
@@ -410,11 +595,7 @@ class OptimizationExecutor:
             If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
-        from time import sleep
-        import psutil
-
-        from tqdm import trange
-        from qcfractal import FractalSnowflake
+        from qcsubmit.factories import OptimizationDatasetFactory
     
         # fail early if output_directory already exists and we aren't deleting it
         if os.path.isdir(output_directory):
@@ -425,7 +606,25 @@ class OptimizationExecutor:
             else:
                 raise Exception(f'Output directory {output_directory} already exists. '
                                  'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
+
+        # get paths to submit, using output directory contents to inform choice
+        # for the given specs, if *any* expected output files are not present, we submit corresponding input file
+        if keep_existing:
+            in_out_path_map = self._source_specs_output_paths(
+                    input_paths, SEASONS[season], output_directory, recursive=recursive)
     
+            input_paths = []
+            for input_file, output_files in in_out_path_map.items():
+                if not all(map(os.path.exists, output_files)):
+                    input_paths.append(input_file)
+
+
+        from time import sleep
+        import psutil
+
+        from tqdm import trange
+        from qcfractal import FractalSnowflake
+
         # start up Snowflake
         server = FractalSnowflake(max_workers=ncores)
 
