@@ -11,7 +11,6 @@ logger = logging.getLogger('openforcefield.utils.toolkits')
 prev_log_level = logger.getEffectiveLevel()
 logger.setLevel(logging.ERROR)
 
-from openforcefield.topology import Molecule
 from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 
 logger.setLevel(prev_log_level)
