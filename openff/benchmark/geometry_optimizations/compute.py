@@ -20,11 +20,6 @@ from .seasons import SEASONS
 from ..utils.io import mols_from_paths
 
 
-def _disable_openff_logger():
-    from openforcefield.utils.toolkits import logger
-    logger.handlers.clear()
-
-
 class OptimizationExecutor:
 
     def __init__(self):
@@ -167,48 +162,16 @@ class OptimizationExecutor:
     
                 # set conformer as final, optimized geometry
                 final_qcmol = opt.get_final_molecule()
-
                 mol = self._process_final_mol(output_id,
                                               mol,
                                               final_qcmol,
                                               optentspec.qc_spec.method,
                                               optentspec.qc_spec.basis,
                                               optentspec.qc_spec.program,
-                                              opt.energies
-                                              )
+                                              opt.energies)
+
                 mol.to_file(outfile, file_format='sdf')
 
-    @staticmethod
-    def _process_final_mol(output_id, offmol, qcmol, method, basis, program, energies):
-        from openforcefield.topology.molecule import unit
-        import numpy as np
-        import pint
-    
-        punit = pint.UnitRegistry()
-    
-        geometry = unit.Quantity(
-                np.array(qcmol.geometry, np.float), unit.bohr
-            )
-        offmol._add_conformer(geometry.in_units_of(unit.angstrom))
-    
-        # set molecule metadata
-        offmol.name = output_id
-    
-        (offmol.properties['group_name'],
-         offmol.properties['molecule_index'],
-         offmol.properties['conformer_index']) = output_id.split('-')
-    
-        # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
-        offmol.properties['method'] = method
-        offmol.properties['basis'] = basis
-        offmol.properties['program'] = program
-    
-        # SDF key-value pairs also used for final energies
-        offmol.properties['initial_energy'] = (energies[0] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
-        offmol.properties['final_energy'] = (energies[-1] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
-
-        return offmol
-    
     def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
         """Get status of optimization for each molecule ID.
@@ -278,105 +241,6 @@ class OptimizationExecutor:
                 print(f"Restarted ERRORed optimization `{opt.id}`")
                 client.modify_tasks(operation='restart', base_result=opt.id)
     
-    def execute_optimization_from_server(self, fractal_uri, dataset_name,
-            output_directory=None, ncores=1, memory=2, client=None, compute_specs=None,
-            molids=None):
-        """Execute optimization from the given molecule locally on this host.
-
-        Will not send results back to the server; this is purely for debugging.
-
-        TODO: make this send results back to server using same API as manager does.
-              then merge with `execute_...` above.
-    
-        """
-        import numpy as np
-        import pint
-    
-        from qcsubmit.factories import OptimizationDatasetFactory
-        from openforcefield.topology import Molecule
-        from openforcefield.topology.molecule import unit
-
-        if client is None:
-            client = FractalClient(fractal_uri, verify=False)
-
-        optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
-
-        df = optds.df
-
-        if (molids is not None) and (len(molids) != 0):
-            df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
-
-        local_options={"ncores": ncores,
-                       "memory": memory}
-
-        results = []
-        for spec_name in df:
-            if output_directory is not None:
-                os.makedirs(os.path.join(output_directory, spec_name), exist_ok=True)
-
-            print("Processing spec: '{}'".format(spec_name))
-            for id, opt in df[spec_name].iteritems():
-                print("... '{}'".format(id))
-                task = client.query_tasks(base_result=opt.id)[0]
-
-                result = self._execute_qcengine(*task.spec.args, local_options=local_options)
-
-                # process final molecule
-                cmiles = result.initial_molecule.extras['canonical_isomeric_explicit_hydrogen_mapped_smiles']
-    
-                fmol = Molecule.from_smiles(cmiles, hydrogens_are_explicit=True)
-                final_qcmol = result.final_molecule
-                geometry = unit.Quantity(
-                        np.array(final_qcmol.geometry, np.float), unit.bohr
-                    )
-                fmol._add_conformer(geometry.in_units_of(unit.angstrom))
-
-                method = result.input_specification.model.method
-                basis = result.input_specification.model.basis
-                program = result.keywords['program']
-
-                fmol = self._process_final_mol(id,
-                                               fmol,
-                                               final_qcmol,
-                                               method,
-                                               basis,
-                                               program,
-                                               result.energies)
-
-                # fix to ensure output fidelity of ids; losing 02 padding on conformer
-                org, molecule, conformer = id.split('-')
-                output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
-                                                                        molecule=int(molecule),
-                                                                        conformer=int(conformer))
-
-                # subfolders for each compute spec, files named according to molecule ids
-                if output_directory is not None:
-                    outfile = "{}".format(
-                            os.path.join(output_directory, spec_name, id))
-    
-                    fmol.to_file("{}.sdf".format(outfile), file_format='sdf')
-                    with open("{}.json".format(outfile), 'w') as f:
-                        f.write(result.json())
-
-                results.append(result)
-
-        return results
-
-    def _execute_qcengine(self, input_data, procedure="geometric", local_options=None):
-        import qcengine
-
-        #local_options['messy'] = messy
-
-        #task.spec.args[0]['input_specification']['keywords']['e_convergence'] = 8
-        #task.spec.args[0]['input_specification']['keywords']['d_convergence'] = 8
-
-        return qcengine.compute_procedure(
-                input_data, procedure=procedure, local_options=local_options)
-
     def get_optimization_from_server(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
         """Get full optimization data from the given molecules.
@@ -453,9 +317,164 @@ class OptimizationExecutor:
     
         return in_out_path_map
     
+    def execute_optimization_from_server(
+            self, fractal_uri, dataset_name, output_directory=None, ncores=1,
+            memory=2, client=None, compute_specs=None, molids=None,
+            scf_maxiter=200, geometric_maxiter=300, geometric_coordsys='dlc',
+            geometric_qccnv=False):
+        """Execute optimization from the given molecule locally on this host.
+
+        Will not send results back to the server; this is purely for debugging.
+
+        TODO: make this send results back to server using same API as manager does.
+              then merge with `execute_...` above.
+    
+        """
+        if client is None:
+            client = FractalClient(fractal_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+
+        df = optds.df
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
+
+        if compute_specs is not None:
+            df = df[compute_specs]
+
+        local_options={"ncores": ncores,
+                       "memory": memory}
+
+        results = []
+        for spec_name in df:
+
+            if output_directory is not None:
+                os.makedirs(os.path.join(output_directory, spec_name), exist_ok=True)
+
+            print("Processing spec: '{}'".format(spec_name))
+            for id, opt in df[spec_name].iteritems():
+
+                # fix to ensure output fidelity of ids; losing 02 padding on conformer
+                org, molecule, conformer = id.split('-')
+                output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
+                                                                        molecule=int(molecule),
+                                                                        conformer=int(conformer))
+
+                # subfolders for each compute spec, files named according to molecule ids
+                if output_directory is not None:
+                    outfile = "{}".format(
+                            os.path.join(output_directory, spec_name, output_id))
+    
+                print("... '{}'".format(id))
+                task = client.query_tasks(base_result=opt.id)[0]
+
+                # execute optimization
+                result = self._execute_qcengine(task.spec.args[0],
+                                                local_options=local_options,
+                                                scf_maxiter=scf_maxiter,
+                                                geometric_maxiter=geometric_maxiter,
+                                                geometric_coordsys=geometric_coordsys,
+                                                geometric_qccnv=geometric_qccnv)
+
+                if result.success:
+
+                    # process final molecule
+                    final_molecule = self._process_optimization_result(output_id, result)
+                    final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
+                else:
+                    print("Optimization failed for '{}'; check JSON results output".format(output_id))
+
+                with open("{}.json".format(outfile), 'w') as f:
+                    f.write(result.json())
+
+                results.append(result)
+
+        return results
+
+    def _execute_qcengine(
+            self, input_data, procedure="geometric", local_options=None,
+            scf_maxiter=None, geometric_maxiter=None, geometric_coordsys=None,
+            geometric_qccnv=None):
+        import qcengine
+
+        # inject reset=True fix, set coordsys to 'dlc'
+        input_data['keywords']['reset'] = True
+        input_data['keywords']['coordsys'] = 'dlc'
+
+        # inject exposed convergence parameters, if specified
+        if scf_maxiter is not None:
+            input_data['input_specification']['keywords']['maxiter'] = scf_maxiter
+        if geometric_maxiter is not None:
+            input_data['keywords']['maxiter'] = geometric_maxiter
+        if geometric_coordsys is not None:
+            input_data['keywords']['coordsys'] = geometric_coordsys
+        if geometric_qccnv is not None:
+            input_data['keywords']['qccnv'] = geometric_qccnv
+
+        return qcengine.compute_procedure(
+                input_data, procedure=procedure, local_options=local_options)
+
+    def _process_optimization_result(self, output_id, result):
+        from openforcefield.topology import Molecule
+
+        cmiles = result.initial_molecule.extras['canonical_isomeric_explicit_hydrogen_mapped_smiles']
+        
+        final_molecule = Molecule.from_smiles(cmiles, hydrogens_are_explicit=True)
+        final_qcmol = result.final_molecule
+        
+        method = result.input_specification.model.method
+        basis = result.input_specification.model.basis
+        program = result.keywords['program']
+
+        final_molecule = self._process_final_mol(output_id,
+                                       final_molecule,
+                                       final_qcmol,
+                                       method,
+                                       basis,
+                                       program,
+                                       result.energies)
+
+        return final_molecule
+
+    @staticmethod
+    def _process_final_mol(output_id, offmol, qcmol, method, basis, program, energies):
+        from openforcefield.topology.molecule import unit
+        import numpy as np
+        import pint
+    
+        punit = pint.UnitRegistry()
+    
+        # set conformer qcmol geometry
+        geometry = unit.Quantity(
+                np.array(qcmol.geometry, np.float), unit.bohr
+            )
+        offmol._add_conformer(geometry.in_units_of(unit.angstrom))
+    
+        # set molecule metadata
+        offmol.name = output_id
+    
+        (offmol.properties['group_name'],
+         offmol.properties['molecule_index'],
+         offmol.properties['conformer_index']) = output_id.split('-')
+    
+        # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
+        offmol.properties['method'] = method
+        offmol.properties['basis'] = basis
+        offmol.properties['program'] = program
+    
+        # SDF key-value pairs also used for final energies
+        offmol.properties['initial_energy'] = (energies[0] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
+        offmol.properties['final_energy'] = (energies[-1] * punit.hartree * punit.avogadro_constant).to('kcal/mol')
+
+        return offmol
+    
     def execute_optimization_from_molecules(
             self, input_paths, output_directory, season, ncores=1, memory=2, 
-            delete_existing=False, keep_existing=True, recursive=False):
+            delete_existing=False, keep_existing=True, recursive=False,
+            scf_maxiter=200, geometric_maxiter=300, geometric_coordsys='dlc',
+            geometric_qccnv=False):
         """Execute optimizations from the given SDF molecules locally on this host.
 
         Optimizations are performed in series for the molecules given,
@@ -483,8 +502,6 @@ class OptimizationExecutor:
             If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
-        _disable_openff_logger()
-
         import numpy as np
         import pint
     
@@ -526,34 +543,11 @@ class OptimizationExecutor:
         results = []
         for spec_name, compute_spec in SEASONS[season].items():
             print("Processing spec: '{}'".format(spec_name))
+
             os.makedirs(os.path.join(output_directory, spec_name), exist_ok=True)
+
             for mol in mols:
                 id = self._mol_to_id(mol)
-                print("... '{}'".format(id))
-
-                input_data = self._generate_optimization_input(mol, compute_spec, factory)
-
-                # execute optimization
-                result = self._execute_qcengine(input_data,
-                                                local_options=local_options)
-
-                # process final molecule
-                cmiles = result.initial_molecule.extras['canonical_isomeric_explicit_hydrogen_mapped_smiles']
-    
-                fmol = Molecule.from_smiles(cmiles, hydrogens_are_explicit=True)
-                final_qcmol = result.final_molecule
-                geometry = unit.Quantity(
-                        np.array(final_qcmol.geometry, np.float), unit.bohr
-                    )
-                fmol._add_conformer(geometry.in_units_of(unit.angstrom))
-
-                fmol = self._process_final_mol(id,
-                                               fmol,
-                                               final_qcmol,
-                                               compute_spec['method'],
-                                               compute_spec['basis'],
-                                               compute_spec['program'],
-                                               result.energies)
 
                 # fix to ensure output fidelity of ids; losing 02 padding on conformer
                 org, molecule, conformer = id.split('-')
@@ -563,9 +557,27 @@ class OptimizationExecutor:
 
                 # subfolders for each compute spec, files named according to molecule ids
                 outfile = "{}".format(
-                        os.path.join(output_directory, spec_name, id))
+                        os.path.join(output_directory, spec_name, output_id))
     
-                fmol.to_file("{}.sdf".format(outfile), file_format='sdf')
+                print("... '{}'".format(id))
+
+                input_data = self._generate_optimization_input(mol, compute_spec, factory)
+
+                # execute optimization
+                result = self._execute_qcengine(input_data,
+                                                local_options=local_options,
+                                                scf_maxiter=scf_maxiter,
+                                                geometric_maxiter=geometric_maxiter,
+                                                geometric_coordsys=geometric_coordsys,
+                                                geometric_qccnv=geometric_qccnv)
+
+                if result.success:
+                    # process final molecule
+                    final_molecule = self._process_optimization_result(output_id, result)
+                    final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
+                else:
+                    print("Optimization failed for '{}'; check JSON results output".format(output_id))
+
                 with open("{}.json".format(outfile), 'w') as f:
                     f.write(result.json())
 
@@ -624,7 +636,7 @@ class OptimizationExecutor:
                 initial_molecule=mol.to_qcschema(extras=attributes)
             )
 
-        return input_data
+        return input_data.dict()
 
     def execute_with_snowflake(
             self, input_paths, output_directory, season, ncores=None, memory=None, 

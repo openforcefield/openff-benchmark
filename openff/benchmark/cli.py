@@ -249,8 +249,13 @@ def extract(molids, fractal_uri, dataset_name, compute_specs):
 @click.option('-m', '--memory', default=2)
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
 @click.option('-o', '--output-directory')
+@click.option('--scf-maxiter', type=int, default=200)
+@click.option('--geometric-maxiter', type=int, default=300)
+@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc')
+@click.option('--geometric-qccnv', is_flag=True)
 @click.argument('molids', nargs=-1)
-def execute_from_server(molids, fractal_uri, dataset_name, compute_specs, nthreads, memory, output_directory):
+def execute_from_server(molids, fractal_uri, dataset_name, compute_specs, nthreads, memory, output_directory,
+                        scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
     import json
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -265,7 +270,11 @@ def execute_from_server(molids, fractal_uri, dataset_name, compute_specs, nthrea
                                                        ncores=nthreads,
                                                        memory=memory,
                                                        compute_specs=compute_specs,
-                                                       molids=molids)
+                                                       molids=molids,
+                                                       scf_maxiter=scf_maxiter,
+                                                       geometric_maxiter=geometric_maxiter,
+                                                       geometric_coordsys=geometric_coordsys,
+                                                       geometric_qccnv=geometric_qccnv)
 
     # export and read back into JSON for final output
     results_processed = [json.loads(res.json()) for res in results]
@@ -280,8 +289,13 @@ def execute_from_server(molids, fractal_uri, dataset_name, compute_specs, nthrea
               help="Delete existing output directory if it exists")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to include")
 @click.option('-o', '--output-directory', required=True)
+@click.option('--scf-maxiter', type=int, default=200)
+@click.option('--geometric-maxiter', type=int, default=300)
+@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc')
+@click.option('--geometric-qccnv', is_flag=True)
 @click.argument('input-paths', nargs=-1)
-def execute(input_paths, output_directory, season, nthreads, memory, delete_existing, recursive):
+def execute(input_paths, output_directory, season, nthreads, memory, delete_existing, recursive,
+            scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
     import os
     import json
     import warnings
@@ -293,12 +307,17 @@ def execute(input_paths, output_directory, season, nthreads, memory, delete_exis
 
     optexec = OptimizationExecutor()
 
-    results = optexec.execute_optimization_from_molecules(
-            input_paths, output_directory, season,
-            ncores=nthreads,
-            memory=memory,
-            delete_existing=delete_existing,
-            recursive=recursive)
+    results = optexec.execute_optimization_from_molecules(input_paths,
+                                                          output_directory,
+                                                          season,
+                                                          ncores=nthreads,
+                                                          memory=memory,
+                                                          delete_existing=delete_existing,
+                                                          recursive=recursive,
+                                                          scf_maxiter=scf_maxiter,
+                                                          geometric_maxiter=geometric_maxiter,
+                                                          geometric_coordsys=geometric_coordsys,
+                                                          geometric_qccnv=geometric_qccnv)
 
     # export and read back into JSON for final output
     results_processed = [json.loads(res.json()) for res in results]
