@@ -51,7 +51,7 @@ class OptimizationExecutor:
             If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
-        from qcsubmit.factories import OptimizationDataset, OptimizationDatasetFactory
+        from openff.qcsubmit.factories import OptimizationDataset, OptimizationDatasetFactory
     
         # extract molecules from SDF inputs
         mols = mols_from_paths(input_paths, recursive=recursive)
@@ -505,7 +505,7 @@ class OptimizationExecutor:
         import numpy as np
         import pint
     
-        from qcsubmit.factories import OptimizationDatasetFactory
+        from openff.qcsubmit.factories import OptimizationDatasetFactory
         from openforcefield.topology import Molecule
         from openforcefield.topology.molecule import unit
 
@@ -669,7 +669,7 @@ class OptimizationExecutor:
             If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
-        from qcsubmit.factories import OptimizationDatasetFactory
+        from openff.qcsubmit.factories import OptimizationDatasetFactory
     
         # fail early if output_directory already exists and we aren't deleting it
         if os.path.isdir(output_directory):
