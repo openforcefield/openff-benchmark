@@ -47,9 +47,9 @@ def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
     optexec.submit_molecules(
             fractal_uri, input_path, season, dataset_name, recursive=recursive)
 
-@optimize.command()
-def submit_compute(fractal_uri, dataset_name, spec_name, method, basis, program):
-    pass
+#@optimize.command()
+#def submit_compute(fractal_uri, dataset_name, spec_name, method, basis, program):
+#    pass
 
 @optimize.command()
 @click.option('-u', '--fractal-uri', default="localhost:7777")

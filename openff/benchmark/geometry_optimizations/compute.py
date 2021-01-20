@@ -76,7 +76,7 @@ class OptimizationExecutor:
     
         print("Submitting...")
         client = FractalClient(fractal_uri, verify=False)
-        ds.submit(client=client)
+        ds.submit(verbose=True, client=client)
         print("Submitted!")
     
     @staticmethod
