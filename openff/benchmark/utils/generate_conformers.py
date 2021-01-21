@@ -264,11 +264,11 @@ def generate_conformers(group2idx2mols2confs):
                 import tempfile
                 try:
                     # Do a roundtrip save/load to ensure this won't crash in subsequent steps
-                    with tempfile.TemporaryFile('w') as tmp:
-                        sio = io.StringIO()
-                        this_conf.to_file(sio, file_format='sdf')
-                        sio.seek(0)
-                        bio = io.BytesIO(sio.read().encode('utf8'))
+                    with tempfile.NamedTemporaryFile(suffix='.sdf') as of:
+                        this_conf.to_file(of.name, file_format='sdf')
+                        of.seek(0)
+                        test_loaded_mol = Molecule.from_file(of.name, file_format='sdf')
+                        test_loaded_mol.to_rdkit()
                     test_loaded_mol = Molecule.from_file(bio, file_format='sdf')
                     test_loaded_mol.to_rdkit()
                     success_mols.append(this_conf)

@@ -5,7 +5,7 @@ from openff.benchmark.utils.utils import get_data_file_path
 import pytest
 import os
 import shutil
-import inspect
+import csv
 import glob
 from click.testing import CliRunner
 runner = CliRunner()
@@ -108,7 +108,7 @@ BBB""" in file_text
             test_dir = '1-validate_and_assign_graphs_and_confs'
             if os.path.exists(test_dir):
                 shutil.rmtree(test_dir)
-            input_mols = [get_data_file_path('input_multi_conf_flexible.sdf')]
+            input_mols = [get_data_file_path('input_five_confs_flexible.sdf')]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
                                            "-o", test_dir,
@@ -151,8 +151,9 @@ BBB""" in file_text
             if os.path.exists(test_dir):
                 shutil.rmtree(test_dir)
             #os.makedirs(test_dir)
-            input_mols = [get_data_file_path('input_multi_conf_flexible.sdf'),
-                          get_data_file_path('input_all_stereoisomers.sdf')]
+            input_mols = [get_data_file_path('input_five_confs_flexible.sdf'),
+                          get_data_file_path('input_eight_stereoisomers.sdf')
+                          ]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
                                            "-o", test_dir,
@@ -160,12 +161,21 @@ BBB""" in file_text
                                      catch_exceptions=False)
             output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
             output_files = [os.path.basename(fname) for fname in output_files]
-            #assert 'BBB-00000.smi' in output_files
-            #assert 'BBB-00011.smi' in output_files
-            #assert 'BBB-00012.smi' not in output_files
-            assert 'BBB-00000-00.sdf' in output_files
-            assert 'BBB-00011-00.sdf' in output_files
-            assert len(output_files) == 12
+            assert sorted(output_files) == ['BBB-00000-00.sdf', # The first input has 5 confs of the same molecule
+                                            'BBB-00000-01.sdf',
+                                            'BBB-00000-02.sdf',
+                                            'BBB-00000-03.sdf',
+                                            'BBB-00000-04.sdf',
+                                            'BBB-00001-00.sdf',# The there are 8 different stereoisomers with 1 conf each
+                                            'BBB-00002-00.sdf',
+                                            'BBB-00003-00.sdf',
+                                            'BBB-00004-00.sdf',
+                                            'BBB-00005-00.sdf',
+                                            'BBB-00006-00.sdf',
+                                            'BBB-00007-00.sdf',
+                                            'BBB-00008-00.sdf',
+                                            ]
+
 
     # multi file multi mol duplicates (ok)
     def test_multi_file_multi_mol_duplicates(self, tmpdir):
@@ -177,7 +187,7 @@ BBB""" in file_text
                 shutil.rmtree(test_dir)
             # os.makedirs(test_dir)
             input_mols = [get_data_file_path('input_one_stereoisomer.sdf'),
-                          get_data_file_path('input_all_stereoisomers.sdf')]
+                          get_data_file_path('input_eight_stereoisomers.sdf')]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
                                            "-o", test_dir,
@@ -185,13 +195,17 @@ BBB""" in file_text
                                      catch_exceptions=False)
             output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
             output_files = [os.path.basename(fname) for fname in output_files]
-            #assert 'BBB-00000.smi' in output_files
-            #assert 'BBB-00007.smi' in output_files
-            assert 'BBB-00000-00.sdf' in output_files
-            assert 'BBB-00000-01.sdf' not in output_files
-            assert 'BBB-00007-00.sdf' in output_files
-            assert 'BBB-00008-00.sdf' not in output_files
-            assert len(output_files) == 8
+            assert sorted(output_files) == ['BBB-00000-00.sdf',
+                                            'BBB-00001-00.sdf',
+                                            'BBB-00002-00.sdf',
+                                            'BBB-00003-00.sdf',
+                                            'BBB-00004-00.sdf',
+                                            'BBB-00005-00.sdf',
+                                            'BBB-00006-00.sdf',
+                                            'BBB-00007-00.sdf',
+                                            ]
+            error_files = glob.glob(os.path.join(test_dir, 'error_mols', '*.sdf'))
+            assert len(error_files) == 1
 
     def test_add(self, tmpdir):
 
@@ -218,5 +232,24 @@ BBB""" in file_text
 
             output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
             output_files = [os.path.basename(fname) for fname in output_files]
+            assert sorted(output_files) == ['BBB-00000-00.sdf',
+                                            'BBB-00001-00.sdf',
+                                            'BBB-00002-00.sdf',
+                                            'BBB-00003-00.sdf',
+                                            'BBB-00004-00.sdf',
+                                            'BBB-00005-00.sdf',
+                                            'BBB-00006-00.sdf',
+                                            'BBB-00007-00.sdf',
+                                            ]
+
             error_files = glob.glob(os.path.join(test_dir, 'error_mols', '*.sdf'))
             error_files = [os.path.basename(fname) for fname in error_files]
+            assert len(error_files) == 1
+            assert error_files == []
+
+            output_name_assignments = []
+            with open(os.path.join(test_dir, 'name_assignments.csv')) as of:
+                csv_reader = csv.reader(of)
+                for row in csv_reader:
+                    output_name_assignments.append(row)
+            raise Exception(output_name_assignments)
