@@ -50,3 +50,10 @@ dependencies:
   # submission
   - qcportal
   - openff-qcsubmit =0.2.0
+
+  # analysis
+  - numpy
+  - pint
+  - itertools
+  - matplotlib
+  - seaborn
