@@ -11,6 +11,9 @@ dependencies:
   - qcfractal =0.15.1
   - qcengine =0.17.0
 
+  # Benchmarking
+  - openff-benchmark =2020.01.21.1
+
   # Storage dependencies
   - alembic
   - psycopg2 >=2.7
