@@ -284,7 +284,9 @@ def preprocess():
 
 @preprocess.command()
 @click.option('--delete-existing', is_flag=True)
-@click.option('--add', is_flag=True)
+@click.option('--add',
+              is_flag=True,
+              help='Appends new molecules to the dataset. The new molecules MUST NOT be new conformers of previously-existing molecules.')
 @click.option('-o', '--output-directory',
               default='1-validate_and_assign', 
               help='Directory to put output files. If this directory does not exist, one will be created.')
@@ -337,9 +339,10 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     existing_output_mols = []
     existing_name_assignments = []
 
-    # Ensure both `delete_existing` and `add` aren't specified
+    # Prepare required directories, ensuring that input flags (`delete_existing` and `add`) are sane
+    error_dir = os.path.join(output_directory, 'error_mols')
     if delete_existing and add:
-        raise Exception("Can not specify BOTH --delete_existing AND --add flags")
+        raise Exception("Can not specify BOTH --delete-existing AND --add flags")
     # Delete pre-existing output mols if requested
     elif delete_existing and not(add):
         if os.path.exists(output_directory):
@@ -355,45 +358,19 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     elif not(delete_existing) and not(add):
         if os.path.exists(output_directory):
             raise Exception(f'Output directory {output_directory} already exists. '
-                            f'Specify `delete_existing=True` to remove.')
+                            f'Specify `--delete-existing` to remove.')
         os.makedirs(output_directory)
         # Create error directory
-        error_dir = os.path.join(output_directory, 'error_mols')
         os.makedirs(error_dir)
-
-    #except OSError:
-
-    ## CLI
-
-    ## Function
-    # If ADD is FALSE, just do the previous stuff
-    # If ADD is TRUE, for each mol
-    #     File roundtrip test it, send to ERROR MOLS and break if bad
-    #     Compare new input graphs to existing outputs, send to ERROR MOLS and break if bad
-    #     Add it to list of SUCCESS MOLS
-    # Figure out the highest molecule index previously assigned
-    # Figure out the highest error molecule index previously assigned
-    # For each success mol
-    #     Give it a unique index
-    #     Write it out
-    #     Append it to name_assignments
-    # For each error mol
-    #     Give it a unique index
-    #     Append the cause of the failure
-
-    ## CLI
-    # Write out name assignments
-    # Write out new success mols
-    # Write out new error mols
 
     input_mols = []
     error_mols = []
     # Load all input mols, annotating SD data with original file+mol index
     print('Loading input files')
-    for molecule_3d_file in input_3d_molecules:
-        #print(f"Reading {molecule_3d_file}")
+    logging.info('Loading input files')
+    for molecule_3d_file in tqdm(input_3d_molecules):
         # Squelch reading warnings
-        # We'll recover the full text of the warning/error during the file round trip tests later.
+        # We'll recover the full text of the warning/error during the file round trip tests in validate_and_assign_ids.py.
         try:
             toolkit_logger = logging.getLogger('openforcefield.utils.toolkits')
             prev_log_level = toolkit_logger.getEffectiveLevel()
@@ -418,8 +395,12 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
 
     # Load all pre-existing output mols
     if add:
+        print('Running in `--add` mode. Loading existing output molecules.')
+        logging.info('Running in `--add` mode. Loading existing output molecules.')
         existing_output_mol_files = glob.glob(os.path.join(output_directory, '*.sdf'))
-        existing_output_mols = [Molecule.from_file(i) for i in existing_output_mol_files]
+        existing_output_mols = []
+        for existing_file in tqdm(existing_output_mol_files):
+            existing_output_mols.append(Molecule.from_file(existing_file))
         # Strip the "-CC.sdf" from the output names ("GGG-MMMMM-CC.sdf")
         existing_name_assignments = []
         with open(os.path.join(output_directory, 'name_assignments.csv')) as of:
@@ -438,35 +419,49 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     success_mols, error_mols, name_assignments = output
 
     # Write successfully processed mols
-    for success_mol in success_mols:
+    print('Writing successful mols')
+    logging.info('Writing successful mols')
+    for success_mol in tqdm(success_mols):
         success_mol.to_file(os.path.join(output_directory, success_mol.name + ".sdf"), "sdf")
 
 
     # Write error mols
-    for idx, (filename, error_mol, exception) in enumerate(error_mols):
-        output_mol_file = os.path.join(error_dir, f'error_mol_{idx}.sdf')
+    print('Writing error mols (if any)')
+    logging.info('Writing error mols (if any)')
+
+    # In case error molecules already exist, make sure we don't overwrite them
+    existing_error_mols = glob.glob(os.path.join(error_dir, '*sdf'))
+    existing_error_mols = [os.path.basename(i) for i in existing_error_mols]
+    if len(existing_error_mols) == 0:
+        start_error_index = 0
+    else:
+        existing_error_mol_indices = [int(i.replace('error_mol_','').replace('.sdf', '')) for i in existing_error_mols]
+        start_error_index = max(existing_error_mol_indices) + 1
+    for idx, (filename, error_mol, exception) in enumerate(tqdm(error_mols)):
+        unique_idx = idx + start_error_index
+        output_mol_file = os.path.join(error_dir, f'error_mol_{unique_idx}.sdf')
         try:
             error_mol.to_file(output_mol_file, file_format='sdf')
         except Exception as e:
             exception = str(exception)
             exception += "\n Then failed when trying to write mol to error directory with "
             exception += str(e)
-        output_summary_file = os.path.join(error_dir, f'error_mol_{idx}.txt')
+        output_summary_file = os.path.join(error_dir, f'error_mol_{unique_idx}.txt')
         with open(output_summary_file, 'w') as of:
             of.write(f'source: {filename}\n')
             of.write(f'error text: {exception}\n')
 
     # Write name assignments
-    #out_file_name = os.path.join(output_directory, 'name_assignments.csv')
     import csv
+    print('Writing name assignments')
+    logging.info('Writing name assignments')
     with open(os.path.join(output_directory, 'name_assignments.csv'), 'w', newline='') as of:
         of.write('orig_name,orig_file,orig_file_index,out_file_name\n')
         csvw = csv.writer(of)
         #np.savetxt(out_file_name, np.array(name_assignments))
         for name_assignment in name_assignments:
             csvw.writerow(name_assignment)
-        #    of.write(','.join([str(i) for i in name_assignment]))
-        #    of.write('\n')
+
 
 @preprocess.command()
 @click.option('--delete-existing', is_flag=True)

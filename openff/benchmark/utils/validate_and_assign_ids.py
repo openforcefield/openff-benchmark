@@ -36,9 +36,12 @@ def validate_and_assign(loaded_mols,
     if name_assignments is None:
         name_assignments = []
 
-    logging.basicConfig(filename=os.path.join('log.txt'),
-                        level=logging.DEBUG)
-    #this_logger = logging.getLogger(__name__)
+    logging.basicConfig(filename='log.txt',
+                        #level=logging.DEBUG
+                        )
+    #logging.setLevel(logging.INFO)
+    #this_logger = logging.getLogger()
+    #this_logger.setLevel(logging.INFO)
         
     smiles_to_success_mol = {}
     error_mols = []
@@ -48,10 +51,9 @@ def validate_and_assign(loaded_mols,
         existing_smiles_to_mol[mol.to_smiles()] = mol
 
     # Handle 3d molecules
-    print('Reading input files and validating structures')
-
-    print("Validating input molecules")
-    for mol_index, mol in enumerate(loaded_mols):
+    print("Validating input molecules and grouping by connection table")
+    logging.info("Validating input molecules and grouping by connection table")
+    for mol_index, mol in enumerate(tqdm(loaded_mols)):
         # Simulate a SDF file roundtrip to check for errors such as undefined stereochemistry
         try:
             with tempfile.NamedTemporaryFile(suffix='.sdf') as of:
@@ -60,7 +62,7 @@ def validate_and_assign(loaded_mols,
                 test_loaded_mol = Molecule.from_file(of.name, file_format='sdf')
                 test_loaded_mol.to_rdkit()
         except Exception as e:
-            error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, e))
+            error_mols.append((f'{mol.properties["original_file"]}:{mol.properties["original_file_index"]}', mol, e))
             continue
 
         # See whether this graph is already in the existing outputs
@@ -70,8 +72,8 @@ def validate_and_assign(loaded_mols,
             msg += f'{mol.name} from {mol.properties["original_file"]}:{mol.properties["original_file"]} '
             msg += f'has an equivalent connection table to existing output'
             msg += f'{existing_smiles_to_mol[smiles]}'
-            logging.warning(msg)
-            error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, msg))
+            logging.debug(msg)
+            error_mols.append((f'{mol.properties["original_file"]}:{mol.properties["original_file_index"]}', mol, msg))
             continue
 
         # If we've reached here, then the molecule is validated
@@ -102,30 +104,32 @@ def validate_and_assign(loaded_mols,
                 # Make a temporary copy of the parent mol for conformer alignment and deduplication
                 temp_mol = copy.deepcopy(orig_mol)
                 temp_mol.add_conformer(reordered_mol.conformers[0])
-                aligned_mol, rmslist = align_offmol_conformers(temp_mol)
+                temp_mol, _rmslist = align_offmol_conformers(temp_mol)
                 # Don't trust rmslist above for deduplication -- It doesn't take into
                 # account multiple atom mappings
                 confs_to_delete = greedy_conf_deduplication(temp_mol,
                                                             0.1)
                 if len(confs_to_delete) > 0:
                     msg = f'Duplicate molecule conformer input detected.\n'
-                    msg += f'{molecule_3d_file}:{mol_index} has an RMSD within 0.1 A '
-                    msg += f'to the molecule originally loaded from '
-                    msg += f'{orig_mol.properties["original_files"]}:{orig_mol.properties["original_file_indices"]}'
-                    logging.warning(msg)
+                    msg += f'{mol.properties["original_file"]}:{mol.properties["original_file_index"]} has an RMSD within 0.1 A '
+                    msg += f'to a conformer of the molecule originally loaded from the following file(s) and indices:'
+                    msg += f'{orig_mol.properties["original_file"]}:{orig_mol.properties["original_file_index"]}'
+                    logging.debug(msg)
                     temp_mol._conformers = [temp_mol.conformers[-1]]
-                    error_mols.append((f'{molecule_3d_file}:{mol_index}', mol, msg))
+                    error_mols.append((f'{mol.properties["original_file"]}:{mol.properties["original_file_index"]}',
+                                       mol, msg))
                     continue
                 temp_mol.properties['original_file'].append(mol.properties['original_file'])
                 temp_mol.properties['original_file_index'].append(mol.properties['original_file_index'])
                 temp_mol.properties['original_name'].append(mol.properties['original_name'])
                 smiles_to_success_mol[smiles] = temp_mol
+            # This is a catch-all for any unexpected processing errors that are encountered above
             except Exception as e:
                 error_mols.append(
                     (f'{mol.properties["original_file"]}:{mol.properties["original_file_index"]}', mol, e))
 
-            # If this graph molecule ISN'T already known, then add
-            # this representation as a new molecule
+        # If this graph molecule ISN'T already known, then add
+        # this representation as a new molecule
         else:
             # Change the metadata into lists so that we can record it for each conformer
             mol.properties['original_file'] = [mol.properties['original_file']]
@@ -137,8 +141,16 @@ def validate_and_assign(loaded_mols,
     # Preserve a mapping of input filename/mol index to output name
     success_mols = []
     print("Assigning IDs and preparing molecules for output")
-    for unique_mol_index, smiles in tqdm(enumerate(smiles_to_success_mol.keys())):
+    logging.info("Assigning IDs and preparing molecules for output")
+    # Determine the highest previously-existing mol index if the output directory is already populated
+    if len(existing_output_mols) == 0:
+        output_mol_index_start_value = 0
+    else:
+        existing_mol_indices = [int(mol.properties['molecule_index']) for mol in existing_output_mols]
+        output_mol_index_start_value= max(existing_mol_indices) + 1
 
+    for success_mol_index, smiles in enumerate(tqdm(smiles_to_success_mol.keys())):
+        unique_mol_index = success_mol_index + output_mol_index_start_value
         mol_name = f'{group_name}-{unique_mol_index:05d}'
         smiles_to_success_mol[smiles].properties['group_name'] = group_name
         smiles_to_success_mol[smiles].properties['molecule_index'] = unique_mol_index
@@ -157,7 +169,7 @@ def validate_and_assign(loaded_mols,
             msg += f'file:position {orig_file}:{orig_file_index}'
             msg += f' has passed validation '
             msg += f'and is being renamed to {mol_copy2.name}.'
-            logging.info(msg)
+            logging.debug(msg)
 
             name_assignments.append((orig_name, orig_file, orig_file_index, mol_copy2.name))
             mol_copy2._conformers = None
@@ -168,7 +180,6 @@ def validate_and_assign(loaded_mols,
             mol_copy2.properties.pop('original_file_index')
             mol_copy2.properties.pop('original_name')
             success_mols.append(mol_copy2)
-            #mol_copy.to_file(os.path.join(output_directory, out_file_name), file_format='sdf')
     return success_mols, error_mols, name_assignments
 
 
