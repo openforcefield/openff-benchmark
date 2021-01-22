@@ -38,6 +38,6 @@ jobs:
           ANACONDA_TOKEN: ${{ secrets.OMNIA_ANACONDA_TOKEN }}
         run: |
           pushd devtools/conda-recipe/
-	  sed -i "s/DATETIME/ `date  +"%Y.%m.%d.%H%M"`/" meta.yaml
+	  sed -i 's/DATETIME/ `date  +"%Y.%m.%d.%H%M"`/' meta.yaml
           conda build --token ${ANACONDA_TOKEN} --user omnia --label benchmark --python=3.6 -c conda-forge -c omnia .
           popd
