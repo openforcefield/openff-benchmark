@@ -76,6 +76,9 @@ jobs:
         echo
         echo "ls build"
         ls build
+        echo
+        echo "ls build/*"
+        ls build/*
 
     - name: Upload installer as artifact
       uses: actions/upload-artifact@v2
