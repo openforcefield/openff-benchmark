@@ -84,13 +84,13 @@ jobs:
         #cd ..
         pwd
         ls
-        ls toolkit-installer-constructor
-        ls toolkit-installer-constructor/build
-        ls toolkit-installer-constructor/build/openff-benchmark-*/
+        ls devtools/installer-constructor
+        ls devtools/installer-constructor/build
+        ls devtools/installer-constructor/build/openff-benchmark-*/
 
         mkdir scratch
         cd scratch
-        echo $HOME/constructor_install/ | bash ../toolkit-installer-constructor/build/openff-benchmark-*/openff-benchmark-*.sh
+        echo $HOME/constructor_install/ | bash ../installer-constructor/build/openff-benchmark-*/openff-benchmark-*.sh
 
         conda activate $HOME/constructor_install/
         conda info
