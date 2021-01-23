@@ -68,8 +68,13 @@ jobs:
 
         python run.py
 
+        echo "pwd"
         pwd
+        echo 
+        echo "ls"
         ls
+        echo
+        echo "ls build"
         ls build
 
     - name: Upload installer as artifact
@@ -83,9 +88,17 @@ jobs:
       run: |
         #cd ..
         pwd
+        echo
+        echo "ls"
         ls
+        echo
+        echo "ls devtools/installer-constructor"
         ls devtools/installer-constructor
+        echo
+        echo "ls devtools/installer-constructor/build"
         ls devtools/installer-constructor/build
+        echo
+        echo "ls devtools/installer-constructor/build/openff-benchmark-*/"
         ls devtools/installer-constructor/build/openff-benchmark-*/
 
         mkdir scratch
