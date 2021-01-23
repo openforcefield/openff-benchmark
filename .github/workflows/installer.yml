@@ -54,10 +54,11 @@ jobs:
 
         echo $LATEST_TAG
 
-        git clone https://github.com/openforcefield/toolkit-installer-constructor
-        cd toolkit-installer-constructor
+        #git clone https://github.com/openforcefield/toolkit-installer-constructor
+        #cd toolkit-installer-constructor
+	cd openff-benchmark/devtools/installer-constructor
 
-        python ../devtools/scripts/build_cookiecutter_json.py $LATEST_TAG $PYVER $CI_OS
+        python build_cookiecutter_json.py $LATEST_TAG $PYVER $CI_OS
         cp new_cookiecutter.json cookiecutter/cookiecutter.json
 
         cat new_cookiecutter.json
