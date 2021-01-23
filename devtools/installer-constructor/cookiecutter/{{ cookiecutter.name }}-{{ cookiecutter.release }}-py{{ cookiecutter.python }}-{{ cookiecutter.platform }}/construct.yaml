@@ -1,0 +1,41 @@
+name: {{ cookiecutter.name }}
+
+version: "{{ cookiecutter.release }}"
+
+{% if cookiecutter.platform == "linux-64" %}
+    {% set platform2 = "Linux-x86_64" %}
+{% elif cookiecutter.platform == "osx-64" %}
+    {% set platform2 = "MacOSX-x86_64" %}
+{% endif %}
+
+installer_filename: {{ cookiecutter.name }}-{{ cookiecutter.release }}-py{{ cookiecutter.python | replace(".", "") }}-{{ platform2 }}.sh
+
+#specs:
+#  - conda
+#  - notebook
+#  - openff-benchmark
+#  - python {{ cookiecutter.python }}*
+#  - pytest
+
+environment_file: ../../../prod-envs/openff-benchmark-optimization.yaml
+
+# https://github.com/conda/constructor/issues/86
+# https://github.com/openturns/otconda/blob/master/construct.yaml.in
+post_install: post_install.sh  [unix]
+
+channels: &id1
+  - https://conda.anaconda.org/conda-forge
+  - https://conda.anaconda.org/omnia
+  - http://repo.anaconda.com/pkgs/main/
+
+
+
+conda_default_channels: *id1
+
+install_in_dependency_order: true
+
+ignore_duplicate_files: true
+
+keep_pkgs: false
+
+initialize_by_default: false
