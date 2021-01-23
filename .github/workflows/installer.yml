@@ -56,10 +56,10 @@ jobs:
 
         #git clone https://github.com/openforcefield/toolkit-installer-constructor
         #cd toolkit-installer-constructor
+        #pwd
+        #cd
         pwd
-        cd
-        pwd
-        cd openff-benchmark/devtools/installer-constructor
+        cd devtools/installer-constructor
 
         python build_cookiecutter_json.py $LATEST_TAG $PYVER $CI_OS
         cp new_cookiecutter.json cookiecutter/cookiecutter.json
