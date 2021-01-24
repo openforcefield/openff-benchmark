@@ -23,13 +23,13 @@ environment_file: ../../../prod-envs/openff-benchmark-optimization.yaml
 # https://github.com/openturns/otconda/blob/master/construct.yaml.in
 post_install: post_install.sh  [unix]
 
-#channels: &id1
-#  - conda-forge
-#  - psi4/label/dev
-#  - omnia
-#  - defaults
-#  - omnia/label/rc
-#  - omnia/label/benchmark
+channels: &id1
+  - conda-forge
+  - psi4/label/dev
+  - omnia
+  - defaults
+  - omnia/label/rc
+  - omnia/label/benchmark
 
 
 
