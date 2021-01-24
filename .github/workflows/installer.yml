@@ -118,7 +118,7 @@ jobs:
         echo $LATEST_TAG
         echo $FOUND_VER
 
-	# Re enable these checks once we have a consistent versioning/tagging system
+        # Re enable these checks once we have a consistent versioning/tagging system
         #if [[ $LATEST_TAG != $FOUND_VER ]];
         #  then echo "Version mismatch"
         #  exit 1
