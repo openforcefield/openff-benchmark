@@ -13,7 +13,7 @@ platform_mapping = {
 
 data = {
     "name": "openff-benchmark",
-    "channel": "omnia/label/benchmark",
+    #"channel": "omnia/label/benchmark",
     "python": [python_version],
     "platform": [platform_mapping[ci_os]],
     "release": release_tag,
