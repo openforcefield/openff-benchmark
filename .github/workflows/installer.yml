@@ -118,10 +118,11 @@ jobs:
         echo $LATEST_TAG
         echo $FOUND_VER
 
-        if [[ $LATEST_TAG != $FOUND_VER ]];
-          then echo "Version mismatch"
-          exit 1
-        fi
+	# Re enable these checks once we have a consistent versioning/tagging system
+        #if [[ $LATEST_TAG != $FOUND_VER ]];
+        #  then echo "Version mismatch"
+        #  exit 1
+        #fi
 
         PYTEST_ARGS=" -r fE --tb=short"
 
