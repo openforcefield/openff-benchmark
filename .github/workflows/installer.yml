@@ -80,12 +80,6 @@ jobs:
         echo "ls build/*"
         ls build/*
 
-    - name: Upload installer as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ matrix.os }}_py${{ matrix.python-version }}.sh  
-        path: toolkit-installer-constructor/build/openff-benchmark*/openff-benchmark*.sh
-
     - name: Install from installer
       shell: bash -l {0}
       run: |
@@ -129,4 +123,12 @@ jobs:
         # This should work if run directly at release time, but a safer approach would be
         # to `git checkout` the corresponding tag of the release, see PR #577
         pytest $PYTEST_ARGS ..//openff/benchmark/tests/
+
+    - name: Upload installer as artifact
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}_py${{ matrix.python-version }}.sh
+        #path: toolkit-installer-constructor/build/openff-benchmark*/openff-benchmark*.sh
+        path: devtools/installer-constructor
 
