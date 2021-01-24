@@ -130,5 +130,5 @@ jobs:
       with:
         name: ${{ matrix.os }}_py${{ matrix.python-version }}.sh
         #path: toolkit-installer-constructor/build/openff-benchmark*/openff-benchmark*.sh
-        path: devtools/installer-constructor
+        path: devtools/installer-constructor/build/openff-benchmark*/openff-benchmark*.sh
 
