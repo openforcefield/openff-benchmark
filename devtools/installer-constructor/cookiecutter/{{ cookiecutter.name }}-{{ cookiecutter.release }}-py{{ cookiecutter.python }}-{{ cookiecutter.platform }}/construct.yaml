@@ -17,9 +17,13 @@ installer_filename: {{ cookiecutter.name }}-{{ cookiecutter.release }}-py{{ cook
 #  - python {{ cookiecutter.python }}*
 #  - pytest
 
-specs: 
-  - python =3.7
+specs:
+  # General deployment stuff (DO NOT DELETE)
+  - conda
+  - python {{ cookiecutter.python }}*
   - pip
+
+  # QC stuff
   - qcfractal =0.15.1
   - qcengine =0.17.0
   - gau2grid =2.0.3
