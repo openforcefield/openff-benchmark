@@ -24,9 +24,13 @@ environment_file: ../../../prod-envs/openff-benchmark-optimization.yaml
 post_install: post_install.sh  [unix]
 
 channels: &id1
-  - https://conda.anaconda.org/conda-forge
-  - https://conda.anaconda.org/omnia
-  - http://repo.anaconda.com/pkgs/main/
+  - conda-forge
+  - psi4/label/dev
+  - omnia
+  - defaults
+  - omnia/label/rc
+  - omnia/label/benchmark
+
 
 
 
