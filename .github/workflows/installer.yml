@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macOS-latest, ubuntu-latest]
+        os: [ubuntu-latest]
         python-version: [3.7]
 
     env:
@@ -68,29 +68,39 @@ jobs:
 
         python run.py
 
+        echo "pwd"
         pwd
+        echo 
+        echo "ls"
         ls
+        echo
+        echo "ls build"
         ls build
-
-    - name: Upload installer as artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: ${{ matrix.os }}_py${{ matrix.python-version }}.sh  
-        path: toolkit-installer-constructor/build/openff-benchmark*/openff-benchmark*.sh
+        echo
+        echo "ls build/*"
+        ls build/*
 
     - name: Install from installer
       shell: bash -l {0}
       run: |
         #cd ..
         pwd
+        echo
+        echo "ls"
         ls
+        echo
+        echo "ls devtools/installer-constructor"
         ls devtools/installer-constructor
+        echo
+        echo "ls devtools/installer-constructor/build"
         ls devtools/installer-constructor/build
+        echo
+        echo "ls devtools/installer-constructor/build/openff-benchmark-*/"
         ls devtools/installer-constructor/build/openff-benchmark-*/
 
         mkdir scratch
         cd scratch
-        echo $HOME/constructor_install/ | bash ../installer-constructor/build/openff-benchmark-*/openff-benchmark-*.sh
+        echo $HOME/constructor_install/ | bash ../devtools/installer-constructor/build/openff-benchmark-*/openff-benchmark-*.sh
 
         conda activate $HOME/constructor_install/
         conda info
@@ -102,14 +112,23 @@ jobs:
         echo $LATEST_TAG
         echo $FOUND_VER
 
-        if [[ $LATEST_TAG != $FOUND_VER ]];
-          then echo "Version mismatch"
-          exit 1
-        fi
+        # Re enable these checks once we have a consistent versioning/tagging system
+        #if [[ $LATEST_TAG != $FOUND_VER ]];
+        #  then echo "Version mismatch"
+        #  exit 1
+        #fi
 
         PYTEST_ARGS=" -r fE --tb=short"
 
         # This should work if run directly at release time, but a safer approach would be
         # to `git checkout` the corresponding tag of the release, see PR #577
-        pytest $PYTEST_ARGS ../openff-benchmark/openff/benchmark/tests/
+        pytest $PYTEST_ARGS ..//openff/benchmark/tests/
+
+    - name: Upload installer as artifact
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.os }}_py${{ matrix.python-version }}.sh
+        #path: toolkit-installer-constructor/build/openff-benchmark*/openff-benchmark*.sh
+        path: devtools/installer-constructor/build/openff-benchmark*/openff-benchmark*.sh
 
