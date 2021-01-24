@@ -106,7 +106,7 @@ jobs:
 
         mkdir scratch
         cd scratch
-        echo $HOME/constructor_install/ | bash ../installer-constructor/build/openff-benchmark-*/openff-benchmark-*.sh
+        echo $HOME/constructor_install/ | bash ../devtools/installer-constructor/build/openff-benchmark-*/openff-benchmark-*.sh
 
         conda activate $HOME/constructor_install/
         conda info
