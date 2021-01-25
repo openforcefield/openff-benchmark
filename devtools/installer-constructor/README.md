@@ -10,7 +10,9 @@ _Special thanks to @loriab and the Psi4 community, as this is basically a copy o
 
 * run in an environment that has `cookiecutter` and `constructor` installed.
 
-* edit `cookiecutter/cookiecutter.json` for control. edit `cookiecutter/{{.../construct.yaml` for templating
+* Run `create_cookiecutter_json.py <tagname> <python_version> <ubuntu-latest/macOS-latest>` 
+
+* edit `cookiecutter/{{.../construct.yaml` for templating
 
 * dir `build/` is regenerated each time.
 
