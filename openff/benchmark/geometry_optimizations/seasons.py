@@ -13,13 +13,13 @@ SEASONS = {
                },
             },
         "1:2": {
-#            "smirnoff99Frosst-1.1.0": {
-#                 "method": "smirnoff99Frosst-1.1.0",
-#                 "basis": "smirnoff",
-#                 "program": "openmm",
-#                 "spec_name": "smirnoff99Frosst-1.1.0",
-#                 "spec_description": "default smirnoff99Frosst-1.1.0 optimization spec",
-#               },
+            "smirnoff99Frosst-1.1.0": {
+                 "method": "smirnoff99Frosst-1.1.0",
+                 "basis": "smirnoff",
+                 "program": "openmm",
+                 "spec_name": "smirnoff99Frosst-1.1.0",
+                 "spec_description": "default smirnoff99Frosst-1.1.0 optimization spec",
+               },
             "openff-1.0.0": {
                  "method": "openff-1.0.0",
                  "basis": "smirnoff",
