@@ -69,9 +69,10 @@ class TestCLI:
     # single file single mol
     def test_single_file_single_mol(self, tmpdir):
         with tmpdir.as_cwd():
-            test_dir = os.path.join('1-validate_and_assign')
+            test_dir = '1-validate_and_assign'
 
             input_mols = [get_data_file_path('input_single_mol_rigid.sdf')]
+            input_mols = [os.path.abspath(input_mol) for input_mol in input_mols]
             response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
                                            "-o", test_dir,
