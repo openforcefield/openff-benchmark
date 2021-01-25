@@ -369,6 +369,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     print('Loading input files')
     logging.info('Loading input files')
     for molecule_3d_file in tqdm(input_3d_molecules):
+        assert os.path.exists(molecule_3d_file), f"File {molecule_3d_file} does not exist"
         # Squelch reading warnings
         # We'll recover the full text of the warning/error during the file round trip tests in validate_and_assign_ids.py.
         try:
