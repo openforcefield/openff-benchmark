@@ -392,8 +392,8 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
             mol.properties['original_file_index'] = mol_index
             mol.properties['original_name'] =mol.name
             input_mols.append(copy.deepcopy(mol))
-    print('input_mols')
-    print(input_mols)
+    logging.info('input_mols')
+    logging.info(input_mols)
     # Load all pre-existing output mols
     if add:
         print('Running in `--add` mode. Loading existing output molecules.')
@@ -418,8 +418,8 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
                                  existing_name_assignments)
 
     success_mols, error_mols, name_assignments = output
-    print('output')
-    print(output)
+    logging.info('output')
+    logging.info(output)
 
     # Write successfully processed mols
     print('Writing successful mols')
