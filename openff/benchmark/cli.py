@@ -418,10 +418,12 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
                                  existing_output_mols,
                                  existing_name_assignments)
 
-    success_mols, error_mols, name_assignments = output
+    success_mols, new_error_mols, name_assignments = output
+    error_mols += new_error_mols
     logging.info('output')
     logging.info(output)
-
+    logging.info('error_mols')
+    logging.info(error_mols)
     # Write successfully processed mols
     print('Writing successful mols')
     logging.info('Writing successful mols')

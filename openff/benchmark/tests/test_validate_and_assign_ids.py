@@ -368,3 +368,4 @@ BBB""" in file_text
 
 # test add_no_redundant
 # test_mol_fails_roundtrip
+# Test file does not exist
