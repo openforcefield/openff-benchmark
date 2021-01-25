@@ -68,6 +68,7 @@ jobs:
     - name: Install package
       shell: bash -l {0}
       run: |
+        conda remove --force openff-benchmark
         python -m pip install --no-deps -e .
 
     - name: Run tests
