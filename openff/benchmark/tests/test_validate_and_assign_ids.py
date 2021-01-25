@@ -177,22 +177,20 @@ BBB""" in file_text
             test_dir =  '1-validate_and_assign'
             input_mols = [get_data_file_path('input_single_mol_rigid.sdf'),
                           get_data_file_path('input_single_mol_rigid_translated.sdf')]
-            response = runner.invoke(cli, ["preprocess", "validate",
+            response = runner.invoke(cli, ["preprocess", "validatee",
                                            "-g", "BBB",
                                            "-o", test_dir,
                                            *input_mols],
                                      catch_exceptions=False)
             output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
             output_files = [os.path.basename(fname) for fname in output_files]
-            #assert sorted(output_files) == ['BBB-00000-00.sdf']
+            assert sorted(output_files) == ['BBB-00000-00.sdf']
             error_files = glob.glob(os.path.join(test_dir, 'error_mols', '*.sdf'))
             error_files = [os.path.basename(fname) for fname in error_files]
-            #assert error_files == ['error_mol_0.sdf']
+            assert error_files == ['error_mol_0.sdf']
             error_txts = glob.glob(os.path.join(test_dir, 'error_mols', '*.txt'))
             error_txts = [open(fname).read() for fname in error_txts]
-            print(error_txts)
-            raise Exception(error_txts)
-            #assert 'Duplicate molecule conformer input detected' in error_txts[0]
+            assert 'Duplicate molecule conformer input detected' in error_txts[0]
 
 
     # multi file multi mol
