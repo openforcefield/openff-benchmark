@@ -177,7 +177,7 @@ BBB""" in file_text
             test_dir =  '1-validate_and_assign'
             input_mols = [get_data_file_path('input_single_mol_rigid.sdf'),
                           get_data_file_path('input_single_mol_rigid_translated.sdf')]
-            response = runner.invoke(cli, ["preprocess", "validatee",
+            response = runner.invoke(cli, ["preprocess", "validate",
                                            "-g", "BBB",
                                            "-o", test_dir,
                                            *input_mols],
