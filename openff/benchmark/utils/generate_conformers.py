@@ -269,8 +269,6 @@ def generate_conformers(group2idx2mols2confs):
                         of.seek(0)
                         test_loaded_mol = Molecule.from_file(of.name, file_format='sdf')
                         test_loaded_mol.to_rdkit()
-                    test_loaded_mol = Molecule.from_file(bio, file_format='sdf')
-                    test_loaded_mol.to_rdkit()
                     success_mols.append(this_conf)
                 except Exception as e:
                     error_mols.append((this_conf, e))
