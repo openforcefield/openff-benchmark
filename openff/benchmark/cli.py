@@ -327,6 +327,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     Where possible, these cases write both an SDF file of the molecule (with key-value pairs indicating the file the structure came from),
     and a correspondingly-named txt file containing more details about the error.
     """
+    from openforcefield.topology import Molecule
     from .utils.validate_and_assign_ids import validate_and_assign
     import glob
     import os
