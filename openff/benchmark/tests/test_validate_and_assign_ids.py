@@ -182,7 +182,6 @@ BBB""" in file_text
                                            "-o", test_dir,
                                            *input_mols],
                                      catch_exceptions=False)
-            raise Exception(response)
             output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
             output_files = [os.path.basename(fname) for fname in output_files]
             assert sorted(output_files) == ['BBB-00000-00.sdf']
