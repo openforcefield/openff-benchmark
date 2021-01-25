@@ -287,13 +287,14 @@ def execute_from_server(molids, fractal_uri, dataset_name, compute_specs, nthrea
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to include")
-@click.option('-o', '--output-directory', required=True)
+@click.option('-o', '--output-directory', required=True, help="Output directory to use for results")
+@click.option('--stdout', is_flag=True, help="If set, results also output to STDOUT")
 @click.option('--scf-maxiter', type=int, default=200)
 @click.option('--geometric-maxiter', type=int, default=300)
 @click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc')
 @click.option('--geometric-qccnv', is_flag=True)
 @click.argument('input-paths', nargs=-1)
-def execute(input_paths, output_directory, season, nthreads, memory, delete_existing, recursive,
+def execute(input_paths, output_directory, stdout, season, nthreads, memory, delete_existing, recursive,
             scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
     import os
     import json
@@ -319,8 +320,9 @@ def execute(input_paths, output_directory, season, nthreads, memory, delete_exis
                                                           geometric_qccnv=geometric_qccnv)
 
     # export and read back into JSON for final output
-    results_processed = [json.loads(res.json()) for res in results]
-    print(json.dumps(results_processed))
+    if stdout:
+        results_processed = [json.loads(res.json()) for res in results]
+        print(json.dumps(results_processed))
 
 
 

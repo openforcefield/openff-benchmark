@@ -502,6 +502,9 @@ class OptimizationExecutor:
             If True, recursively load SDFs from any directories given in `input_paths`.
     
         """
+        from datetime import datetime
+        import json
+
         import numpy as np
         import pint
     
@@ -564,6 +567,7 @@ class OptimizationExecutor:
                 input_data = self._generate_optimization_input(mol, compute_spec, factory)
 
                 # execute optimization
+                start_dt = datetime.utcnow()
                 result = self._execute_qcengine(input_data,
                                                 local_options=local_options,
                                                 scf_maxiter=scf_maxiter,
@@ -571,6 +575,7 @@ class OptimizationExecutor:
                                                 geometric_coordsys=geometric_coordsys,
                                                 geometric_qccnv=geometric_qccnv)
 
+                end_dt = datetime.utcnow()
                 if result.success:
                     # process final molecule
                     final_molecule = self._process_optimization_result(output_id, result)
@@ -580,6 +585,9 @@ class OptimizationExecutor:
 
                 with open("{}.json".format(outfile), 'w') as f:
                     f.write(result.json())
+
+                with open("{}.perf.json".format(outfile), 'w') as f:
+                    json.dump({'start': start_dt.isoformat(), 'end': end_dt.isoformat()}, f)
 
                 results.append(result)
 
