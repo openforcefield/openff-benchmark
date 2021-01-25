@@ -184,13 +184,15 @@ BBB""" in file_text
                                      catch_exceptions=False)
             output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
             output_files = [os.path.basename(fname) for fname in output_files]
-            assert sorted(output_files) == ['BBB-00000-00.sdf']
+            #assert sorted(output_files) == ['BBB-00000-00.sdf']
             error_files = glob.glob(os.path.join(test_dir, 'error_mols', '*.sdf'))
             error_files = [os.path.basename(fname) for fname in error_files]
-            assert error_files == ['error_mol_0.sdf']
+            #assert error_files == ['error_mol_0.sdf']
             error_txts = glob.glob(os.path.join(test_dir, 'error_mols', '*.txt'))
             error_txts = [open(fname).read() for fname in error_txts]
-            assert 'Duplicate molecule conformer input detected' in error_txts[0]
+            print(error_txts)
+            raise Exception(error_txts)
+            #assert 'Duplicate molecule conformer input detected' in error_txts[0]
 
 
     # multi file multi mol
