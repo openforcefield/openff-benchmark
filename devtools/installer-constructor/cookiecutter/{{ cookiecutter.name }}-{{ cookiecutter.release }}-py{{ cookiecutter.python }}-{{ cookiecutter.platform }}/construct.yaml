@@ -23,13 +23,13 @@ specs:
   - python {{ cookiecutter.python }}*
   - pip
 
-  # QC stuff
+  # QC Stuff
   - qcfractal =0.15.1
   - qcengine =0.17.0
   - gau2grid =2.0.3
 
   # Benchmarking
-  - openff-benchmark =2020.01.21.1
+  - openff-benchmark =2021.01.25.0
 
   # Storage dependencies
   - alembic
