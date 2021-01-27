@@ -108,7 +108,7 @@ def validate_and_assign(loaded_mols,
                 # Don't trust rmslist above for deduplication -- It doesn't take into
                 # account multiple atom mappings
                 confs_to_delete = greedy_conf_deduplication(temp_mol,
-                                                            0.1)
+                                                            1.0)
                 if len(confs_to_delete) > 0:
                     msg = f'Duplicate molecule conformer input detected.\n'
                     msg += f'{mol.properties["original_file"]}:{mol.properties["original_file_index"]} has an RMSD within 0.1 A '
