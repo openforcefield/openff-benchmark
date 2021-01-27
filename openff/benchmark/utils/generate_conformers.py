@@ -227,7 +227,7 @@ def generate_conformers(group2idx2mols2confs):
                 conf_dict = group2idx2mols2confs[group_id][mol_idx]
                 output_confs = gen_confs_preserving_orig_confs(conf_dict,
                                                                target_n_confs=10,
-                                                               min_rmsd=1)
+                                                               min_rmsd=1.5)
                 group2idx2mols2confs[group_id][mol_idx] = output_confs
             except Exception as e:
                 mol_id = f'{group_id}-{mol_idx}'
