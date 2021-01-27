@@ -421,7 +421,7 @@ class OptimizationExecutor:
 
         cmiles = result.initial_molecule.extras['canonical_isomeric_explicit_hydrogen_mapped_smiles']
         
-        final_molecule = Molecule.from_mapped_smiles(cmiles, hydrogens_are_explicit=True)
+        final_molecule = Molecule.from_mapped_smiles(cmiles)
         final_qcmol = result.final_molecule
         
         method = result.input_specification.model.method
