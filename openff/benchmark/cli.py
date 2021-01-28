@@ -6,6 +6,7 @@ Top-level `openff-benchmark` cli entrypoint.
 import click
 import logging
 import csv
+import sys
 
 # Deregister OpenEye for any ToolkitRegistry calls that happen in this file
 logger = logging.getLogger('openforcefield.utils.toolkits')
@@ -22,6 +23,11 @@ for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
         oetk_loaded = True
 if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
+
+
+logging.basicConfig(filename=f'{sys.argv[2]}.log',
+                    level=logging.DEBUG
+                    )
 
 
 @click.group()
