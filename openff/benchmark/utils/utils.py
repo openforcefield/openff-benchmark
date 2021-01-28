@@ -1,5 +1,5 @@
-import os
 import contextlib
+
 
 def get_data_file_path(relative_path):
     """
@@ -27,6 +27,7 @@ def get_data_file_path(relative_path):
 
     return fn
 
+
 @contextlib.contextmanager
 def temporary_cd(dir_path):
     """Context to temporary change the working directory.
@@ -48,3 +49,45 @@ def temporary_cd(dir_path):
         yield
     finally:
         os.chdir(prev_dir)
+
+
+def prepare_folders(output_directory: str, delete_existing: bool, add: bool) -> str:
+    """
+    A general folder prep function to help with the preprocess steps, this will handle general file prep and delete_existing and add conflicts.
+    Parameters
+    ----------
+    output_directory: The name of the output directory that should be made.
+    delete_existing: If the existing output directory should be overwritten
+    add: If the user is trying to add molecules to an existing output folder.
+
+    Returns
+    -------
+    error_dir: The name of the error directory that has been made/found.
+    """
+    import os
+    import shutil
+
+    error_dir = os.path.join(output_directory, 'error_mols')
+    if delete_existing and add:
+        raise Exception("Can not specify BOTH --delete-existing AND --add flags")
+    # Delete pre-existing output mols if requested
+    elif delete_existing and not (add):
+        if os.path.exists(output_directory):
+            shutil.rmtree(output_directory)
+        os.makedirs(output_directory)
+        # Create error directory
+        error_dir = os.path.join(output_directory, 'error_mols')
+        os.makedirs(error_dir)
+    elif not (delete_existing) and add:
+        if not os.path.exists(output_directory):
+            raise Exception(f'--add flag was specified but directory {output_directory} not found')
+    # If ADD is FALSE, make new output dir
+    elif not (delete_existing) and not (add):
+        if os.path.exists(output_directory):
+            raise Exception(f'Output directory {output_directory} already exists. '
+                            f'Specify `--delete-existing` to remove.')
+        os.makedirs(output_directory)
+        # Create error directory
+        os.makedirs(error_dir)
+
+    return error_dir

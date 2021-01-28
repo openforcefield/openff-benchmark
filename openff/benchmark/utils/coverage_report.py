@@ -27,11 +27,9 @@ if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
 
-
-def generate_coverage_report(input_molecules: Union[List[str], str],
-                             forcefield_name,
-                             processors: Optional[int] = None,
-                            ) -> Dict[str, Dict[str, int]]:
+def generate_coverage_report(input_molecules: List[Molecule],
+                             forcefield_name: str,
+                             processors: Optional[int] = None):
     """
     For the given set of molecules produce a coverage report of the smirks parameters used in typing the molecule.
     Also try and produce charges for the molecules as some may have missing bccs.
@@ -41,8 +39,6 @@ def generate_coverage_report(input_molecules: Union[List[str], str],
     input_molecules: The List of 3d sdf files to run the coverage on or the name of the directory containing the files.
     forcefield_name: The name of the openFF forcefield to run the coverage for.
     processors: The number of processors we can use to build the coverage report
-    output_directory: The directory the files will be writen too if they pass the coverage step
-    delete_existing: If any files currently exist remove them and run again
 
     Returns
     -------
@@ -50,20 +46,8 @@ def generate_coverage_report(input_molecules: Union[List[str], str],
     success_mols: A list of openforcefield.topology.Molecule objects that were successful in this step
     error_mols: A list of tuples (Molecule, Exception) of molecules that failed this step
     """
-
-    if isinstance(input_molecules, list):
-        input_files = input_molecules
-    else:
-        # check if its a dir then look for sdfs
-        if os.path.isdir(input_molecules):
-            # Search for the 00th conformer so we dont double-count any moleucles
-            input_files = glob.glob(os.path.join(input_molecules, "*00.sdf"))
-        else:
-            input_files = [input_molecules, ]
-
-    # now load each molecule they should already be unique
-    molecules = [Molecule.from_file(mol_file, file_format="sdf", allow_undefined_stereo=True) for mol_file in input_files]
-
+    if isinstance(input_molecules, Molecule):
+        input_molecules = [input_molecules, ]
     coverage = {"Angles": {}, "Bonds": {}, "ProperTorsions": {}, "ImproperTorsions": {}, "vdW": {}}
     # a func to update the coverage dict
     def update_coverage(single_report):
@@ -76,7 +60,7 @@ def generate_coverage_report(input_molecules: Union[List[str], str],
                     # set the param number if new
                     coverage[param_type][param_id] = no
                 else:
-                    # add onto the current parmeter count
+                    # add onto the current parameter count
                     coverage[param_type][param_id] += no
 
     # make the forcefield
@@ -94,7 +78,7 @@ def generate_coverage_report(input_molecules: Union[List[str], str],
 
         with Pool(processes=processors) as pool:
             # generate the work list
-            work_list = [pool.apply_async(single_molecule_coverage, (molecule, ff)) for molecule in molecules]
+            work_list = [pool.apply_async(single_molecule_coverage, (molecule, ff)) for molecule in input_molecules]
             for work in tqdm.tqdm(
                     work_list,
                     total=len(work_list),
@@ -111,8 +95,8 @@ def generate_coverage_report(input_molecules: Union[List[str], str],
                     error_mols.append((molecule, e))
 
     else:
-        for molecule in tqdm.tqdm(molecules,
-                                  total=len(molecules),
+        for molecule in tqdm.tqdm(input_molecules,
+                                  total=len(input_molecules),
                                   ncols=80,
                                   desc="{:30s}".format("Generating Coverage")):
             #try:
@@ -125,6 +109,11 @@ def generate_coverage_report(input_molecules: Union[List[str], str],
             #except Exception as e:
             else:
                 error_mols.append((molecule, e))
+
+    # record how many molecules we processed
+    coverage["passed_unique_molecules"] = len(success_mols)
+    coverage["total_unique_molecules"] = len(success_mols) + len(error_mols)
+    coverage["forcefield_name"] = forcefield_name
 
     return coverage, success_mols, error_mols
 
