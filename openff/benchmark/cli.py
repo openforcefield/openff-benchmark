@@ -402,7 +402,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     Multiple conformers of the same molecule will be automatically detected and grouped under a single molecule ID.
     The definition of "identical molecule" is whether RDKit assigns them the same canonical, isomeric, explicit hydrogen SMILES. 
     When molecules are grouped, their RMSD (accounting for symmetry automorphs) is tested. 
-    If two inputs are within 0.1 A by RMSD, the second is considered an error and sent to the error_mols directory.
+    If two inputs are within 1.0 A by RMSD, the second is considered an error and sent to the error_mols directory.
     SD data pairs and molecule names are stripped from the input molecules.
     The order of atoms may change during this step.
     
