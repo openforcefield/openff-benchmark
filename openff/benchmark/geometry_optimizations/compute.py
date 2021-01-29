@@ -240,6 +240,9 @@ class OptimizationExecutor:
             if opt.status == 'ERROR':
                 print(f"Restarted ERRORed optimization `{opt.id}`")
                 client.modify_tasks(operation='restart', base_result=opt.id)
+            if opt.status == 'INCOMPLETE' and (opt.final_molecule is not None):
+                print(f"Regnerated INCOMPLETE optimization `{opt.id}`")
+                client.modify_tasks(operation='regenerate', base_result=opt.id)
     
     def get_optimization_from_server(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
