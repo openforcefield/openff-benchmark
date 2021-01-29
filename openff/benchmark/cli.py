@@ -357,7 +357,7 @@ def match_minima(input_path, ref_method, output_directory):
     analysis.match_minima(input_path, ref_method, output_directory)
 
 @report.command()
-@click.option('--input-path', default='4-compare_forcefields', multiple=True, required=True)
+@click.option('--input-path', default='5-compare_forcefields', multiple=True, required=True)
 @click.option('--ref-method', default='default', required=True)
 @click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
 def plots(input_path, ref_method, output_directory):
