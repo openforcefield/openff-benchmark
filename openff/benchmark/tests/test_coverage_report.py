@@ -2,6 +2,7 @@ from openff.benchmark.utils.coverage_report import generate_coverage_report
 from openff.benchmark.utils.utils import get_data_file_path
 from openff.benchmark.cli import cli
 from openforcefield.topology import Molecule
+import shutil
 import json
 import glob
 import os
@@ -119,3 +120,138 @@ def test_cli_error_mol(tmpdir):
 
         assert report["passed_unique_molecules"] == 0
         assert report["total_unique_molecules"] == 1
+
+def test_cli_add_no_molecules(tmpdir):
+    """Make sure that the cli exits if users run coverage report with add but no new molecules are found."""
+
+    with tmpdir.as_cwd():
+        test_dir = '3-coverage_report'
+        input_folder = get_data_file_path('1-validate_and_assign_graphs_and_confs')
+        # run once to get the coverage report
+
+        response = runner.invoke(cli, ["preprocess", "coverage-report",
+                                       "-p", 1,
+                                       "-o", test_dir,
+                                       input_folder],
+                                 catch_exceptions=False)
+
+        # count the number of files in the output
+        n_out_mols = len(os.listdir(test_dir))
+
+        # now run again with the add flag
+        response = runner.invoke(cli, ["preprocess", "coverage-report",
+                                       "-p", 1,
+                                       "-o", test_dir,
+                                       "--add",
+                                       input_folder],
+                                 catch_exceptions=False)
+
+        assert response.output == f"No new files found in {input_folder}, the coverage report was not changed.\n"
+
+        # make sure the number of output files has not changed
+        n_out_add_mols = len(os.listdir(test_dir))
+        assert n_out_mols == n_out_add_mols
+
+def test_cli_adding_molecules(tmpdir):
+    """Make sure that when new molecules are found they are correctly added."""
+
+    with tmpdir.as_cwd():
+        test_dir = '3-coverage_report'
+        input_dir = "1-validate_and_assign_graphs_and_confs"
+        # copy all files to a local folder
+        shutil.copytree(get_data_file_path(input_dir), input_dir)
+
+        # run once to get the coverage report
+        response = runner.invoke(cli, ["preprocess", "coverage-report",
+                                       "-p", 1,
+                                       "-o", test_dir,
+                                       input_dir],
+                                 catch_exceptions=False)
+
+        # count the number of files in the output
+        n_out_mols = len(os.listdir(test_dir))
+        # get the coverage report
+        with open(os.path.join(test_dir, "coverage_report.json")) as report:
+            old_report = json.load(report)
+
+        # now add a new molecule to dir
+        ehtane = Molecule.from_file(get_data_file_path("ethane.sdf"))
+        ehtane.properties["group_name"] = "BBB"
+        ehtane.properties["molecule_index"] = "99999"
+        ehtane.to_file(os.path.join(input_dir, "BBB-99999-00.sdf"), "sdf")
+
+        # run again with add
+        response = runner.invoke(cli, ["preprocess", "coverage-report",
+                                       "-p", 1,
+                                       "--add",
+                                       "-o", test_dir,
+                                       input_dir],
+                                 catch_exceptions=False)
+
+        # make sure new molecules were added
+        n_new_out_mols = len(os.listdir(test_dir))
+        assert n_new_out_mols > n_out_mols
+
+        # get the new coverage report and make sure it has been updated
+        with open(os.path.join(test_dir, "coverage_report.json")) as report:
+            new_report = json.load(report)
+
+        assert new_report.pop("total_unique_molecules") > old_report.pop("total_unique_molecules")
+        assert new_report.pop("passed_unique_molecules") > old_report.pop("passed_unique_molecules")
+        assert new_report.pop("forcefield_name") == old_report.pop("forcefield_name")
+        # now we only have parameter counts left, make sure they have changed
+        assert new_report != old_report
+
+
+def test_cli_add_molecules_error(tmpdir):
+    """Make sure when adding error molecules the coverage report is not changed and the molecule is put in the error mols folder"""
+
+    with tmpdir.as_cwd():
+        test_dir = '3-coverage_report'
+        input_dir = "1-validate_and_assign_graphs_and_confs"
+        # copy all files to a local folder
+        shutil.copytree(get_data_file_path(input_dir), input_dir)
+
+        # run once to get the coverage report
+        response = runner.invoke(cli, ["preprocess", "coverage-report",
+                                       "-p", 1,
+                                       "-o", test_dir,
+                                       input_dir],
+                                 catch_exceptions=False)
+
+        # count the number of files in the output
+        n_out_mols = len(os.listdir(test_dir))
+        # get the coverage report
+        with open(os.path.join(test_dir, "coverage_report.json")) as report:
+            old_report = json.load(report)
+
+        # now add a new molecule to dir
+        mol = Molecule.from_file(get_data_file_path("missing_valence_params.sdf"))
+        mol.properties["group_name"] = "BBB"
+        mol.properties["molecule_index"] = "99999"
+        mol.to_file(os.path.join(input_dir, "BBB-99999-00.sdf"), "sdf")
+
+        # run again with add
+        response = runner.invoke(cli, ["preprocess", "coverage-report",
+                                       "-p", 1,
+                                       "--add",
+                                       "-o", test_dir,
+                                       input_dir],
+                                 catch_exceptions=False)
+
+        # make sure no new molecules were added
+        n_new_out_mols = len(os.listdir(test_dir))
+        assert n_new_out_mols == n_out_mols
+
+        # make sure the molecule is in the error folder
+        assert len(glob.glob(os.path.join(test_dir, "error_mols", "*.sdf"))) == 1
+
+        # get the new coverage report and make sure it has been updated
+        with open(os.path.join(test_dir, "coverage_report.json")) as report:
+            new_report = json.load(report)
+
+        assert new_report.pop("total_unique_molecules") > old_report.pop("total_unique_molecules")
+        assert new_report.pop("passed_unique_molecules") == old_report.pop("passed_unique_molecules")
+        assert new_report.pop("forcefield_name") == old_report.pop("forcefield_name")
+        # now we only have parameter counts left, make sure they have changed
+        assert new_report == old_report

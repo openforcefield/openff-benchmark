@@ -26,6 +26,18 @@ for tkw in GLOBAL_TOOLKIT_REGISTRY.registered_toolkits:
 if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
+def _update_coverage(main_report, single_report):
+    """
+    Take the single molecule report and update the master coverage dict
+    """
+    for param_type in main_report.keys():
+        for param_id, no in single_report[param_type].items():
+            if param_id not in main_report[param_type]:
+                # set the param number if new
+                main_report[param_type][param_id] = no
+            else:
+                # add onto the current parameter count
+                main_report[param_type][param_id] += no
 
 def generate_coverage_report(input_molecules: List[Molecule],
                              forcefield_name: str,
@@ -49,19 +61,7 @@ def generate_coverage_report(input_molecules: List[Molecule],
     if isinstance(input_molecules, Molecule):
         input_molecules = [input_molecules, ]
     coverage = {"Angles": {}, "Bonds": {}, "ProperTorsions": {}, "ImproperTorsions": {}, "vdW": {}}
-    # a func to update the coverage dict
-    def update_coverage(single_report):
-        """
-        Take the single molecule report and update the master coverage dict
-        """
-        for param_type in coverage.keys():
-            for param_id, no in single_report[param_type].items():
-                if param_id not in coverage[param_type]:
-                    # set the param number if new
-                    coverage[param_type][param_id] = no
-                else:
-                    # add onto the current parameter count
-                    coverage[param_type][param_id] += no
+
 
     # make the forcefield
     ff = ForceField(forcefield_name)
@@ -88,7 +88,7 @@ def generate_coverage_report(input_molecules: List[Molecule],
                 report, e = work.get()
                 molecule = report["molecule"]
                 if e is None:
-                    update_coverage(report)
+                    _update_coverage(coverage, report)
                     success_mols.append(molecule)
                 #except Exception as e:
                 else:
@@ -104,7 +104,7 @@ def generate_coverage_report(input_molecules: List[Molecule],
             # update the master coverage dict
             mol: Molecule = report["molecule"]
             if e is None:
-                update_coverage(report)
+                _update_coverage(coverage, report)
                 success_mols.append(mol)
             #except Exception as e:
             else:

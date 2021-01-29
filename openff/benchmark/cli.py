@@ -635,6 +635,9 @@ def generate_conformers(input_directory, output_directory, delete_existing):
 
 @preprocess.command()
 @click.argument("input_directory")
+@click.option('--add',
+              is_flag=True,
+              help='Appends new molecules to the dataset. The new molecules MUST NOT be new conformers of previously-existing molecules.')
 @click.option("-ff", "--forcefield_name", default="openff_unconstrained-1.3.0.offxml")
 @click.option("-o", "--output_directory",
               default="3-coverage_report",
@@ -643,11 +646,11 @@ def generate_conformers(input_directory, output_directory, delete_existing):
               default=None,
               type=click.INT)
 @click.option('--delete-existing', is_flag=True)
-def coverage_report(input_directory, forcefield_name, output_directory, processors, delete_existing):
+def coverage_report(input_directory, forcefield_name, output_directory, processors, delete_existing, add):
     """
     Generate a coverage report for the set of validated input molecules.
     """
-    from openff.benchmark.utils.coverage_report import generate_coverage_report
+    from openff.benchmark.utils.coverage_report import generate_coverage_report, _update_coverage
     from openforcefield.topology import Molecule
     from openff.benchmark.utils.utils import prepare_folders
     import json
@@ -655,17 +658,33 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
     import os
     import shutil
 
-    error_dir = prepare_folders(output_directory=output_directory, delete_existing=delete_existing, add=False)
+    error_dir = prepare_folders(output_directory=output_directory, delete_existing=delete_existing, add=add)
     # Search for the 00th conformer so we dont double-count any moleucles
     input_files = glob.glob(os.path.join(input_directory, "*00.sdf"))
+
+    if add:
+        # now we need to load output molecules and get the difference between them
+        output_files = set([os.path.split(path)[-1] for path in  glob.glob(os.path.join(output_directory, "*00.sdf"))])
+        # make a new input file list
+        in_files = set([os.path.split(path)[-1] for path in input_files])
+        # now get the difference between them
+        new_files = set(in_files) - output_files
+        # if no new files exit here
+        if not new_files:
+            print(f"No new files found in {input_directory}, the coverage report was not changed.")
+            return
+        # now remake the file paths
+        molecule_files = [os.path.join(input_directory, filename) for filename in new_files]
+
+    else:
+        molecule_files = input_files
+
     # now load each molecule they should already be unique
-    molecules = [Molecule.from_file(mol_file, file_format="sdf", allow_undefined_stereo=True) for mol_file in input_files]
+    molecules = [Molecule.from_file(mol_file, file_format="sdf", allow_undefined_stereo=True) for mol_file in molecule_files]
 
     report, success_mols, error_mols = generate_coverage_report(input_molecules=molecules,
                                       forcefield_name=forcefield_name,
-                                      processors=processors,
-                                      #output_directory=output_directory
-                                      )
+                                      processors=processors)
 
     # Copy successfully processed mols and all conformers to the new folder
     for success_mol in success_mols:
@@ -686,7 +705,28 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
             shutil.copy(file, error_dir)
 
     # Write coverage report
-    data = json.dumps(report, indent=2)
+    if add:
+        # load the old coverage report
+        with open(os.path.join(output_directory, "coverage_report.json")) as old_data:
+            old_report = json.load(old_data)
+
+        # now extend the old report with new values
+        total_molecules = old_report.pop("total_unique_molecules") + report.pop("total_unique_molecules")
+        passed_molecules = old_report.pop("passed_unique_molecules") + report.pop("passed_unique_molecules")
+        old_forcefield = old_report.pop("forcefield_name")
+        new_forcefield = report.pop("forcefield_name")
+        assert old_forcefield == new_forcefield
+        # now add
+        _update_coverage(old_report, report)
+        # now put the totals back in
+        old_report["total_unique_molecules"] = total_molecules
+        old_report["passed_unique_molecules"] = passed_molecules
+        old_report["forcefield_name"] = old_forcefield
+        data = json.dumps(old_report, indent=2)
+
+    else:
+        data = json.dumps(report, indent=2)
+
     with open(os.path.join(output_directory, "coverage_report.json"), "w") as reporter:
         reporter.write(data)
         # TODO do we want the list of errors in the coverage report as well?
