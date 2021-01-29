@@ -25,9 +25,9 @@ if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
 
-# logging.basicConfig(filename=f'{sys.argv[2]}.log',
-#                     level=logging.DEBUG
-#                     )
+logging.basicConfig(filename=f'{sys.argv[2]}.log',
+                    level=logging.DEBUG
+                    )
 
 
 @click.group()
