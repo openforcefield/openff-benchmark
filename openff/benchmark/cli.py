@@ -343,7 +343,7 @@ def report():
 @report.command()
 @click.option('--input-path', default='./', multiple=True, required=True)
 @click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='4-compare_forcefields', required=True)
+@click.option('--output-directory', default='5-compare_forcefields', required=True)
 def compare_forcefields(input_path, ref_method, output_directory):
     from .analysis import analysis
     analysis.main(input_path, ref_method, output_directory)
@@ -351,7 +351,7 @@ def compare_forcefields(input_path, ref_method, output_directory):
 @report.command()
 @click.option('--input-path', default='./', multiple=True, required=True)
 @click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='4-match_minima', required=True)
+@click.option('--output-directory', default='5-match_minima', required=True)
 def match_minima(input_path, ref_method, output_directory):
     from .analysis import analysis
     analysis.match_minima(input_path, ref_method, output_directory)
