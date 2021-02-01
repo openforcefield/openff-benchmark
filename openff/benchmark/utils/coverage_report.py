@@ -110,6 +110,11 @@ def generate_coverage_report(input_molecules: List[Molecule],
             else:
                 error_mols.append((molecule, e))
 
+    # Sort the keys of the coverage dict, so that it doesn't show which parameters were found first
+    for parameter_type in coverage.keys():
+        sorted_sub_dict = dict(sorted(coverage[parameter_type].items()))
+        coverage[parameter_type] = sorted_sub_dict
+
     # record how many molecules we processed
     coverage["passed_unique_molecules"] = len(success_mols)
     coverage["total_unique_molecules"] = len(success_mols) + len(error_mols)
