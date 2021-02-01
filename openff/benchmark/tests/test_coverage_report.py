@@ -253,5 +253,5 @@ def test_cli_add_molecules_error(tmpdir):
         assert new_report.pop("total_unique_molecules") > old_report.pop("total_unique_molecules")
         assert new_report.pop("passed_unique_molecules") == old_report.pop("passed_unique_molecules")
         assert new_report.pop("forcefield_name") == old_report.pop("forcefield_name")
-        # now we only have parameter counts left, make sure they have changed
+        # now we only have parameter counts left, make sure they have not changed
         assert new_report == old_report
