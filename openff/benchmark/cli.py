@@ -419,10 +419,10 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     and a correspondingly-named txt file containing more details about the error.
     """
     from openforcefield.topology import Molecule
-    from .utils.validate_and_assign_ids import validate_and_assign
+    from openff.benchmark.utils.validate_and_assign_ids import validate_and_assign
+    from openff.benchmark.utils.utils import prepare_folders
     import glob
     import os
-    import shutil
     from tqdm import tqdm
     import copy
     import csv
@@ -432,28 +432,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     existing_name_assignments = []
 
     # Prepare required directories, ensuring that input flags (`delete_existing` and `add`) are sane
-    error_dir = os.path.join(output_directory, 'error_mols')
-    if delete_existing and add:
-        raise Exception("Can not specify BOTH --delete-existing AND --add flags")
-    # Delete pre-existing output mols if requested
-    elif delete_existing and not(add):
-        if os.path.exists(output_directory):
-            shutil.rmtree(output_directory)
-        os.makedirs(output_directory)
-        # Create error directory
-        error_dir = os.path.join(output_directory, 'error_mols')
-        os.makedirs(error_dir)
-    elif not(delete_existing) and add:
-        if not os.path.exists(output_directory):
-            raise Exception(f'--add flag was specified but directory {output_directory} not found')
-    # If ADD is FALSE, make new output dir
-    elif not(delete_existing) and not(add):
-        if os.path.exists(output_directory):
-            raise Exception(f'Output directory {output_directory} already exists. '
-                            f'Specify `--delete-existing` to remove.')
-        os.makedirs(output_directory)
-        # Create error directory
-        os.makedirs(error_dir)
+    error_dir = prepare_folders(output_directory=output_directory, delete_existing=delete_existing, add=add)
 
     input_mols = []
     error_mols = []
@@ -656,7 +635,10 @@ def generate_conformers(input_directory, output_directory, delete_existing):
 
 @preprocess.command()
 @click.argument("input_directory")
-@click.argument("forcefield_name")
+@click.option('--add',
+              is_flag=True,
+              help='Appends new molecules to the dataset. The new molecules MUST NOT be new conformers of previously-existing molecules.')
+@click.option("-ff", "--forcefield_name", default="openff_unconstrained-1.3.0.offxml")
 @click.option("-o", "--output_directory",
               default="3-coverage_report",
               help="The directory for output files.")
@@ -664,42 +646,90 @@ def generate_conformers(input_directory, output_directory, delete_existing):
               default=None,
               type=click.INT)
 @click.option('--delete-existing', is_flag=True)
-def coverage_report(input_directory, forcefield_name, output_directory, processors, delete_existing):
+def coverage_report(input_directory, forcefield_name, output_directory, processors, delete_existing, add):
     """
     Generate a coverage report for the set of validated input molecules.
     """
-    from openff.benchmark.utils.coverage_report import generate_coverage_report
+    from openff.benchmark.utils.coverage_report import generate_coverage_report, _update_coverage
+    from openforcefield.topology import Molecule
+    from openff.benchmark.utils.utils import prepare_folders
     import json
+    import glob
     import os
     import shutil
 
-    try:
-        os.makedirs(output_directory)
-    except OSError:
-        if delete_existing:
-            shutil.rmtree(output_directory)
-            os.makedirs(os.path.join(output_directory, "error_mols"))
-        else:
-            raise Exception(f'Output directory {output_directory} already exists. '
-                             'Specify `delete_existing=True` to remove.')
+    error_dir = prepare_folders(output_directory=output_directory, delete_existing=delete_existing, add=add)
+    # Search for the 00th conformer so we dont double-count any moleucles
+    input_files = glob.glob(os.path.join(input_directory, "*00.sdf"))
 
-    report, success_mols, error_mols = generate_coverage_report(input_molecules=input_directory,
+    if add:
+        # now we need to load output molecules and get the difference between them
+        output_files = set([os.path.split(path)[-1] for path in  glob.glob(os.path.join(output_directory, "*00.sdf"))])
+        # make a new input file list
+        in_files = set([os.path.split(path)[-1] for path in input_files])
+        # now get the difference between them
+        new_files = set(in_files) - output_files
+        # if no new files exit here
+        if not new_files:
+            print(f"No new files found in {input_directory}, the coverage report was not changed.")
+            return
+        # now remake the file paths
+        molecule_files = [os.path.join(input_directory, filename) for filename in new_files]
+
+    else:
+        molecule_files = input_files
+
+    # now load each molecule they should already be unique
+    molecules = [Molecule.from_file(mol_file, file_format="sdf", allow_undefined_stereo=True) for mol_file in molecule_files]
+
+    report, success_mols, error_mols = generate_coverage_report(input_molecules=molecules,
                                       forcefield_name=forcefield_name,
-                                      processors=processors,
-                                      #output_directory=output_directory
-                                      )
-    # Write successfully processed mols
+                                      processors=processors)
+
+    # Copy successfully processed mols and all conformers to the new folder
     for success_mol in success_mols:
-        success_mol.to_file(os.path.join(output_directory, success_mol.name + ".sdf"), "sdf")
-    # Write errored mols
+        common_id = f"{success_mol.properties['group_name']}-{success_mol.properties['molecule_index']}"
+        # get all conformer files
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}*"))
+        for file in conformer_files:
+            shutil.copy(file, output_directory)
+    # Copy all conformers of an error mol to the error dir
     for error_mol, e in error_mols:
-        error_mol.to_file(os.path.join(output_directory, "error_mols", error_mol.name + ".sdf"), "sdf")
-        with open(os.path.join(output_directory, "error_mols", error_mol.name + ".txt"), 'w') as of:
-            of.write(e)
+        with open(os.path.join(error_dir, error_mol.name + ".txt"), 'w') as of:
+            of.write(f'source: {error_mol.name}\n')
+            of.write(f'error text: {e}\n')
+        # now get all conformers and move them
+        common_id = f"{error_mol.properties['group_name']}-{error_mol.properties['molecule_index']}"
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}*"))
+        for file in conformer_files:
+            shutil.copy(file, error_dir)
+
     # Write coverage report
-    data = json.dumps(report, indent=2)
+    if add:
+        # load the old coverage report
+        with open(os.path.join(output_directory, "coverage_report.json")) as old_data:
+            old_report = json.load(old_data)
+
+        # now extend the old report with new values
+        total_molecules = old_report.pop("total_unique_molecules") + report.pop("total_unique_molecules")
+        passed_molecules = old_report.pop("passed_unique_molecules") + report.pop("passed_unique_molecules")
+        old_forcefield = old_report.pop("forcefield_name")
+        new_forcefield = report.pop("forcefield_name")
+        assert old_forcefield == new_forcefield
+        # now add
+        _update_coverage(old_report, report)
+        # now put the totals back in
+        old_report["total_unique_molecules"] = total_molecules
+        old_report["passed_unique_molecules"] = passed_molecules
+        old_report["forcefield_name"] = old_forcefield
+        data = json.dumps(old_report, indent=2)
+
+    else:
+        data = json.dumps(report, indent=2)
+
     with open(os.path.join(output_directory, "coverage_report.json"), "w") as reporter:
         reporter.write(data)
+        # TODO do we want the list of errors in the coverage report as well?
     
 
 if __name__ == "__main__":
