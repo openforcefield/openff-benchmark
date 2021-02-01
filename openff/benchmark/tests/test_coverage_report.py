@@ -175,10 +175,10 @@ def test_cli_adding_molecules(tmpdir):
             old_report = json.load(report)
 
         # now add a new molecule to dir
-        ehtane = Molecule.from_file(get_data_file_path("ethane.sdf"))
-        ehtane.properties["group_name"] = "BBB"
-        ehtane.properties["molecule_index"] = "99999"
-        ehtane.to_file(os.path.join(input_dir, "BBB-99999-00.sdf"), "sdf")
+        ethane = Molecule.from_file(get_data_file_path("ethane.sdf"))
+        ethane.properties["group_name"] = "BBB"
+        ethane.properties["molecule_index"] = "99999"
+        ethane.to_file(os.path.join(input_dir, "BBB-99999-00.sdf"), "sdf")
 
         # run again with add
         response = runner.invoke(cli, ["preprocess", "coverage-report",
