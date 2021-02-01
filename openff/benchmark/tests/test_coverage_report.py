@@ -196,8 +196,8 @@ def test_cli_adding_molecules(tmpdir):
         with open(os.path.join(test_dir, "coverage_report.json")) as report:
             new_report = json.load(report)
 
-        assert new_report.pop("total_unique_molecules") > old_report.pop("total_unique_molecules")
-        assert new_report.pop("passed_unique_molecules") > old_report.pop("passed_unique_molecules")
+        assert new_report.pop("total_unique_molecules") == old_report.pop("total_unique_molecules") + 1
+        assert new_report.pop("passed_unique_molecules") == old_report.pop("passed_unique_molecules") + 1
         assert new_report.pop("forcefield_name") == old_report.pop("forcefield_name")
         # now we only have parameter counts left, make sure they have changed
         assert new_report != old_report
