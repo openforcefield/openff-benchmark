@@ -239,8 +239,8 @@ def generate_conformers(group2idx2mols2confs):
                         error_mols.append((conf_mol, e))
                         #conf_mol.to_file(os.path.join(error_dir, conf_file), file_format='sdf')
                 except Exception as e2:
-                    logging.info(f'Unable to write all error structures to file. Encountered error [{e}]')
-                    e = str(e) + '\n Then, when trying to write out the conformers:\n' + str(e2)
+                    logging.info(f'Unable to collect errored conformers. Encountered error [{e}]')
+                    e = str(e) + '\n Then, when trying collect errored conformers:\n' + str(e2)
                     error_mols.append((Molecule(), e))
                 #with open(os.path.join(error_dir, f'{mol_id}.txt'), 'w') as of:
                 #    of.write(str(e))

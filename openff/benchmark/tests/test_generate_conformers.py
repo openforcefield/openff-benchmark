@@ -7,6 +7,7 @@ import glob
 import shutil
 from openff.benchmark.utils.utils import get_data_file_path
 from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper, RDKitToolkitWrapper
+from openforcefield.topology import Molecule
 from click.testing import CliRunner
 runner = CliRunner()
 
@@ -27,7 +28,7 @@ def test_dont_overwrite_output_directory(tmpdir):
                                        "-o", output_dir,
                                        input_dir],
                                  catch_exceptions=False)
-        with pytest.raises(Exception, match='Specify `delete_existing=True` to remove'):
+        with pytest.raises(Exception, match='Specify `--delete-existing` to remove'):
             response = runner.invoke(cli, ["preprocess", "generate-conformers",
                                            "-o", output_dir,
                                            input_dir],
@@ -40,8 +41,6 @@ def test_generate_conformers(tmpdir):
         # test_name = inspect.stack()[0].function
         input_dir = get_data_file_path('1-validate_and_assign_graphs_and_confs')
         output_dir = '2-generate_conformers'
-        if os.path.exists(output_dir):
-            shutil.rmtree(output_dir)
 
         # generate_conformers(input_dir, output_dir)
         response = runner.invoke(cli, ["preprocess", "generate-conformers",
@@ -72,6 +71,42 @@ def test_generate_conformers(tmpdir):
         #bbb4_confs = glob.glob(os.path.join(output_dir, 'BBB-00004-*.sdf'))
         #assert len(bbb4_confs) == 10
 
+
+def test_generate_conformers_add(tmpdir):
+    with tmpdir.as_cwd():
+        # test_name = inspect.stack()[0].function
+        input_dir = '1-validate_and_assign_graphs_and_confs'
+        # Make a copy of this directory, otherwise we'll contaminate the original when we add a new mol for the test
+        shutil.copytree(get_data_file_path(input_dir), input_dir)
+        output_dir = '2-generate_conformers'
+        # generate_conformers(input_dir, output_dir)
+        response = runner.invoke(cli, ["preprocess", "generate-conformers",
+                                       "-o", output_dir,
+                                       input_dir],
+                                 catch_exceptions=False)
+        initial_confs = glob.glob(os.path.join(output_dir, 'BBB-*.sdf'))
+        initial_confs = [os.path.basename(filename) for filename in initial_confs]
+
+        # now add a new ridiculously flexible molecule to dir
+        mol = Molecule.from_smiles('CCCCC[C@H](COCOC)COCCOCCCCCCC')
+        mol.generate_conformers()
+        mol.properties["group_name"] = "BBB"
+        mol.properties["molecule_index"] = "99999"
+        mol.to_file(os.path.join(input_dir, "BBB-99999-00.sdf"), "sdf")
+
+        response = runner.invoke(cli, ["preprocess", "generate-conformers",
+                                       "-o", output_dir,
+                                       "--add",
+                                       input_dir],
+                                 catch_exceptions=False)
+
+        final_confs = glob.glob(os.path.join(output_dir, 'BBB-*.sdf'))
+        final_confs = [os.path.basename(filename) for filename in final_confs]
+        assert 'BBB-99999-00.sdf' in final_confs
+        assert 'BBB-99999-09.sdf' in final_confs
+        assert len(final_confs) == len(initial_confs) + 10
+
+
 def test_bad_macrocycle(tmpdir):
     with tmpdir.as_cwd():
         # test_name = inspect.stack()[0].function
@@ -90,3 +125,36 @@ def test_bad_macrocycle(tmpdir):
         assert len(jan_203_confs) == 1
 
 
+def test_generate_conformers_add_bad_macrocycle(tmpdir):
+    with tmpdir.as_cwd():
+        # test_name = inspect.stack()[0].function
+        input_dir = '1-validate_and_assign_graphs_and_confs'
+        # Make a copy of this directory, otherwise we'll contaminate the original when we add a new mol for the test
+        shutil.copytree(get_data_file_path(input_dir), input_dir)
+        output_dir = '2-generate_conformers'
+        # generate_conformers(input_dir, output_dir)
+        response = runner.invoke(cli, ["preprocess", "generate-conformers",
+                                       "-o", output_dir,
+                                       input_dir],
+                                 catch_exceptions=False)
+        initial_confs = glob.glob(os.path.join(output_dir, 'BBB-*.sdf'))
+        initial_confs = [os.path.basename(filename) for filename in initial_confs]
+
+        # now add a new molecule to dir
+        mol = Molecule.from_file(get_data_file_path("1-validate_and_assign_graphs_and_confs_bad_macrocycle/JAN-00203-00.sdf"))
+        mol.properties["group_name"] = "BBB"
+        mol.properties["molecule_index"] = "99999"
+        mol.to_file(os.path.join(input_dir, "BBB-99999-00.sdf"), "sdf")
+
+        response = runner.invoke(cli, ["preprocess", "generate-conformers",
+                                       "-o", output_dir,
+                                       "--add",
+                                       input_dir],
+                                 catch_exceptions=False)
+        final_confs = glob.glob(os.path.join(output_dir, 'BBB-*.sdf'))
+        final_confs = [os.path.basename(filename) for filename in final_confs]
+        assert 'BBB-99999-00.sdf' in final_confs
+        assert 'BBB-99999-01.sdf' not in final_confs
+        assert len(final_confs) == len(initial_confs) + 1
+        error_mols = glob.glob(os.path.join(output_dir, 'error_mols', '*'))
+        assert len(error_mols) > 0
