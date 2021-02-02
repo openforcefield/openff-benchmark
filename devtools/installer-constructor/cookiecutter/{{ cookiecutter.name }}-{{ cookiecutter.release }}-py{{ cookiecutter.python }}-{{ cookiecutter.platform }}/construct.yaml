@@ -29,7 +29,7 @@ specs:
   - gau2grid =2.0.3
 
   # Benchmarking
-  - openff-benchmark =2021.01.25.0
+  - openff-benchmark =2021.02.01.0
 
   # Storage dependencies
   - alembic
@@ -68,7 +68,7 @@ specs:
 
   # submission
   - qcportal
-  - openff-qcsubmit =0.2.0
+  - openff-qcsubmit =0.2.1
 
   # analysis
   - numpy
