@@ -25,11 +25,6 @@ if oetk_loaded:
     GLOBAL_TOOLKIT_REGISTRY.deregister_toolkit(OpenEyeToolkitWrapper)
 
 
-logging.basicConfig(filename=f'{sys.argv[2]}.log',
-                    level=logging.DEBUG
-                    )
-
-
 @click.group()
 def cli():
     pass
@@ -427,6 +422,10 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     import copy
     import csv
 
+    logging.basicConfig(filename='validate.log',
+                    level=logging.DEBUG
+                    )
+
     # If we're not running with the `--add` flag, these will remain as empty lists
     existing_output_mols = []
     existing_name_assignments = []
@@ -572,6 +571,9 @@ def generate_conformers(input_directory, output_directory, add, delete_existing)
     import shutil
     import re
 
+    logging.basicConfig(filename='generate-conformers.log',
+                    level=logging.DEBUG
+                    )
 
     # Prepare required directories, ensuring that input flags (`delete_existing` and `add`) are sane
     error_dir = prepare_folders(output_directory=output_directory, delete_existing=delete_existing, add=add)
@@ -669,6 +671,10 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
     import glob
     import os
     import shutil
+
+    logging.basicConfig(filename='coverage-report.log',
+                    level=logging.DEBUG
+                    )
 
     error_dir = prepare_folders(output_directory=output_directory, delete_existing=delete_existing, add=add)
     # Search for the 00th conformer so we dont double-count any moleucles
