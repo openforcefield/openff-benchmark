@@ -112,6 +112,8 @@ class OptimizationExecutor:
             Relies *only* on filepaths of existing files for determining match.
     
         """
+        import json
+
         # get dataset
         client = FractalClient(fractal_uri, verify=False)
         optds = client.get_collection("OptimizationDataset", dataset_name)
@@ -132,6 +134,7 @@ class OptimizationExecutor:
         # deposit SDF giving final molecule, energy
         specs = optds.list_specifications().index.tolist()
         for spec in specs:
+            print("Exporting spec: '{}'".format(spec))
             os.makedirs(os.path.join(output_directory, spec), exist_ok=True)
             optentspec = optds.get_specification(spec)
     
@@ -141,7 +144,9 @@ class OptimizationExecutor:
     
                 # skip incomplete cases
                 if opt.status != 'COMPLETE':
+                    print("... '{}' : skipping INCOMPLETE".format(id))
                     continue
+
     
                 # fix to ensure output fidelity of ids; losing 02 padding on conformer
                 org, molecule, conformer = id.split('-')
@@ -150,14 +155,16 @@ class OptimizationExecutor:
                                                                         conformer=int(conformer))
     
                 # subfolders for each compute spec, files named according to molecule ids
-                outfile = "{}.sdf".format(
+                outfile = "{}".format(
                         os.path.join(output_directory, spec, output_id))
     
                 # if we did not delete everything at the start and the path already exists,
                 # skip this one; reduces processing and writes to filesystem
-                if (not delete_existing) and os.path.exists(outfile):
+                if (not delete_existing) and os.path.exists("{}.sdf".format(outfile)):
+                    print("... '{}' : skipping SDF exists".format(id))
                     continue
     
+                print("... '{}' : exporting COMPLETE".format(id))
                 mol = self._mol_from_qcserver(records[id.lower()])
     
                 # set conformer as final, optimized geometry
@@ -170,7 +177,17 @@ class OptimizationExecutor:
                                               optentspec.qc_spec.program,
                                               opt.energies)
 
-                mol.to_file(outfile, file_format='sdf')
+                optd = self._get_complete_optimization_result(opt, client)
+
+                # writeout file results
+                mol.to_file("{}.sdf".format(outfile), file_format='sdf')
+
+                with open("{}.json".format(outfile), 'w') as f:
+                    json.dump(optd, f)
+
+                with open("{}.perf.json".format(outfile), 'w') as f:
+                    json.dump({'walltime': opt.provenance.wall_time,
+                               'completed': opt.modified_on.isoformat()}, f)
 
     def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
@@ -206,9 +223,26 @@ class OptimizationExecutor:
                         "normal": PriorityEnum.NORMAL,
                         "low": PriorityEnum.LOW}
 
-        client.modify_tasks(operation='modify',
-                            base_result=[opt.id for opt in opts if opt.status != 'COMPLETE'],
-                            new_priority=priority_map[priority])
+        optids = [opt.id for opt in opts if opt.status != 'COMPLETE']
+        for id in optids:
+            client.modify_tasks(operation='modify',
+                                base_result=id,
+                                new_priority=priority_map[priority])
+
+    def set_optimization_tag(self, fractal_uri, tag, dataset_name):
+        from qcportal.models.task_models import PriorityEnum
+
+        client = FractalClient(fractal_uri, verify=False)
+
+        optds = client.get_collection("OptimizationDataset", dataset_name)
+        optds.status()
+        opts = optds.df.values.flatten()
+
+        optids = [opt.id for opt in opts if opt.status != 'COMPLETE']
+        for id in optids:
+            client.modify_tasks(operation='modify',
+                                base_result=id,
+                                new_tag=tag)
 
     def errorcycle_optimizations(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
@@ -238,12 +272,12 @@ class OptimizationExecutor:
 
         for opt in df.values.flatten():
             if opt.status == 'ERROR':
-                print(f"Restarted ERRORed optimization `{opt.id}`")
                 client.modify_tasks(operation='restart', base_result=opt.id)
+                print(f"Restarted ERRORed optimization `{opt.id}`")
             if opt.status == 'INCOMPLETE' and (opt.final_molecule is not None):
-                print(f"Regnerated INCOMPLETE optimization `{opt.id}`")
                 client.modify_tasks(operation='regenerate', base_result=opt.id)
-    
+                print(f"Regnerated INCOMPLETE optimization `{opt.id}`")
+
     def get_optimization_from_server(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
         """Get full optimization data from the given molecules.
@@ -264,11 +298,49 @@ class OptimizationExecutor:
         if compute_specs is not None:
             df = df[compute_specs]
 
-        results = []
+        out = []
         for opt in df.values.flatten():
-            results.append(opt)
 
-        return results
+            if opt.status != 'COMPLETE':
+                continue
+
+            optd = self._get_complete_optimization_result(opt, client)
+            out.append(optd)
+
+        return out
+
+    @staticmethod
+    def _get_complete_optimization_result(opt, client):
+        import json
+        optd = json.loads(opt.json())
+
+        # get full trajectory of results, with molecule data
+        results = client.query_results(opt.trajectory)
+        molids = [res.molecule for res in results]
+        mols = client.query_molecules(molids)
+
+        resultsd = []
+        for res, mol in zip(results, mols):
+            resd = json.loads(res.json())
+            resd['molecule'] = json.loads(mol.json())
+            resd['stdout'] = res.get_stdout()
+            resd['stderr'] = res.get_stderr()
+
+            resultsd.append(resd)
+
+        optd['trajectory'] = resultsd
+
+        # get initial molcule
+        optd['initial_molecule'] = json.loads(opt.get_initial_molecule().json())
+
+        # get final molecule
+        optd['final_molecule'] = json.loads(opt.get_final_molecule().json())
+
+        # get stdout, stderr
+        optd['stdout'] = opt.get_stdout()
+        optd['stderr'] = opt.get_stderr()
+
+        return optd
 
     def get_optimization_tracebacks(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
@@ -333,6 +405,9 @@ class OptimizationExecutor:
               then merge with `execute_...` above.
     
         """
+        from datetime import datetime
+        import json
+
         if client is None:
             client = FractalClient(fractal_uri, verify=False)
 
@@ -371,30 +446,59 @@ class OptimizationExecutor:
                             os.path.join(output_directory, spec_name, output_id))
     
                 print("... '{}'".format(id))
-                task = client.query_tasks(base_result=opt.id)[0]
+                #task = client.query_tasks(base_result=opt.id)[0]
+                inputs = self._args_from_optimizationrecord(opt, client)
 
                 # execute optimization
-                result = self._execute_qcengine(task.spec.args[0],
+                start_dt = datetime.utcnow()
+                result = self._execute_qcengine(inputs,
                                                 local_options=local_options,
                                                 scf_maxiter=scf_maxiter,
                                                 geometric_maxiter=geometric_maxiter,
                                                 geometric_coordsys=geometric_coordsys,
                                                 geometric_qccnv=geometric_qccnv)
 
-                if result.success:
+                end_dt = datetime.utcnow()
+                if output_directory is not None:
+                    if result.success:
+                        # process final molecule
+                        final_molecule = self._process_optimization_result(output_id, result)
+                        final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
+                    else:
+                        print("Optimization failed for '{}'; check JSON results output".format(output_id))
 
-                    # process final molecule
-                    final_molecule = self._process_optimization_result(output_id, result)
-                    final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
-                else:
-                    print("Optimization failed for '{}'; check JSON results output".format(output_id))
+                    with open("{}.json".format(outfile), 'w') as f:
+                        f.write(result.json())
 
-                with open("{}.json".format(outfile), 'w') as f:
-                    f.write(result.json())
+                    with open("{}.perf.json".format(outfile), 'w') as f:
+                        json.dump({'start': start_dt.isoformat(), 'end': end_dt.isoformat()}, f)
+
 
                 results.append(result)
 
         return results
+
+    @staticmethod
+    def _args_from_optimizationrecord(opt, client):
+        from qcelemental.models import OptimizationInput
+
+        # generate optimization inputs
+        input_data = OptimizationInput(
+                keywords=opt.keywords,
+                extras={},
+                protocols={},
+                input_specification={
+                    "driver": "gradient",
+                    "model": {
+                      "method": opt.qc_spec.method,
+                      "basis": opt.qc_spec.basis,
+                    },
+                    "keywords": client.query_keywords(opt.qc_spec.keywords)[0].values
+                },
+                initial_molecule=opt.get_initial_molecule()
+            )
+
+        return input_data.dict()
 
     def _execute_qcengine(
             self, input_data, procedure="geometric", local_options=None,
@@ -508,15 +612,8 @@ class OptimizationExecutor:
         from datetime import datetime
         import json
 
-        import numpy as np
-        import pint
-    
         from openff.qcsubmit.factories import OptimizationDatasetFactory
-        from openforcefield.topology import Molecule
-        from openforcefield.topology.molecule import unit
 
-        punit = pint.UnitRegistry()
-    
         # fail early if output_directory already exists and we aren't deleting it
         if os.path.isdir(output_directory):
             if delete_existing:

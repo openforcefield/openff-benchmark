@@ -37,12 +37,20 @@ def optimize():
     pass
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
 @click.option('-d', '--dataset-name', required=True, help="Dataset name to submit molecules under")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
-@click.option('-s', '--season', required=True)
+@click.option('-s', '--season', required=True, type=click.Choice(['1:1', '1:2']), help="Season identifier specifying compute selections applied to molecules")
 @click.argument('input-path', nargs=-1)
 def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
+    """Submit molecules from INPUT_PATH.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to submit molecules to.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
     from .geometry_optimizations.compute import OptimizationExecutor
 
     optexec = OptimizationExecutor()
@@ -54,11 +62,18 @@ def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
 #    pass
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
-@click.option('-d', '--dataset-name', required=True)
-@click.option('--delete-existing', is_flag=True)
-@click.option('-o', '--output-directory', default='3-export-compute')
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
+@click.option('-d', '--dataset-name', required=True, help="Dataset name to export molecule optimization data from")
+@click.option('--delete-existing', is_flag=True,
+              help="Delete existing output directory if it exists")
+@click.option('-o', '--output-directory', required=True, help="Output directory to use for results")
 def export(fractal_uri, output_directory, dataset_name, delete_existing):
+    """Export molecule optimization data from a given dataset into an output directory.
+
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to export.
+    You must also provide the output directory via `-o OUTPUT_DIRECTORY`.
+
+    """
     import os
     import warnings
     from .geometry_optimizations.compute import OptimizationExecutor
@@ -71,11 +86,16 @@ def export(fractal_uri, output_directory, dataset_name, delete_existing):
             fractal_uri, output_directory, dataset_name, delete_existing)
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
-@click.option('-d', '--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
+@click.option('-d', '--dataset-name', required=True, help="Dataset name to limit scope of status display to")
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
 @click.argument('molids', nargs=-1)
 def status(molids, fractal_uri, dataset_name, compute_specs):
+    """Print the status of molecule optimizations from a given dataset in a table on STDOUT.
+
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to display the status of.
+
+    """
     import pandas as pd
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -90,11 +110,17 @@ def status(molids, fractal_uri, dataset_name, compute_specs):
 
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
 @click.option('-f', '--frequency', default=10, help="Time in seconds between updates")
-@click.option('-d', '--dataset-name', default=None)
-@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.option('-d', '--dataset-name', default=None, help="Dataset name to limit scope of progress display to")
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit progress display to")
 def progress(fractal_uri, frequency, dataset_name, compute_specs):
+    """Display a live progress bar for molecule optimizations from a given dataset.
+
+    Providing the dataset name via `-d DATASET_NAME` will reduce the scope of the progress bar to that dataset.
+    Providing compute specs via `-c COMPUTE_SPEC,COMPUTE_SPEC,...` will reduce the scope of the progress bar further to those named compute specs.
+
+    """
     from time import sleep
     from tqdm import trange
 
@@ -134,10 +160,19 @@ def progress(fractal_uri, frequency, dataset_name, compute_specs):
 
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
-@click.option('-d', '--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
+@click.option('-d', '--dataset-name', required=True, help="Name of dataset to change priority of")
 @click.argument('priority', nargs=1)
 def set_priority(fractal_uri, dataset_name, priority):
+    """Set the compute priority for molecule optimizations in a given dataset.
+
+    Optimizations at a higher priority will be executed by manager(s) before optimizations of a lower priority.
+    By default, all datasets are submitted with 'normal' priority.
+
+    PRIORITY may be one of 'low', 'normal', 'high', ordered in increasing priority.
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to set the priority of.
+
+    """
     from .geometry_optimizations.compute import OptimizationExecutor
 
     if priority not in ('high', 'normal', 'low'):
@@ -146,14 +181,47 @@ def set_priority(fractal_uri, dataset_name, priority):
     optexec = OptimizationExecutor()
     optexec.set_optimization_priority(fractal_uri, priority, dataset_name)
 
+@optimize.command()
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
+@click.option('-d', '--dataset-name', required=True, help="Name of dataset to change priority of")
+@click.argument('tag', nargs=1)
+def set_tag(fractal_uri, dataset_name, tag):
+    """Set the compute tag for molecule optimizations in a given dataset.
+
+    Compute tags allow you to control which managers, if any, can compute a given optimization; it is a routing mechanism.
+    By default, all datasets are submitted with the 'openff' compute tag.
+
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to set the compute tag for.
+
+    An example use case is marking a dataset with a compute tag that no manager will pick up, effectively marking it as 'defunct' or 'do not compute'.
+    This could be accomplished with, e.g.
+
+        openff-benchmark optimize set-tag -d DATASET_NAME 'defunct'
+
+    """
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+    optexec.set_optimization_tag(fractal_uri, tag, dataset_name)
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
-@click.option('-d', '--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
+@click.option('-d', '--dataset-name', required=True, help="Name of dataset to error cycle")
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit errorcycling to")
 @click.option('-w', '--watch', default=None, help="Run in 'watch' mode with interval in seconds between cycles")
 @click.argument('molids', nargs=-1)
 def errorcycle(molids, fractal_uri, dataset_name, watch, compute_specs):
+    """Error-cycle failed molecule optimizations in a given dataset.
+
+    When computing many optimizations across many compute resources, errors are almost inevitable.
+    Many of these will be random errors, and can be cleared by using this command to set the optimization for re-run.
+    It is advised to regularly cycle errors to clear these random cases, leaving behind only errors that have a systematic issue requiring deeper analysis.
+
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to error-cycle.
+    Providing compute specs via `-c COMPUTE_SPEC,COMPUTE_SPEC,...` will reduce the scope of error cycling further to those named compute specs.
+    If you would like to limit error-cycling to a handful of molecules, you can also specify any number of MOLIDS.
+
+    """
     from time import sleep
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -171,11 +239,21 @@ def errorcycle(molids, fractal_uri, dataset_name, watch, compute_specs):
 
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
-@click.option('-d', '--dataset-name', required=True)
-@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
+@click.option('-d', '--dataset-name', required=True, help="Name of dataset to pull tracebacks for")
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit traceback reporting from")
 @click.argument('molids', nargs=-1)
 def traceback(molids, fractal_uri, dataset_name, compute_specs):
+    """Get tracebacks for failed molecule optimizations in a given dataset.
+
+    Use this command to output tracebacks for errored optimizations.
+    Use before error cycling, which will clear the traceback on errored optimizations.
+
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to get tracebacks for.
+    Providing compute specs via `-c COMPUTE_SPEC,COMPUTE_SPEC,...` will reduce the scope of traceback reporting further to those named compute specs.
+    If you would like to limit traceback reporting to a handful of molecules, you can also specify any number of MOLIDS.
+
+    """
     import pandas as pd
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -198,8 +276,11 @@ def traceback(molids, fractal_uri, dataset_name, compute_specs):
 
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
 def list_datasets(fractal_uri):
+    """Get the names of all optimization datasets present in the QCFractal Server.
+
+    """
     import pandas as pd
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -210,9 +291,16 @@ def list_datasets(fractal_uri):
 
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
 @click.argument('dataset-name', nargs=-1)
 def delete_datasets(fractal_uri, dataset_name):
+    """Remove the named optimization datasets from the QCFractal Server.
+
+    **Note**: removing a dataset does not remove optimizations from the compute queue.
+              It is not advised to use this if you are trying to stop compute on a dataset you are no longer interested in.
+              See `set-tag` instead first.
+
+    """
     from .geometry_optimizations.compute import OptimizationExecutor
 
     optexec = OptimizationExecutor()
@@ -220,11 +308,18 @@ def delete_datasets(fractal_uri, dataset_name):
 
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
-@click.option('-d', '--dataset-name', required=True)
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
+@click.option('-d', '--dataset-name', required=True, help="Name of dataset to extract raw molecule and optimization results from")
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
 @click.argument('molids', nargs=-1)
 def extract(molids, fractal_uri, dataset_name, compute_specs):
+    """Extract raw results for molecule optimizations and print to STDOUT.
+
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to get result outputs for.
+    Providing compute specs via `-c COMPUTE_SPEC,COMPUTE_SPEC,...` will reduce the scope of result outputs further to those named compute specs.
+    If you would like to limit result outputs to a handful of molecules, you can also specify any number of MOLIDS.
+
+    """
     import json
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -237,26 +332,40 @@ def extract(molids, fractal_uri, dataset_name, compute_specs):
                                                      dataset_name,
                                                      compute_specs=compute_specs,
                                                      molids=molids)
-
     # export and read back into JSON for final output
-    results_processed = [json.loads(res.json()) for res in results]
-    print(json.dumps(results_processed))
+    #results_processed = [json.loads(res.json()) for res in results]
+    print(json.dumps(results))
 
 
 @optimize.command()
-@click.option('-u', '--fractal-uri', default="localhost:7777")
+@click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
 @click.option('-d', '--dataset-name', required=True)
 @click.option('-t', '--nthreads', default=2)
 @click.option('-m', '--memory', default=2)
 @click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit status display to")
 @click.option('-o', '--output-directory')
-@click.option('--scf-maxiter', type=int, default=200)
-@click.option('--geometric-maxiter', type=int, default=300)
-@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc')
-@click.option('--geometric-qccnv', is_flag=True)
+@click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
+@click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
+@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
+@click.option('--geometric-qccnv', is_flag=True, help="If set, use QChem-style convergence criteria")
 @click.argument('molids', nargs=-1)
 def execute_from_server(molids, fractal_uri, dataset_name, compute_specs, nthreads, memory, output_directory,
                         scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
+    """Execute molecule optimization locally, pulling task from the server.
+
+    This is intended as a debugging tool for understanding cases that fail to complete on a manager.
+    Molecule optimizations specified will be executed locally using provided `--nthreads` and `--memory` parameters.
+    You may also modify parameters used for the optimization, such as `--scf-maxiter`.
+    This allows for experimentation and debugging of problematic cases.
+
+    Calculation results are returned on STDOUT.
+    To also output to a directory specify `-o OUTPUT_DIRECTORY`.
+
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to execute optimizations for.
+    Providing compute specs via `-c COMPUTE_SPEC,COMPUTE_SPEC,...` will reduce the scope of optimization execution further to those named compute specs.
+    If you would like to limit optimization execution to a handful of molecules, you can also specify any number of MOLIDS.
+
+    """
     import json
     from .geometry_optimizations.compute import OptimizationExecutor
 
@@ -283,21 +392,38 @@ def execute_from_server(molids, fractal_uri, dataset_name, compute_specs, nthrea
 
 
 @optimize.command()
-@click.option('-s', '--season', required=True)
-@click.option('-t', '--nthreads', default=2)
-@click.option('-m', '--memory', default=2)
+@click.option('-s', '--season', required=True, help="Season identifier specifying compute selections applied to molecules")
+@click.option('-t', '--nthreads', default=2, help="Number of threads to utilize for each gradient calculation step")
+@click.option('-m', '--memory', default=2, help="Maximum memory in GiB to allocate for each gradient calculation; set at least 5% *below* desired maximum")
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to include")
 @click.option('-o', '--output-directory', required=True, help="Output directory to use for results")
 @click.option('--stdout', is_flag=True, help="If set, results also output to STDOUT")
-@click.option('--scf-maxiter', type=int, default=200)
-@click.option('--geometric-maxiter', type=int, default=300)
-@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc')
-@click.option('--geometric-qccnv', is_flag=True)
+@click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
+@click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
+@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
+@click.option('--geometric-qccnv', is_flag=True, help="If set, use QChem-style convergence criteria")
 @click.argument('input-paths', nargs=-1)
 def execute(input_paths, output_directory, stdout, season, nthreads, memory, delete_existing, recursive,
             scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
+    """Execute molecule optimization locally from a set of SDF files.
+
+    Molecule optimizations specified will be executed locally using provided `--nthreads` and `--memory` parameters.
+
+    In case you hit problems, you may also modify parameters used for the optimization, such as `--scf-maxiter`.
+    This allows for experimentation and debugging of problematic cases.
+    Please avoid changing parameters for production benchmarking data, taking care to output results to a different directory with `-o OUTPUT_DIRECTORY`.
+
+    You must output to a directory by specifying `-o OUTPUT_DIRECTORY`.
+    Calculation results can also be returned on STDOUT with the `--stdout` flag.
+    Note that results will only be printed to STDOUT when all results are complete.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
     import os
     import json
     import warnings
@@ -330,7 +456,7 @@ def execute(input_paths, output_directory, stdout, season, nthreads, memory, del
 
 @cli.group()
 def report():
-    """Analyze the results and create plots
+    """Analyze the results and create plots.
 
     """
     pass
