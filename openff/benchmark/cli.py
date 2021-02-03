@@ -778,13 +778,13 @@ def generate_conformers(input_directory, output_directory, add, delete_existing)
 @click.option('--add',
               is_flag=True,
               help='Appends new molecules to the dataset. The new molecules MUST be new unique molecules, NOT new conformers of previously-existing molecules.')
-@click.option("-ff", "--forcefield_name", default="openff_unconstrained-1.3.0.offxml")
-@click.option("-o", "--output_directory",
+@click.option("-f", "--forcefield-name", default="openff_unconstrained-1.3.0.offxml")
+@click.option("-o", "--output-directory",
               default="3-coverage_report",
               help="The directory for output files.")
 @click.option("-p", "--processors",
               default=None,
-              type=click.INT)
+              type=click.INT, help="Number of parellel processes to use to generate coverage report")
 @click.option('--delete-existing', is_flag=True)
 def coverage_report(input_directory, forcefield_name, output_directory, processors, delete_existing, add):
     """
