@@ -107,7 +107,7 @@ def validate_and_assign(loaded_mols,
                 temp_mol, _rmslist = align_offmol_conformers(temp_mol)
                 # Don't trust rmslist above for deduplication -- It doesn't take into
                 # account multiple atom mappings
-                rms_cutoff = 1.0
+                rms_cutoff = 0.2 # angstrom
                 confs_to_delete = greedy_conf_deduplication(temp_mol,
                                                             rms_cutoff)
                 if len(confs_to_delete) > 0:

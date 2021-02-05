@@ -166,8 +166,7 @@ def gen_confs_preserving_orig_confs(conformer_mols,
     
     # Generate a large number of candidate conformers
     mol.generate_conformers(n_conformers=5 * target_n_confs,
-                            # Multiply by 1.5 because this RMSD include hydrogens
-                            rms_cutoff=min_rmsd * 1.5 * unit.angstrom, 
+                            rms_cutoff=min_rmsd * unit.angstrom, # This is heavy-atom RMSD
                             clear_existing=False)
     
     mol, rmslist = align_offmol_conformers(mol)
@@ -227,7 +226,8 @@ def generate_conformers(group2idx2mols2confs):
                 conf_dict = group2idx2mols2confs[group_id][mol_idx]
                 output_confs = gen_confs_preserving_orig_confs(conf_dict,
                                                                target_n_confs=10,
-                                                               min_rmsd=1.5)
+                                                               min_rmsd=0.5 # angstrom
+                                                               )
                 group2idx2mols2confs[group_id][mol_idx] = output_confs
             except Exception as e:
                 mol_id = f'{group_id}-{mol_idx}'
