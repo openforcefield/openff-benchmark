@@ -14,7 +14,7 @@ dependencies:
   - gau2grid =2.0.3
 
   # Benchmarking
-  - openff-benchmark =2021.02.01.0
+  - openff-benchmark =2021.02.05.0
 
   # Storage dependencies
   - alembic
