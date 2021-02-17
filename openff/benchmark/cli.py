@@ -7,6 +7,7 @@ import click
 import logging
 import csv
 import sys
+import os
 
 # Deregister OpenEye for any ToolkitRegistry calls that happen in this file
 logger = logging.getLogger('openforcefield.utils.toolkits')
@@ -484,6 +485,102 @@ def match_minima(input_path, ref_method, output_directory):
 def plots(input_path, ref_method, output_directory):
     from .analysis import draw
     draw.plot_compare_ffs(input_path, ref_method, output_directory)
+
+
+@cli.group()
+def schrodinger():
+    """Generate OPLS parameters and optimize using Schrodinger tools.
+    """
+    pass
+
+@schrodinger.command()
+@click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
+@click.option('--host', default='localhost', help="Host name as specified in SCHRODINGER_HOSTS.")
+@click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. Defaults to /home/$USER/.schrodinger/opls_dir")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
+@click.option('-o', '--output-path', default='7-schrodinger', help="Path where output files are written to.")
+@click.argument('input-path', nargs=-1)
+def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, output_path):
+    """Build OPLS3e force field parameters using molecules from INPUT_PATH.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to submit molecules to.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
+    from .schrodinger import ffbuilder
+
+    if schrodinger_path is None:
+        schrodinger_path = os.getenv('SCHRODINGER')
+    if opls_dir is None:
+        opls_dir = os.path.join(os.getenv("HOME"),".schrodinger","opls_dir")
+    host_settings=host
+    if max_jobs is not None:
+        host_settings += f':{max_jobs}'
+
+    ffbuilder.ffbuilder(
+        input_path, 
+        schrodinger_path=schrodinger_path, 
+        host_settings=host_settings,
+        opls_dir=opls_dir, 
+        recursive=recursive,
+        output_path=output_path)
+
+
+@schrodinger.command()
+@click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
+@click.option('--host', default='localhost', help="Host name as specified in SCHRODINGER_HOSTS.")
+@click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. Defaults to /home/$USER/.schrodinger/opls_dir")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
+@click.option('-o', '--output-path', default='7-schrodinger', help="Path where output files are written to.")
+@click.argument('input-path', nargs=-1)
+def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, output_path):
+    """Starts optimizations of molecules from INPUT_PATH with Schrodinger macromodel.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
+    from .schrodinger import optimization
+
+    if schrodinger_path is None:
+        schrodinger_path = os.getenv('SCHRODINGER')
+    if opls_dir is None:
+        opls_dir = os.path.join(os.getenv("HOME"),".schrodinger","opls_dir")
+    host_settings=host
+    if max_jobs is not None:
+        host_settings += f':{max_jobs}'
+
+    optimization.optimization(
+        input_path, 
+        schrodinger_path=schrodinger_path, 
+        host_settings=host_settings,
+        opls_dir=opls_dir, 
+        recursive=recursive,
+        output_path=output_path)
+
+@schrodinger.command()
+@click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
+@click.option('-o', '--output-path', default='8-optimize_schrodinger', help="Path where output files are written to.")
+@click.argument('input-paths', nargs=-1)
+def postprocess(input_paths, schrodinger_path, output_path):
+    """Postprocesses output from Schrodinger macromodel optimizations.
+
+    INPUT_PATH may be any number of single MAE or MAEGZ files, which are the ouput of Schrodinger macromodel optimizations.
+    """
+    from .schrodinger import optimization
+
+    if schrodinger_path is None:
+        schrodinger_path = os.getenv('SCHRODINGER')
+
+    optimization.postprocess(
+        input_paths, 
+        schrodinger_path=schrodinger_path, 
+        output_path=output_path)
 
 
 
