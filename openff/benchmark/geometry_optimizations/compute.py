@@ -90,7 +90,7 @@ class OptimizationExecutor:
         except toolkits.ToolkitUnavailableException:
             pass
     
-        return Molecule.from_qcschema(record)
+        return Molecule.from_qcschema(qca_record=record, allow_undefined_stereo=True)
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
                              delete_existing=False, keep_existing=True):
