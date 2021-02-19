@@ -8,6 +8,7 @@ import logging
 import csv
 import sys
 import os
+import warnings
 
 # Deregister OpenEye for any ToolkitRegistry calls that happen in this file
 logger = logging.getLogger('openforcefield.utils.toolkits')
@@ -497,7 +498,7 @@ def schrodinger():
 @click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
 @click.option('--host', default='localhost', help="Host name as specified in SCHRODINGER_HOSTS.")
 @click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
-@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. Defaults to /home/$USER/.schrodinger/opls_dir")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If it is not given, NO custom parameters will be used.")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
 @click.option('-o', '--output-path', default='7-schrodinger', help="Path where output files are written to.")
 @click.argument('input-path', nargs=-1)
@@ -514,8 +515,14 @@ def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive,
 
     if schrodinger_path is None:
         schrodinger_path = os.getenv('SCHRODINGER')
+    if not os.path.isdir(schrodinger_path):
+        raise ValueError("A valid SCHRODINGER path is not given.")
     if opls_dir is None:
-        opls_dir = os.path.join(os.getenv("HOME"),".schrodinger","opls_dir")
+        warnings.warn("The specified OPLS custom parameter path is not given. A default path is used.")
+        opls_dir = os.path.join(os.getenv('HOME'), '.schrodinger', 'opls_dir')
+    if not os.path.isdir(opls_dir):
+        raise ValueError("The specified OPLS custom parameter path is not found. Exiting.")
+
     host_settings=host
     if max_jobs is not None:
         host_settings += f':{max_jobs}'
@@ -533,7 +540,7 @@ def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive,
 @click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
 @click.option('--host', default='localhost', help="Host name as specified in SCHRODINGER_HOSTS.")
 @click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
-@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. Defaults to /home/$USER/.schrodinger/opls_dir")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If not specified, NO custom parameters will be used.")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
 @click.option('-o', '--output-path', default='7-schrodinger', help="Path where output files are written to.")
 @click.argument('input-path', nargs=-1)
@@ -549,8 +556,11 @@ def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, 
 
     if schrodinger_path is None:
         schrodinger_path = os.getenv('SCHRODINGER')
-    if opls_dir is None:
-        opls_dir = os.path.join(os.getenv("HOME"),".schrodinger","opls_dir")
+    if not os.path.isdir(schrodinger_path):
+        raise ValueError("A valid SCHRODINGER path is not given.")
+    if opls_dir is not None and not os.path.isdir(opls_dir):
+        raise UserWarning("The specified OPLS custom parameter path is not found. Custom parameters will not be used.")
+        opls_dir = None        
     host_settings=host
     if max_jobs is not None:
         host_settings += f':{max_jobs}'
@@ -576,6 +586,8 @@ def postprocess(input_paths, schrodinger_path, output_path):
 
     if schrodinger_path is None:
         schrodinger_path = os.getenv('SCHRODINGER')
+    if not os.path.isdir(schrodinger_path):
+        raise ValueError("A valid SCHRODINGER path is not given.")
 
     optimization.postprocess(
         input_paths, 

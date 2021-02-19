@@ -95,10 +95,14 @@ def optimization(input_paths, schrodinger_path, host_settings, opls_dir, recursi
 
         
         command = [os.path.join(schrodinger_path, 'macromodel'),
-                   '-OPLSDIR', os.path.abspath(opls_dir),
-                   '-HOST', host_settings,
                    'mmod_openff_benchmark.com'
         ]
+        if host_settings is not None:
+            command.append('-HOST')
+            command.append(f'{host_settings}')
+        if opls_dir is not None:
+            command.append('-OPLSDIR')
+            command.append(os.path.abspath(opls_dir))
         subprocess.run(command, cwd=os.path.join(output_path, '2-macromodel'))
 
 
