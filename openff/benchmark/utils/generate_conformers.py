@@ -85,8 +85,8 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
     if mol_hash not in RMS_MATRIX_CACHE:
         rdmol = offmol.to_rdkit()
         rdmol = Chem.RemoveHs(rdmol)
-        # If we're going to be testing against reflections of the current conformer, add a new conformer
-        # for each original one containing the mirror image (x coordinate flipped)
+        # If we're going to be testing against reflections of the current conformer, add a new molecule,
+        # with a mirror image of each original conformer (x coordinate flipped)
         if consider_reflections:
             mirror_rdmol = Chem.Mol(rdmol)
             mirror_rdmol.RemoveAllConformers()
@@ -109,7 +109,7 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
                                                   refId=i,
                                                   )
                 # If we're also testing against mirror-image conformers, also test against the
-                # mirror image of conformer j, which is stored in conformer (j+orig_num_conformers)
+                # equivalent conformer in our mirror molecule
                 if consider_reflections:
                     mirror_rmsd = Chem.rdMolAlign.GetBestRMS(mirror_rdmol,
                                                              rdmol,
