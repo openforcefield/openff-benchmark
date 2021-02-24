@@ -15,7 +15,7 @@ from collections import defaultdict
 #logging.disable(logging.WARNING) 
 
 from qcportal import FractalClient
-
+from openforcefield.topology import Molecule
 from .seasons import SEASONS
 from ..utils.io import mols_from_paths
 
@@ -157,7 +157,7 @@ class OptimizationExecutor:
         specs = optds.list_specifications().index.tolist()
         for spec in specs:
             print("Exporting spec: '{}'".format(spec))
-            os.makedirs(os.path.join(output_directory, spec), exist_ok=True)
+            os.makedirs(os.path.join(output_directory, spec, 'error_dir'), exist_ok=True)
             optentspec = optds.get_specification(spec)
     
             records = optds.data.dict()['records']
@@ -179,37 +179,69 @@ class OptimizationExecutor:
                 # subfolders for each compute spec, files named according to molecule ids
                 outfile = "{}".format(
                         os.path.join(output_directory, spec, output_id))
-    
+
                 # if we did not delete everything at the start and the path already exists,
                 # skip this one; reduces processing and writes to filesystem
                 if (not delete_existing) and os.path.exists("{}.sdf".format(outfile)):
                     print("... '{}' : skipping SDF exists".format(id))
                     continue
-    
+
+                mol = Molecule()
                 print("... '{}' : exporting COMPLETE".format(id))
-                mol = self._mol_from_qcserver(records[id.lower()])
-    
-                # set conformer as final, optimized geometry
-                final_qcmol = opt.get_final_molecule()
-                mol = self._process_final_mol(output_id,
-                                              mol,
-                                              final_qcmol,
-                                              optentspec.qc_spec.method,
-                                              optentspec.qc_spec.basis,
-                                              optentspec.qc_spec.program,
-                                              opt.energies)
+                try:
+                    mol = self._mol_from_qcserver(records[id.lower()])
 
-                optd = self._get_complete_optimization_result(opt, client)
+                    # set conformer as final, optimized geometry
+                    final_qcmol = opt.get_final_molecule()
+                    mol = self._process_final_mol(output_id,
+                                                  mol,
+                                                  final_qcmol,
+                                                  optentspec.qc_spec.method,
+                                                  optentspec.qc_spec.basis,
+                                                  optentspec.qc_spec.program,
+                                                  opt.energies)
 
-                # writeout file results
-                mol.to_file("{}.sdf".format(outfile), file_format='sdf')
+                    optd = self._get_complete_optimization_result(opt, client)
 
-                with open("{}.json".format(outfile), 'w') as f:
-                    json.dump(optd, f)
+                    # writeout file results
+                    mol.to_file("{}.sdf".format(outfile), file_format='sdf')
 
-                with open("{}.perf.json".format(outfile), 'w') as f:
-                    json.dump({'walltime': opt.provenance.wall_time,
-                               'completed': opt.modified_on.isoformat()}, f)
+                    with open("{}.json".format(outfile), 'w') as f:
+                        json.dump(optd, f)
+
+                    with open("{}.perf.json".format(outfile), 'w') as f:
+                        json.dump({'walltime': opt.provenance.wall_time,
+                                   'completed': opt.modified_on.isoformat()}, f)
+                except Exception as e:
+                    print("... '{}' : Export error".format(id))
+
+                    error_outfile = "{}".format(
+                        os.path.join(output_directory, spec, 'error_mols', output_id))
+                    # If the molecule really is corrupted, one of the following steps may fail,
+                    # so run each inside a try: block
+                    try:
+                        with open("{}.txt".format(error_outfile), 'w') as f:
+                            f.write(str(e))
+                    except:
+                        pass
+
+                    # writeout file results
+                    try:
+                        mol.to_file("{}.sdf".format(error_outfile), file_format='sdf')
+                    except:
+                        pass
+                    try:
+                        with open("{}.json".format(error_outfile), 'w') as f:
+                            json.dump(optd, f)
+                    except:
+                        pass
+                    try:
+                        with open("{}.perf.json".format(error_outfile), 'w') as f:
+                            json.dump({'walltime': opt.provenance.wall_time,
+                                       'completed': opt.modified_on.isoformat()}, f)
+                    except:
+                        pass
+
 
     def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
