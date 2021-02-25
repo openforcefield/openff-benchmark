@@ -201,6 +201,9 @@ class OptimizationExecutor:
                                                   optentspec.qc_spec.program,
                                                   opt.energies)
 
+                    if self._connectivity_rearranged(mol):
+                        raise Exception("Connectivity rearrangement (usually proton transfer) detected.")
+
                     optd = self._get_complete_optimization_result(opt, client)
 
                     # writeout file results
