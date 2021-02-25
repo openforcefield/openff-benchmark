@@ -66,6 +66,26 @@ def ethane_qm_optimized():
     return get_data_file_path('ethane-qm-optimized.sdf')
 
 
+@pytest.fixture(scope="module")
+def acetic_acid_optimized_proton_transfer():
+    """Acetic acid, QM optimized, with the connection table indicating a proton transfer between oxygens.
+
+    The `group_name`, `molecule_index`, and conformer_index` fields are set as:
+
+    ```
+    >  <group_name>  (1)
+    BBB
+
+    >  <molecule_index>  (1)
+    00000
+
+    >  <conformer_index>  (1)
+    00
+    ```
+
+    """
+    return get_data_file_path('acetic_acid_optimized_proton_transfer.sdf')
+
 ## server required
 
 def test_cli_optimize_submit_molecules_qm(fractal_compute_server, tmpdir, ethane_preprocessed):
@@ -220,6 +240,29 @@ def test_cli_optimize_execute_qm(tmpdir, ethane_preprocessed):
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
             assert set(exported_files) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
 
+
+def test_cli_optimize_execute_qm_proton_transfer(tmpdir, acetic_acid_optimized_proton_transfer):
+    """Test execution of QM via QCEngine via the CLI.
+
+    """
+
+    with tmpdir.as_cwd():
+        outdir = '4-compute-qm'
+        response = runner.invoke(cli, ['optimize', 'execute',
+                                       '--season', '1:1',
+                                       '--nthreads', '2',
+                                       '--memory', '1',
+                                       '-o', outdir,
+                                       acetic_acid_optimized_proton_transfer])
+
+        assert response.exit_code == 0
+        assert "... 'OFF-00000-00'" in response.output
+
+        for season in SEASONS["1:1"]:
+            exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
+            assert set(exported_files) == set()
+            exported_error_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season, 'error_mols'))
+            assert set(exported_error_files) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
 
 def test_cli_optimize_execute_mm(tmpdir, ethane_qm_optimized):
     """Test execution of MM via QCEngine via the CLI.
