@@ -256,13 +256,13 @@ def test_cli_optimize_execute_qm_proton_transfer(tmpdir, acetic_acid_optimized_p
                                        acetic_acid_optimized_proton_transfer])
 
         assert response.exit_code == 0
-        assert "... 'OFF-00000-00'" in response.output
+        assert "... 'OFF-00001-00'" in response.output
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
             assert set(exported_files) == set()
             exported_error_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season, 'error_mols'))
-            assert set(exported_error_files) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_error_files) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "sdf", "json", "perf.json"])
 
 def test_cli_optimize_execute_mm(tmpdir, ethane_qm_optimized):
     """Test execution of MM via QCEngine via the CLI.
