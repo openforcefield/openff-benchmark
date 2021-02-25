@@ -32,6 +32,33 @@ if oetk_loaded:
 
 RMS_MATRIX_CACHE = {}
 
+
+def mol_has_stereocenters(offmol):
+    """
+    Determines whether a molecule has stereogenic groups. This is used to determine whether it's appropriate
+    to use a mirror-image check in RMS deduplication.
+
+    Parameters
+    ----------
+    offmol : An openforcefield.topology.Molecule object
+        A molecule with one or more conformers
+
+    Returns
+    -------
+    has_stereocenters : boolean
+        True if the molecule has a stereogenic atom or bond, False otherwise.
+
+    """
+    for atom in offmol.atoms:
+        if atom.stereochemistry is not None:
+            return True
+
+    for bond in offmol.bonds:
+        if bond.stereochemistry is not None:
+            return True
+
+    return False
+
 def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
     """
     Parameters
@@ -42,7 +69,7 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
         The RMSD cutoff (in angstroms) to apply during deduplication
     user_confs : iterable of integer
         The indices of existing molecule conformers which should never be removed.
-        
+
     Returns
     -------
     confs_to_delete : set of int
@@ -51,18 +78,47 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
     """
     # Try to pull the rms matrix out of the cache. Calculate it if it doesn't yet exist
     mol_hash = hash(str(offmol.to_dict()))
-    #print('a', rms_cutoff)
+
+    # Determine whether the molecule has stereocenters (if not, include mirror image confs in RMS deduplication)
+    consider_reflections = not(mol_has_stereocenters(offmol))
+
     if mol_hash not in RMS_MATRIX_CACHE:
         rdmol = offmol.to_rdkit()
         rdmol = Chem.RemoveHs(rdmol)
+        # If we're going to be testing against reflections of the current conformer, add a new molecule,
+        # with a mirror image of each original conformer (x coordinate flipped)
+        if consider_reflections:
+            mirror_rdmol = Chem.Mol(rdmol)
+            mirror_rdmol.RemoveAllConformers()
+            for conformer_idx in range(rdmol.GetNumConformers()):
+                conformer = rdmol.GetConformer(conformer_idx)
+                mirror_conformer = Chem.Conformer(conformer)
+                for atom_idx in range(mirror_conformer.GetNumAtoms()):
+                    coord = conformer.GetAtomPosition(atom_idx)
+                    coord.x = coord.x * -1
+                    mirror_conformer.SetAtomPosition(atom_idx, coord)
+                mirror_rdmol.AddConformer(mirror_conformer)
+
+        # Calculate the RMSD of each conformer to all conformers after it
         rms_matrix = np.zeros((rdmol.GetNumConformers(), rdmol.GetNumConformers()))
         for i in range(rdmol.GetNumConformers()):
             for j in range(i+1, rdmol.GetNumConformers()):
-                #print(i,j)
                 rmsd = Chem.rdMolAlign.GetBestRMS(rdmol,
-                                               rdmol,
-                                               prbId=j,
-                                               refId=i)
+                                                  rdmol,
+                                                  prbId=j,
+                                                  refId=i,
+                                                  )
+                # If we're also testing against mirror-image conformers, also test against the
+                # equivalent conformer in our mirror molecule
+                if consider_reflections:
+                    mirror_rmsd = Chem.rdMolAlign.GetBestRMS(mirror_rdmol,
+                                                             rdmol,
+                                                             prbId=j,
+                                                             refId=i,
+                                                             )
+                    # Store the lower RMSD
+                    rmsd = min(rmsd, mirror_rmsd)
+
                 rms_matrix[i,j] = rmsd
                 rms_matrix[j,i] = rmsd
         RMS_MATRIX_CACHE[mol_hash] = rms_matrix
