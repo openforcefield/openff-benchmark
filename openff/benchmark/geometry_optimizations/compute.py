@@ -33,28 +33,6 @@ class OptimizationExecutor:
                 conformer=mol.properties['conformer_index'])
         return id
 
-    def _connectivity_rearranged(self, offmol):
-        """
-        Compare the connectivity implied by the molecule's geometry to that in its connectivity table.
-
-        Returns True if the molecule's connectivity appears to have been rearranged.
-
-        The method is taken from Josh Horton's work in QCSubmit
-        https://github.com/openforcefield/openff-qcsubmit/blob/ce2df12d60ec01893e77cbccc50be9f0944a65db/openff/qcsubmit/results.py#L769
-        """
-        import qcelemental
-        qmol = offmol.to_qcschema()
-        guessed_connectivity = qcelemental.molutil.guess_connectivity(qmol.symbols, qmol.geometry)
-
-        if len(offmol.bonds) != len(guessed_connectivity):
-            return True
-
-        for bond in offmol.bonds:
-            b_tup = tuple([bond.atom1_index, bond.atom2_index])
-            if b_tup not in guessed_connectivity and reversed(tuple(b_tup)) not in guessed_connectivity:
-                return True
-        return False
-
     def submit_molecules(self, fractal_uri, input_paths, season,
             dataset_name, recursive=False):
         """Submit SDF molecules from given directory to the target QCFractal server.
@@ -200,9 +178,6 @@ class OptimizationExecutor:
                                                   optentspec.qc_spec.basis,
                                                   optentspec.qc_spec.program,
                                                   opt.energies)
-
-                    if self._connectivity_rearranged(mol):
-                        raise Exception("Connectivity rearrangement (usually proton transfer) detected.")
 
                     optd = self._get_complete_optimization_result(opt, client)
 
@@ -603,6 +578,30 @@ class OptimizationExecutor:
         return final_molecule
 
     @staticmethod
+    def _connectivity_rearranged(self, offmol):
+        """
+        Compare the connectivity implied by the molecule's geometry to that in its connectivity table.
+
+        Returns True if the molecule's connectivity appears to have been rearranged.
+
+        The method is taken from Josh Horton's work in QCSubmit
+        https://github.com/openforcefield/openff-qcsubmit/blob/ce2df12d60ec01893e77cbccc50be9f0944a65db/openff/qcsubmit/results.py#L769
+        """
+        import qcelemental
+        qmol = offmol.to_qcschema()
+        guessed_connectivity = qcelemental.molutil.guess_connectivity(qmol.symbols, qmol.geometry)
+
+        if len(offmol.bonds) != len(guessed_connectivity):
+            return True
+
+        for bond in offmol.bonds:
+            b_tup = tuple([bond.atom1_index, bond.atom2_index])
+            if b_tup not in guessed_connectivity and reversed(tuple(b_tup)) not in guessed_connectivity:
+                return True
+        return False
+
+
+    @staticmethod
     def _process_final_mol(output_id, offmol, qcmol, method, basis, program, energies):
         from openforcefield.topology.molecule import unit
         import numpy as np
@@ -615,7 +614,10 @@ class OptimizationExecutor:
                 np.array(qcmol.geometry, np.float), unit.bohr
             )
         offmol._add_conformer(geometry.in_units_of(unit.angstrom))
-    
+
+        if OptimizationExecutor._connectivity_rearranged(offmol):
+            raise Exception("Connectivity rearrangement (usually proton transfer) detected.")
+
         # set molecule metadata
         offmol.name = output_id
     
