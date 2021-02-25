@@ -43,7 +43,7 @@ class OptimizationExecutor:
         https://github.com/openforcefield/openff-qcsubmit/blob/ce2df12d60ec01893e77cbccc50be9f0944a65db/openff/qcsubmit/results.py#L769
         """
         import qcelemental
-        qcmol = offmol.to_qcschema()
+        qmol = offmol.to_qcschema()
         guessed_connectivity = qcelemental.molutil.guess_connectivity(qmol.symbols, qmol.geometry)
 
         if len(offmol.bonds) != len(guessed_connectivity):
