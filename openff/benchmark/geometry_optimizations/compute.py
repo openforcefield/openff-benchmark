@@ -578,7 +578,7 @@ class OptimizationExecutor:
         return final_molecule
 
     @staticmethod
-    def _connectivity_rearranged(self, offmol):
+    def _connectivity_rearranged(offmol):
         """
         Compare the connectivity implied by the molecule's geometry to that in its connectivity table.
 
