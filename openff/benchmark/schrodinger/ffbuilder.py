@@ -9,6 +9,7 @@ import os
 import shutil
 import logging
 import subprocess
+import warnings
 from collections import defaultdict
 
 # DO NOT USE; MESSES UP LOGGING 
@@ -40,19 +41,57 @@ def ffbuilder(input_paths, schrodinger_path, host_settings, opls_dir, recursive,
     mols = mols_from_paths(input_paths, recursive=recursive)
     
     os.makedirs(output_path, exist_ok=True)
-    os.makedirs(f'{output_path}/1-ffbuilder', exist_ok=True)
+    os.makedirs(f'{output_path}', exist_ok=True)
     
-    with open(f'{output_path}/1-ffbuilder/ffb_input.sdf', 'w') as file:
+    if os.path.exists(os.path.join(output_path, 'ffb_openff_benchmark.zip')):
+        warnings.warn(f'Schrodinger ffbuilder has been run already. '\
+                      f'Merging parameters and moving files to backup.')
+        ffb_merge(schrodinger_path, opls_dir, output_path)
+        ffb_backup(output_path)
+
+    with open(f'{output_path}/ffb_input.sdf', 'w') as file:
         for mol in mols:
             if mol.name.endswith('00'):
                 mol.to_file(file, 'SDF')
 
     command = [os.path.join(schrodinger_path, 'ffbuilder'),
                '-JOBNAME', 'ffb_openff_benchmark',
-               os.path.join(output_path, '1-ffbuilder', 'ffb_input.sdf'),
+               'ffb_input.sdf',
                '-fit_advanced',
                '-OPLSDIR', opls_dir,
                '-HOST', host_settings,
                '-TMPLAUNCHDIR'
     ]
+    subprocess.run(command, cwd=output_path)
+
+
+
+def ffb_merge(schrodinger_path, opls_dir, input_path):
+    command = [os.path.join(schrodinger_path, 'run'),
+               '-FROM',
+               'ffld',
+               'merge_opls_data.py',
+               os.path.join(input_path, 'ffb_openff_benchmark_oplsdir'),
+               '-o',
+               opls_dir
+               ]
     subprocess.run(command)
+
+
+
+def ffb_backup(output_path):
+    os.makedirs(f'{output_path}', exist_ok=True)
+    backup_base = 'ffb_openff_benchmark.bk'
+    backup_dir = backup_base
+    num = 1
+    while os.path.exists(os.path.join(output_path, backup_dir)):
+        backup_dir = f'{backup_base}.{num}'
+        num += 1
+    backup_path = os.path.join(f'{output_path}', backup_dir)
+    os.makedirs(backup_path)
+    for obj in ['ffb_openff_benchmark_oplsdir',
+                'ffb_input.sdf',
+                'ffb_openff_benchmark.log',
+                'ffb_openff_benchmark.zip']:
+        obj_path = os.path.join(f'{output_path}', obj)
+        shutil.move(obj_path, backup_path)

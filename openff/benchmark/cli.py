@@ -500,7 +500,7 @@ def schrodinger():
 @click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
 @click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If it is not given, NO custom parameters will be used.")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
-@click.option('-o', '--output-path', default='7-schrodinger', help="Path where output files are written to.")
+@click.option('-o', '--output-path', default='7-schrodinger_ffb', help="Path where output files are written to.")
 @click.argument('input-path', nargs=-1)
 def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, output_path):
     """Build OPLS3e force field parameters using molecules from INPUT_PATH.
@@ -535,6 +535,32 @@ def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive,
         recursive=recursive,
         output_path=output_path)
 
+@schrodinger.command()
+@click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If it is not given, NO custom parameters will be used.")
+@click.option('-i', '--input-path', default='7-schrodinger_ffb', help="Path where ffbuilder was run")
+def ffmerge(schrodinger_path, opls_dir, input_path):
+    """Merge Built OPLS3e force field parameters into custom parameter path.
+
+    The input directory has to be the directory, where output of ffbuilder was written to.
+    """
+    from .schrodinger import ffbuilder
+
+    if schrodinger_path is None:
+        schrodinger_path = os.getenv('SCHRODINGER')
+    if not os.path.isdir(schrodinger_path):
+        raise ValueError("A valid SCHRODINGER path is not given.")
+    if opls_dir is None:
+        warnings.warn("The specified OPLS custom parameter path is not given. A default path is used.")
+        opls_dir = os.path.join(os.getenv('HOME'), '.schrodinger', 'opls_dir')
+    if not os.path.isdir(opls_dir):
+        raise ValueError("The specified OPLS custom parameter path is not found. Exiting.")
+
+    ffbuilder.ffb_merge(
+        schrodinger_path=schrodinger_path, 
+        opls_dir=opls_dir, 
+        input_path=input_path)
+
 
 @schrodinger.command()
 @click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
@@ -542,7 +568,7 @@ def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive,
 @click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
 @click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If not specified, NO custom parameters will be used.")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
-@click.option('-o', '--output-path', default='7-schrodinger', help="Path where output files are written to.")
+@click.option('-o', '--output-path', default='8-schrodinger_mm/9-schrodinger_mm_custom', help="Path where output files are written to. Defaults to 8-schrodinger_mm or 9-schrodinger_mm_custom, depending on whether opls-dir is set or not.")
 @click.argument('input-path', nargs=-1)
 def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, output_path):
     """Starts optimizations of molecules from INPUT_PATH with Schrodinger macromodel.
