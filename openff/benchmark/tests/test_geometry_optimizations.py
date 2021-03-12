@@ -166,7 +166,7 @@ def test_cli_optimize_export_qm(fractal_compute_server, tmpdir, ethane_preproces
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
 
 
 def test_cli_optimize_export_mm(fractal_compute_server, tmpdir, ethane_qm_optimized):
@@ -191,7 +191,7 @@ def test_cli_optimize_export_mm(fractal_compute_server, tmpdir, ethane_qm_optimi
 
         for season in SEASONS["1:2"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
 
 
 def test_cli_optimize_status(fractal_compute_server, tmpdir, ethane_preprocessed):

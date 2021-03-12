@@ -15,7 +15,6 @@ from collections import defaultdict
 #logging.disable(logging.WARNING) 
 
 from qcportal import FractalClient
-from openforcefield.topology import Molecule
 from .seasons import SEASONS
 from ..utils.io import mols_from_paths
 
@@ -135,7 +134,7 @@ class OptimizationExecutor:
         specs = optds.list_specifications().index.tolist()
         for spec in specs:
             print("Exporting spec: '{}'".format(spec))
-            os.makedirs(os.path.join(output_directory, spec, 'error_dir'), exist_ok=True)
+            os.makedirs(os.path.join(output_directory, spec, 'error_mols'), exist_ok=True)
             optentspec = optds.get_specification(spec)
     
             records = optds.data.dict()['records']
@@ -164,7 +163,6 @@ class OptimizationExecutor:
                     print("... '{}' : skipping SDF exists".format(id))
                     continue
 
-                mol = Molecule()
                 print("... '{}' : exporting COMPLETE".format(id))
                 try:
                     mol = self._mol_from_qcserver(records[id.lower()])
@@ -181,45 +179,32 @@ class OptimizationExecutor:
 
                     optd = self._get_complete_optimization_result(opt, client)
 
-                    # writeout file results
-                    mol.to_file("{}.sdf".format(outfile), file_format='sdf')
 
-                    with open("{}.json".format(outfile), 'w') as f:
-                        json.dump(optd, f)
+                    perfd = {'walltime': opt.provenance.wall_time,
+                             'completed': opt.modified_on.isoformat()}
 
-                    with open("{}.perf.json".format(outfile), 'w') as f:
-                        json.dump({'walltime': opt.provenance.wall_time,
-                                   'completed': opt.modified_on.isoformat()}, f)
+
+                    self._execute_output_results(output_id,
+                                                 optd,
+                                                 mol,
+                                                 outfile,
+                                                 True,
+                                                 perfd)
+
                 except Exception as e:
-                    print("... '{}' : Export error".format(id))
+                    print("... '{}' : export error".format(id))
 
                     error_outfile = "{}".format(
                         os.path.join(output_directory, spec, 'error_mols', output_id))
                     # If the molecule really is corrupted, one of the following steps may fail,
                     # so run each inside a try: block
-                    try:
-                        with open("{}.txt".format(error_outfile), 'w') as f:
-                            f.write(str(e))
-                    except:
-                        pass
 
-                    # writeout file results
-                    try:
-                        mol.to_file("{}.sdf".format(error_outfile), file_format='sdf')
-                    except:
-                        pass
-                    try:
-                        with open("{}.json".format(error_outfile), 'w') as f:
-                            json.dump(optd, f)
-                    except:
-                        pass
-                    try:
-                        with open("{}.perf.json".format(error_outfile), 'w') as f:
-                            json.dump({'walltime': opt.provenance.wall_time,
-                                       'completed': opt.modified_on.isoformat()}, f)
-                    except:
-                        pass
-
+                    self._execute_output_results(output_id,
+                                                 optd,
+                                                 mol,
+                                                 error_outfile,
+                                                 True,
+                                                 perfd)
 
     def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
@@ -491,24 +476,48 @@ class OptimizationExecutor:
                                                 geometric_qccnv=geometric_qccnv)
 
                 end_dt = datetime.utcnow()
+                perfd = {'start': start_dt.isoformat(), 'end': end_dt.isoformat()}
+
                 if output_directory is not None:
                     if result.success:
-                        # process final molecule
                         final_molecule = self._process_optimization_result(output_id, result)
-                        final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
                     else:
-                        print("Optimization failed for '{}'; check JSON results output".format(output_id))
+                        final_molecule = None
 
-                    with open("{}.json".format(outfile), 'w') as f:
-                        f.write(result.json())
-
-                    with open("{}.perf.json".format(outfile), 'w') as f:
-                        json.dump({'start': start_dt.isoformat(), 'end': end_dt.isoformat()}, f)
-
+                    self._execute_output_results(output_id,
+                                                 result,
+                                                 final_molecule,
+                                                 outfile,
+                                                 result.success,
+                                                 perfd)
 
                 results.append(result)
 
         return results
+
+    @staticmethod
+    def _execute_output_results(output_id, result, final_mol, outfile, success, perfd):
+        import json
+        if success:
+            try:
+                final_mol.to_file("{}.sdf".format(outfile), file_format='sdf')
+            except:
+                print("Failed to write out SDF for '{}'".format(output_id))
+        else:
+            print("Optimization failed for '{}'; check JSON results output".format(output_id))
+
+        try:
+            with open("{}.json".format(outfile), 'w') as f:
+                f.write(result.json())
+        except:
+                print("Failed to write result JSON for '{}'".format(output_id))
+
+        try:
+            with open("{}.perf.json".format(outfile), 'w') as f:
+                json.dump(perfd, f)
+        except:
+                print("Failed to write performance JSON for '{}'".format(output_id))
+
 
     @staticmethod
     def _args_from_optimizationrecord(opt, client):
@@ -599,7 +608,6 @@ class OptimizationExecutor:
             if b_tup not in guessed_connectivity and reversed(tuple(b_tup)) not in guessed_connectivity:
                 return True
         return False
-
 
     @staticmethod
     def _process_final_mol(output_id, offmol, qcmol, method, basis, program, energies):
@@ -735,18 +743,19 @@ class OptimizationExecutor:
                                                 geometric_qccnv=geometric_qccnv)
 
                 end_dt = datetime.utcnow()
+                perfd = {'start': start_dt.isoformat(), 'end': end_dt.isoformat()}
+
                 if result.success:
-                    # process final molecule
                     final_molecule = self._process_optimization_result(output_id, result)
-                    final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
                 else:
-                    print("Optimization failed for '{}'; check JSON results output".format(output_id))
+                    final_molecule = None
 
-                with open("{}.json".format(outfile), 'w') as f:
-                    f.write(result.json())
-
-                with open("{}.perf.json".format(outfile), 'w') as f:
-                    json.dump({'start': start_dt.isoformat(), 'end': end_dt.isoformat()}, f)
+                self._execute_output_results(output_id,
+                                             result,
+                                             final_molecule,
+                                             outfile,
+                                             result.success,
+                                             perfd)
 
                 results.append(result)
 
