@@ -164,6 +164,10 @@ class OptimizationExecutor:
                     continue
 
                 print("... '{}' : exporting COMPLETE".format(id))
+                optd = self._get_complete_optimization_result(opt, client)
+                perfd = {'walltime': opt.provenance.wall_time,
+                         'completed': opt.modified_on.isoformat()}
+
                 try:
                     offmol = self._mol_from_qcserver(records[id.lower()])
 
@@ -177,15 +181,9 @@ class OptimizationExecutor:
                                                              optentspec.qc_spec.program,
                                                              opt.energies)
 
-                    optd = self._get_complete_optimization_result(opt, client)
-
-
-                    perfd = {'walltime': opt.provenance.wall_time,
-                             'completed': opt.modified_on.isoformat()}
-
 
                     self._execute_output_results(output_id=output_id,
-                                                 optd=optd,
+                                                 result=optd,
                                                  final_molecule=final_molecule,
                                                  outfile=outfile,
                                                  success=True,

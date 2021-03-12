@@ -77,7 +77,7 @@ def acetic_acid_optimized_proton_transfer():
     BBB
 
     >  <molecule_index>  (1)
-    00000
+    00001
 
     >  <conformer_index>  (1)
     00
@@ -116,6 +116,33 @@ def test_cli_optimize_submit_molecules_qm(fractal_compute_server, tmpdir, ethane
         assert "COMPLETE" in response.output
 
 
+def test_cli_optimize_execute_from_server_qm(fractal_compute_server, tmpdir, ethane_preprocessed):
+    """Test execution of QM with QCEngine pulling from the server via the CLI.
+
+    """
+
+    # need to submit first; should be quick if already there
+    test_cli_optimize_submit_molecules_qm(fractal_compute_server, tmpdir, ethane_preprocessed)
+
+    fc = FractalClient(fractal_compute_server)
+
+    with tmpdir.as_cwd():
+        outdir = '4-compute-qm'
+        response = runner.invoke(cli, ['optimize', 'execute-from-server',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - QM"',
+                                       '-o', outdir,
+                                       'OFF-00000-00'])
+
+        if response.exception:
+            print(response.exception)
+
+        assert response.exit_code == 0
+        for season in SEASONS["1:1"]:
+            exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+
+
 def test_cli_optimize_submit_molecules_mm(fractal_compute_server, tmpdir, ethane_qm_optimized):
     """Test submission of QM to a Fractal server via the CLI.
 
@@ -144,6 +171,33 @@ def test_cli_optimize_submit_molecules_mm(fractal_compute_server, tmpdir, ethane
         assert "COMPLETE" in response.output
 
 
+def test_cli_optimize_execute_from_server_mm(fractal_compute_server, tmpdir, ethane_qm_optimized):
+    """Test execution of MM with QCEngine pulling from the server via the CLI.
+
+    """
+
+    # need to submit first; should be quick if already there
+    test_cli_optimize_submit_molecules_mm(fractal_compute_server, tmpdir, ethane_qm_optimized)
+
+    fc = FractalClient(fractal_compute_server)
+
+    with tmpdir.as_cwd():
+        outdir = '4-compute-mm'
+        response = runner.invoke(cli, ['optimize', 'execute-from-server',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - MM"',
+                                       '-o', outdir,
+                                       'OFF-00000-00'])
+
+        if response.exception:
+            print(response.exception)
+
+        assert response.exit_code == 0
+        for season in SEASONS["1:2"]:
+            exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+
+
 def test_cli_optimize_export_qm(fractal_compute_server, tmpdir, ethane_preprocessed):
     """Test export of molecule QM data from a Fractal server via the CLI.
 
@@ -167,6 +221,83 @@ def test_cli_optimize_export_qm(fractal_compute_server, tmpdir, ethane_preproces
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
             assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+
+
+def test_cli_optimize_export_qm_proton_transfer(fractal_compute_server, tmpdir, acetic_acid_optimized_proton_transfer):
+    """Test export failure of molecule QM data from a Fractal server via the CLI.
+
+    """
+
+
+    fc = FractalClient(fractal_compute_server)
+
+    with tmpdir.as_cwd():
+
+        response = runner.invoke(cli, ['optimize', 'submit-molecules',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - QM - proton transfer"',
+                                       '--season', '1:1',
+                                       acetic_acid_optimized_proton_transfer])
+
+        assert response.exit_code == 0
+        assert "Submitted!" in response.output
+    
+        # wait for results
+        fractal_compute_server.await_results()
+
+        response = runner.invoke(cli, ['optimize', 'status',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - QM - proton transfer"'])
+
+        assert response.exit_code == 0
+        assert "COMPLETE" in response.output
+
+        outdir = '4-compute-qm'
+        response = runner.invoke(cli, ['optimize', 'export',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - QM - proton transfer"',
+                                       '-o', outdir])
+        if response.exception:
+            print(response.exception)
+
+        assert response.exit_code == 0
+        assert "... 'OFF-00001-00' : exporting COMPLETE" in response.output
+        assert "... 'OFF-00001-00' : export error" in response.output
+
+        for season in SEASONS["1:1"]:
+            exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
+            assert set(exported_files) == set(['error_mols'])
+            exported_error_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season, 'error_mols'))
+            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json", "perf.json"])
+
+
+def test_cli_optimize_execute_from_server_qm_proton_transfer(fractal_compute_server, tmpdir, acetic_acid_optimized_proton_transfer):
+    """Test execution of QM with QCEngine pulling from the server via the CLI.
+
+    """
+
+    # need to submit first; should be quick if already there
+    test_cli_optimize_export_qm_proton_transfer(fractal_compute_server, tmpdir, acetic_acid_optimized_proton_transfer)
+
+    fc = FractalClient(fractal_compute_server)
+
+    with tmpdir.as_cwd():
+        outdir = '4-compute-qm-ex'
+        response = runner.invoke(cli, ['optimize', 'execute-from-server',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - QM - proton transfer"',
+                                       '-o', outdir,
+                                       'OFF-00001-00'])
+
+        if response.exception:
+            print(response.exception)
+
+        assert response.exit_code == 0
+        for season in SEASONS["1:1"]:
+            exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
+            assert set(exported_files) == set(['error_mols'])
+            exported_error_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season, 'error_mols'))
+            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json", "perf.json"])
 
 
 def test_cli_optimize_export_mm(fractal_compute_server, tmpdir, ethane_qm_optimized):
@@ -238,7 +369,7 @@ def test_cli_optimize_execute_qm(tmpdir, ethane_preprocessed):
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
 
 
 def test_cli_optimize_execute_qm_proton_transfer(tmpdir, acetic_acid_optimized_proton_transfer):
@@ -263,7 +394,8 @@ def test_cli_optimize_execute_qm_proton_transfer(tmpdir, acetic_acid_optimized_p
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
             assert set(exported_files) == set(['error_mols'])
             exported_error_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season, 'error_mols'))
-            assert set(exported_error_files) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json", "perf.json"])
+            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json", "perf.json"])
+
 
 def test_cli_optimize_execute_mm(tmpdir, ethane_qm_optimized):
     """Test execution of MM via QCEngine via the CLI.
@@ -284,7 +416,7 @@ def test_cli_optimize_execute_mm(tmpdir, ethane_qm_optimized):
 
         for season in SEASONS["1:2"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
 
 
 class TestOptimizationExecutor:
