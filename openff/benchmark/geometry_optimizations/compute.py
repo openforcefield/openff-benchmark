@@ -165,17 +165,17 @@ class OptimizationExecutor:
 
                 print("... '{}' : exporting COMPLETE".format(id))
                 try:
-                    mol = self._mol_from_qcserver(records[id.lower()])
+                    offmol = self._mol_from_qcserver(records[id.lower()])
 
                     # set conformer as final, optimized geometry
                     final_qcmol = opt.get_final_molecule()
-                    mol = self._process_final_mol(output_id,
-                                                  mol,
-                                                  final_qcmol,
-                                                  optentspec.qc_spec.method,
-                                                  optentspec.qc_spec.basis,
-                                                  optentspec.qc_spec.program,
-                                                  opt.energies)
+                    final_molecule = self._process_final_mol(output_id,
+                                                             offmol,
+                                                             final_qcmol,
+                                                             optentspec.qc_spec.method,
+                                                             optentspec.qc_spec.basis,
+                                                             optentspec.qc_spec.program,
+                                                             opt.energies)
 
                     optd = self._get_complete_optimization_result(opt, client)
 
@@ -184,27 +184,32 @@ class OptimizationExecutor:
                              'completed': opt.modified_on.isoformat()}
 
 
-                    self._execute_output_results(output_id,
-                                                 optd,
-                                                 mol,
-                                                 outfile,
-                                                 True,
-                                                 perfd)
+                    self._execute_output_results(output_id=output_id,
+                                                 optd=optd,
+                                                 final_molecule=final_molecule,
+                                                 outfile=outfile,
+                                                 success=True,
+                                                 perfd=perfd)
 
                 except Exception as e:
                     print("... '{}' : export error".format(id))
+                    final_molecule = None
 
                     error_outfile = "{}".format(
                         os.path.join(output_directory, spec, 'error_mols', output_id))
-                    # If the molecule really is corrupted, one of the following steps may fail,
-                    # so run each inside a try: block
 
-                    self._execute_output_results(output_id,
-                                                 optd,
-                                                 mol,
-                                                 error_outfile,
-                                                 True,
-                                                 perfd)
+                    try:
+                        with open("{}.txt".format(error_outfile), 'w') as f:
+                            f.write(str(e))
+                    except:
+                        pass
+
+                    self._execute_output_results(output_id=output_id,
+                                                 result=optd,
+                                                 final_molecule=final_molecule,
+                                                 outfile=error_outfile,
+                                                 success=False,
+                                                 perfd=perfd)
 
     def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
@@ -446,7 +451,7 @@ class OptimizationExecutor:
         for spec_name in df:
 
             if output_directory is not None:
-                os.makedirs(os.path.join(output_directory, spec_name), exist_ok=True)
+                os.makedirs(os.path.join(output_directory, spec_name, 'error_mols'), exist_ok=True)
 
             print("Processing spec: '{}'".format(spec_name))
             for id, opt in df[spec_name].iteritems():
@@ -480,27 +485,56 @@ class OptimizationExecutor:
 
                 if output_directory is not None:
                     if result.success:
-                        final_molecule = self._process_optimization_result(output_id, result)
-                    else:
-                        final_molecule = None
+                        try:
+                            final_molecule = self._process_optimization_result(output_id, result)
+                            self._execute_output_results(output_id=output_id,
+                                                         result=result,
+                                                         final_molecule=final_molecule,
+                                                         outfile=outfile,
+                                                         success=True,
+                                                         perfd=perfd)
+                        except Exception as e:
+                            print("... '{}' : export error".format(id))
+                            final_molecule = None
 
-                    self._execute_output_results(output_id,
-                                                 result,
-                                                 final_molecule,
-                                                 outfile,
-                                                 result.success,
-                                                 perfd)
+                            error_outfile = "{}".format(
+                                os.path.join(output_directory, spec_name, 'error_mols', output_id))
+
+                            try:
+                                with open("{}.txt".format(error_outfile), 'w') as f:
+                                    f.write(str(e))
+                            except:
+                                pass
+
+                            self._execute_output_results(output_id=output_id,
+                                                         result=result,
+                                                         final_molecule=final_molecule,
+                                                         outfile=error_outfile,
+                                                         success=False,
+                                                         perfd=perfd)
+                    else:
+                        print("... '{}' : compute failed".format(id))
+                        final_molecule = None
+                        error_outfile = "{}".format(
+                            os.path.join(output_directory, spec_name, 'error_mols', output_id))
+
+                        self._execute_output_results(output_id=output_id,
+                                                     result=result,
+                                                     final_molecule=final_molecule,
+                                                     outfile=error_outfile,
+                                                     success=False,
+                                                     perfd=perfd)
 
                 results.append(result)
 
         return results
 
     @staticmethod
-    def _execute_output_results(output_id, result, final_mol, outfile, success, perfd):
+    def _execute_output_results(output_id, result, final_molecule, outfile, success, perfd):
         import json
         if success:
             try:
-                final_mol.to_file("{}.sdf".format(outfile), file_format='sdf')
+                final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
             except:
                 print("Failed to write out SDF for '{}'".format(output_id))
         else:
@@ -714,7 +748,7 @@ class OptimizationExecutor:
         for spec_name, compute_spec in SEASONS[season].items():
             print("Processing spec: '{}'".format(spec_name))
 
-            os.makedirs(os.path.join(output_directory, spec_name), exist_ok=True)
+            os.makedirs(os.path.join(output_directory, spec_name, 'error_mols'), exist_ok=True)
 
             for mol in mols:
                 id = self._mol_to_id(mol)
@@ -746,16 +780,46 @@ class OptimizationExecutor:
                 perfd = {'start': start_dt.isoformat(), 'end': end_dt.isoformat()}
 
                 if result.success:
-                    final_molecule = self._process_optimization_result(output_id, result)
-                else:
-                    final_molecule = None
+                    try:
+                        final_molecule = self._process_optimization_result(output_id, result)
+                        self._execute_output_results(output_id=output_id,
+                                                     result=result,
+                                                     final_molecule=final_molecule,
+                                                     outfile=outfile,
+                                                     success=True,
+                                                     perfd=perfd)
+                    except Exception as e:
+                        print("... '{}' : export error".format(id))
+                        final_molecule = None
 
-                self._execute_output_results(output_id,
-                                             result,
-                                             final_molecule,
-                                             outfile,
-                                             result.success,
-                                             perfd)
+                        error_outfile = "{}".format(
+                            os.path.join(output_directory, spec_name, 'error_mols', output_id))
+
+                        try:
+                            with open("{}.txt".format(error_outfile), 'w') as f:
+                                f.write(str(e))
+                        except:
+                            pass
+
+                        self._execute_output_results(output_id=output_id,
+                                                     result=result,
+                                                     final_molecule=final_molecule,
+                                                     outfile=error_outfile,
+                                                     success=False,
+                                                     perfd=perfd)
+                else:
+                    print("... '{}' : compute failed".format(id))
+                    final_molecule = None
+                    error_outfile = "{}".format(
+                        os.path.join(output_directory, spec_name, 'error_mols', output_id))
+
+                    self._execute_output_results(output_id=output_id,
+                                                 result=result,
+                                                 final_molecule=final_molecule,
+                                                 outfile=error_outfile,
+                                                 success=False,
+                                                 perfd=perfd)
+
 
                 results.append(result)
 
