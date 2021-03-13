@@ -217,6 +217,7 @@ def test_cli_optimize_export_qm(fractal_compute_server, tmpdir, ethane_preproces
 
         assert response.exit_code == 0
         assert "exporting COMPLETE" in response.output
+        assert "Failed to write" not in response.output
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
@@ -251,6 +252,7 @@ def test_cli_optimize_export_qm_proton_transfer(fractal_compute_server, tmpdir, 
 
         assert response.exit_code == 0
         assert "COMPLETE" in response.output
+        assert "Failed to write" not in response.output
 
         outdir = '4-compute-qm'
         response = runner.invoke(cli, ['optimize', 'export',
@@ -292,6 +294,8 @@ def test_cli_optimize_execute_from_server_qm_proton_transfer(fractal_compute_ser
         if response.exception:
             print(response.exception)
 
+        assert "Failed to write" not in response.output
+
         assert response.exit_code == 0
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
@@ -319,6 +323,7 @@ def test_cli_optimize_export_mm(fractal_compute_server, tmpdir, ethane_qm_optimi
 
         assert response.exit_code == 0
         assert "exporting COMPLETE" in response.output
+        assert "Failed to write" not in response.output
 
         for season in SEASONS["1:2"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
@@ -366,6 +371,7 @@ def test_cli_optimize_execute_qm(tmpdir, ethane_preprocessed):
 
         assert response.exit_code == 0
         assert "... 'OFF-00000-00'" in response.output
+        assert "Failed to write" not in response.output
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
@@ -389,6 +395,7 @@ def test_cli_optimize_execute_qm_proton_transfer(tmpdir, acetic_acid_optimized_p
         assert response.exit_code == 0
         assert "... 'OFF-00001-00'" in response.output
         assert "... 'OFF-00001-00' : export error" in response.output
+        assert "Failed to write" not in response.output
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
@@ -413,6 +420,7 @@ def test_cli_optimize_execute_mm(tmpdir, ethane_qm_optimized):
 
         assert response.exit_code == 0
         assert "... 'OFF-00000-00'" in response.output
+        assert "Failed to write" not in response.output
 
         for season in SEASONS["1:2"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))

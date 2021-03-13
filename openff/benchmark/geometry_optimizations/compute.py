@@ -142,10 +142,9 @@ class OptimizationExecutor:
             for id, opt in optds.df[spec].iteritems():
     
                 # skip incomplete cases
-                if opt.status != 'COMPLETE':
+                if opt.final_molecule is None:
                     print("... '{}' : skipping INCOMPLETE".format(id))
                     continue
-
     
                 # fix to ensure output fidelity of ids; losing 02 padding on conformer
                 org, molecule, conformer = id.split('-')
@@ -165,6 +164,8 @@ class OptimizationExecutor:
 
                 print("... '{}' : exporting COMPLETE".format(id))
                 optd = self._get_complete_optimization_result(opt, client)
+                optdjson = json.dumps(optd)
+
                 perfd = {'walltime': opt.provenance.wall_time,
                          'completed': opt.modified_on.isoformat()}
 
@@ -183,7 +184,7 @@ class OptimizationExecutor:
 
 
                     self._execute_output_results(output_id=output_id,
-                                                 result=optd,
+                                                 resultjson=optdjson,
                                                  final_molecule=final_molecule,
                                                  outfile=outfile,
                                                  success=True,
@@ -203,7 +204,7 @@ class OptimizationExecutor:
                         pass
 
                     self._execute_output_results(output_id=output_id,
-                                                 result=optd,
+                                                 resultjson=optdjson,
                                                  final_molecule=final_molecule,
                                                  outfile=error_outfile,
                                                  success=False,
@@ -486,7 +487,7 @@ class OptimizationExecutor:
                         try:
                             final_molecule = self._process_optimization_result(output_id, result)
                             self._execute_output_results(output_id=output_id,
-                                                         result=result,
+                                                         resultjson=result.json(),
                                                          final_molecule=final_molecule,
                                                          outfile=outfile,
                                                          success=True,
@@ -505,7 +506,7 @@ class OptimizationExecutor:
                                 pass
 
                             self._execute_output_results(output_id=output_id,
-                                                         result=result,
+                                                         resultjson=result.json(),
                                                          final_molecule=final_molecule,
                                                          outfile=error_outfile,
                                                          success=False,
@@ -528,7 +529,7 @@ class OptimizationExecutor:
         return results
 
     @staticmethod
-    def _execute_output_results(output_id, result, final_molecule, outfile, success, perfd):
+    def _execute_output_results(output_id, resultjson, final_molecule, outfile, success, perfd):
         import json
         if success:
             try:
@@ -540,7 +541,7 @@ class OptimizationExecutor:
 
         try:
             with open("{}.json".format(outfile), 'w') as f:
-                f.write(result.json())
+                f.write(resultjson)
         except:
                 print("Failed to write result JSON for '{}'".format(output_id))
 
@@ -781,7 +782,7 @@ class OptimizationExecutor:
                     try:
                         final_molecule = self._process_optimization_result(output_id, result)
                         self._execute_output_results(output_id=output_id,
-                                                     result=result,
+                                                     resultjson=result.json(),
                                                      final_molecule=final_molecule,
                                                      outfile=outfile,
                                                      success=True,
@@ -800,7 +801,7 @@ class OptimizationExecutor:
                             pass
 
                         self._execute_output_results(output_id=output_id,
-                                                     result=result,
+                                                     resultjson=result.json(),
                                                      final_molecule=final_molecule,
                                                      outfile=error_outfile,
                                                      success=False,
