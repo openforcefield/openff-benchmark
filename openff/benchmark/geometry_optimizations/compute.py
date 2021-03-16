@@ -702,6 +702,14 @@ class OptimizationExecutor:
         if isinstance(mol.properties.get('atom_map'), str):
             mol.properties['atom_map'] = ast.literal_eval(mol.properties['atom_map'])
 
+        # This block will fail for OFF Toolkit 0.8.4, but succeed for 0.8.3rc1
+        try:
+            attributes = factory.create_cmiles_metadata(mol)
+            qcmol = mol.to_qcschema(extras=attributes)
+        # In OFFTK 0.8.4, the CMILES field is automatically populated by this method
+        except:
+            qcmol = mol.to_qcschema()
+
         method = compute_spec['method']
         basis = compute_spec['basis']
         program = compute_spec['program']
@@ -740,7 +748,7 @@ class OptimizationExecutor:
                       ]
                     },
                 },
-                initial_molecule=mol.to_qcschema()
+                initial_molecule=qcmol)
             )
 
         return input_data.dict()
