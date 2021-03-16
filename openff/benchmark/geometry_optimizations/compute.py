@@ -701,8 +701,7 @@ class OptimizationExecutor:
         # TODO: bug report in openff where `atom_map` is a string
         if isinstance(mol.properties.get('atom_map'), str):
             mol.properties['atom_map'] = ast.literal_eval(mol.properties['atom_map'])
-    
-        attributes = factory.create_cmiles_metadata(mol)
+
         method = compute_spec['method']
         basis = compute_spec['basis']
         program = compute_spec['program']
@@ -741,7 +740,7 @@ class OptimizationExecutor:
                       ]
                     },
                 },
-                initial_molecule=mol.to_qcschema(extras=attributes)
+                initial_molecule=mol.to_qcschema()
             )
 
         return input_data.dict()
