@@ -215,6 +215,8 @@ def test_cli_optimize_export_qm(fractal_compute_server, tmpdir, ethane_preproces
                                        '--dataset-name', '"Test Dataset - QM"',
                                        '-o', outdir])
 
+        if response.exception:
+            print(response.exception)
         assert response.exit_code == 0
         assert "exporting COMPLETE" in response.output
         assert "Failed to write" not in response.output
@@ -321,6 +323,8 @@ def test_cli_optimize_export_mm(fractal_compute_server, tmpdir, ethane_qm_optimi
                                        '--dataset-name', '"Test Dataset - MM"',
                                        '-o', outdir])
 
+        if response.exception:
+            print(response.exception)
         assert response.exit_code == 0
         assert "exporting COMPLETE" in response.output
         assert "Failed to write" not in response.output
