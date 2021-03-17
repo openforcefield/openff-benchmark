@@ -90,7 +90,15 @@ class OptimizationExecutor:
         except toolkits.ToolkitUnavailableException:
             pass
     
-        return Molecule.from_qcschema(record)
+        offmol = Molecule.from_qcschema(record)
+
+        # we really don't want the molecule populated with a conformer
+        # we're actually feeding this function an entry in our usage below,
+        # so it won't get one, but to be safe we set it to None so we can put
+        # just our final molecule there
+        offmol._conformers = None
+
+        return offmol
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
                              delete_existing=False, keep_existing=True):
