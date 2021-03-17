@@ -702,7 +702,7 @@ class OptimizationExecutor:
         if isinstance(mol.properties.get('atom_map'), str):
             mol.properties['atom_map'] = ast.literal_eval(mol.properties['atom_map'])
 
-        # This block will fail for OFF Toolkit 0.8.4, but succeed for 0.8.3rc1
+        # This block will fail for OFF Toolkit 0.8.4, but succeed for 0.8.4rc1
         try:
             attributes = factory.create_cmiles_metadata(mol)
             qcmol = mol.to_qcschema(extras=attributes)
