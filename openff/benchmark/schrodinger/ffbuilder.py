@@ -67,15 +67,16 @@ def ffbuilder(input_paths, schrodinger_path, host_settings, opls_dir, recursive,
 
 
 def ffb_merge(schrodinger_path, opls_dir, input_path):
-    command = [os.path.join(schrodinger_path, 'run'),
-               '-FROM',
-               'ffld',
-               'merge_opls_data.py',
-               os.path.join(input_path, 'ffb_openff_benchmark_oplsdir'),
-               '-o',
-               opls_dir
-               ]
-    subprocess.run(command)
+    if os.path.exists(os.path.join(input_path, 'ffb_openff_benchmark_oplsdir')):
+        command = [os.path.join(schrodinger_path, 'run'),
+                   '-FROM',
+                   'ffld',
+                   'merge_opls_data.py',
+                   os.path.join(input_path, 'ffb_openff_benchmark_oplsdir'),
+                   '-o',
+                   opls_dir
+        ]
+        subprocess.run(command)
 
 
 
@@ -94,4 +95,5 @@ def ffb_backup(output_path):
                 'ffb_openff_benchmark.log',
                 'ffb_openff_benchmark.zip']:
         obj_path = os.path.join(f'{output_path}', obj)
-        shutil.move(obj_path, backup_path)
+        if os.path.exists(obj_path):
+            shutil.move(obj_path, backup_path)
