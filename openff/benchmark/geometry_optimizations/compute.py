@@ -54,29 +54,63 @@ class OptimizationExecutor:
     
         # extract molecules from SDF inputs
         mols = mols_from_paths(input_paths, recursive=recursive)
-    
-        # create OptimizationDataset with QCSubmit
-        ds = OptimizationDataset(dataset_name=dataset_name)
-        factory = OptimizationDatasetFactory()
-    
-        for mol in mols:
-            id = self._mol_to_id(mol)
 
-            attributes = factory.create_cmiles_metadata(mol)
-            ds.add_molecule(index=id, molecule=mol, attributes=attributes)
-    
-        ds.qc_specifications = SEASONS[season]
-    
-        ds.metadata.long_description_url = "https://localhost.local/null"
-
-        # add in known modifications to `OptimizationDataset` defaults
-        ds.optimization_procedure.coordsys = 'dlc'
-        ds.optimization_procedure.reset = True
+        ds = self._create_qcsubmit_dataset(dataset_name, mols, season)
     
         print("Submitting...")
         client = FractalClient(fractal_uri, verify=False)
         ds.submit(verbose=True, client=client)
         print("Submitted!")
+
+    def create_submittable(self, output_path, input_paths, season,
+            dataset_name, recursive=False):
+        """Create serialized QCSubmit dataset from given directory.
+
+        Parameters
+        ----------
+        output_path : Path-like
+            Path for written submittable; often `dataset.json.bz2` or similar.
+        input_paths : iterable of Path-like
+            Paths to SDF files or directories; for directories, all SDF files are loaded.
+        season : str
+            Benchmark season identifier. Indicates the mix of compute specs to utilize.
+        dataset_name : str
+            Dataset name to use for submission on the QCFractal server.
+        recursive : bool
+            If True, recursively load SDFs from any directories given in `input_paths`.
+
+        """
+
+        # extract molecules from SDF inputs
+        mols = mols_from_paths(input_paths, recursive=recursive)
+
+        ds = self._create_qcsubmit_dataset(dataset_name, mols, season)
+
+        print(f"Exporting to '{output_path}'...")
+        ds.export_dataset(output_path)
+        print("Exported!")
+
+    def _create_qcsubmit_dataset(self, dataset_name, mols, season):
+        from openff.qcsubmit.factories import OptimizationDataset, OptimizationDatasetFactory
+        # create OptimizationDataset with QCSubmit
+        ds = OptimizationDataset(dataset_name=dataset_name)
+        factory = OptimizationDatasetFactory()
+
+        for mol in mols:
+            id = self._mol_to_id(mol)
+
+            attributes = factory.create_cmiles_metadata(mol)
+            ds.add_molecule(index=id, molecule=mol, attributes=attributes)
+
+        ds.qc_specifications = SEASONS[season]
+
+        ds.metadata.long_description_url = "https://localhost.local/null"
+
+        # add in known modifications to `OptimizationDataset` defaults
+        ds.optimization_procedure.coordsys = 'dlc'
+        ds.optimization_procedure.reset = True
+
+        return ds
     
     @staticmethod
     def _mol_from_qcserver(record):
