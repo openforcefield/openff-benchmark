@@ -53,10 +53,18 @@ def ffbuilder(
         ffb_merge(schrodinger_path, opls_dir, output_path)
         ffb_backup(output_path)
 
+    mol_ids = set()
     with open(f"{output_path}/ffb_input.sdf", "w") as file:
         for mol in mols:
-            if mol.name.endswith("00"):
+            mol_id = mol.properties["molecule_index"]
+            if mol_id in mol_ids:
+                pass
+            else:
+                mol_ids.add(mol_id)
                 mol.to_file(file, "SDF")
+    if len(mol_ids) == 0:
+        raise Exception("No molecules are selected for the ffbuilder job. "
+                        "Check the input path.")
 
     command = [
         os.path.join(schrodinger_path, "ffbuilder"),

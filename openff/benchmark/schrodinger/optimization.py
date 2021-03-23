@@ -90,6 +90,10 @@ def optimization(
     sdf_file = os.path.join(output_path, "mmod_input.sdf")
 
     mols = mols_from_paths(input_paths, recursive=recursive)
+    if len(mols) == 0:
+        raise Exception("No molecules are selected for the ffbuilder job. "
+                        "Check the input path.")
+        
     with open(sdf_file, "w") as file:
         for i, mol in enumerate(mols):
             if opls_dir is None:
