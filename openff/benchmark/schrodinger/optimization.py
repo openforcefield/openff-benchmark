@@ -9,6 +9,7 @@ import os
 import shutil
 import logging
 import subprocess
+import warnings
 from collections import defaultdict
 
 # DO NOT USE; MESSES UP LOGGING 
@@ -36,7 +37,7 @@ def mae_to_sdf(mae_file, sdf_file, schrodinger_path, append=True):
         command.append('-a')
     subprocess.run(command)
 
-def optimization(input_paths, schrodinger_path, host_settings, opls_dir, recursive, output_path):
+def optimization(input_paths, schrodinger_path, host_settings, opls_dir, recursive, output_path, delete_existing=False):
     """Submit SDF molecules from given directory to a Schrodinger macromodel OPLS3e minimization
 
     Parameters
@@ -53,12 +54,21 @@ def optimization(input_paths, schrodinger_path, host_settings, opls_dir, recursi
         If True, recursively load SDFs from any directories given in `input_paths`.
     output_path: str
         Path where output sdf files should be written to    
+    delete_existing : bool (False)
+            If True, delete existing directory if present.
     """
-    os.makedirs(output_path, exist_ok=True)
+    try:
+        os.makedirs(output_path)
+    except OSError:
+        if delete_existing:
+            shutil.rmtree(output_path)
+            os.makedirs(output_path)
+        else:
+            raise Exception(f'Output directory {output_path} already exists. '
+                            'Specify `delete_existing=True` to remove or select a different output directory.')
+
     mae_file = os.path.join(output_path, 'mmod_input.maegz')
     sdf_file = os.path.join(output_path, 'mmod_input.sdf')
-    if os.path.isfile(mae_file):
-        os.remove(mae_file)
 
     mols = mols_from_paths(input_paths, recursive=recursive)
     with open(sdf_file, 'w') as file:
@@ -104,7 +114,7 @@ def optimization(input_paths, schrodinger_path, host_settings, opls_dir, recursi
 
 
 
-def postprocess(input_paths, schrodinger_path, output_path):
+def postprocess(input_paths, schrodinger_path, output_path, delete_existing=False, keep_existing=True):
     """Postprocess output from Schrodinger macromodel OPLS3e minimization.
     
     Parameters
@@ -115,8 +125,13 @@ def postprocess(input_paths, schrodinger_path, output_path):
         Path to Schrodinger executables
     output_path: str
         Path where output sdf files should be written to    
+    delete_existing : bool (False)
+            If True, delete existing directory if present.
+    keep_existing : bool (True)
+            If True, keep existing files in export directory.
+            Relies *only* on filepaths of existing files for determining match.
     """
-    
+
     mols = []
     for path in input_paths:
         if (os.path.isfile(path) and (path.split('.')[-1].lower() == 'maegz' or path.split('.')[-1].lower() == 'mae')):
@@ -127,18 +142,36 @@ def postprocess(input_paths, schrodinger_path, output_path):
                 mols.append(tmp_mols)
             else:
                 mols += tmp_mols
+    
 
-    os.makedirs(output_path, exist_ok=True)
-    os.makedirs(os.path.join(output_path, 'opls3e_custom'), exist_ok=True)
-    os.makedirs(os.path.join(output_path, 'opls3e_default'), exist_ok=True)
-
+    methods = set()
     for mol in mols:
         mol.properties.pop('initial_energy')
         mol.properties['final_energy'] = f'{mol.properties["r_mmod_Potential_Energy-OPLS3e"]} kJ / mole'
         mol.properties['molecule_index'] = f"{mol.properties['molecule_index']:05d}"
         mol.properties['conformer_index'] = f"{mol.properties['conformer_index']:02d}"
-        if mol.properties['method'] != 'opls3e_default' and mol.properties['method'] != 'opls3e_custom':
-            raise ValueError(f'Method {mol.properties["method"]} not known.')
-        else:
-            mol.to_file(os.path.join(output_path, mol.properties['method'], f'{mol.name}.sdf'), 'SDF')
+        methods.add(mol.properties['method'])
+
+    os.makedirs(output_path, exist_ok=True)
+    for method in methods:
+        output_directory = os.path.join(output_path, method)
+        try:
+            os.makedirs(output_directory)
+        except OSError:
+            if delete_existing:
+                shutil.rmtree(output_directory)
+                os.makedirs(output_directory)
+            elif keep_existing: 
+                warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced."
+                              "Specify `delete_existing=True` to replace.")
+                pass
+            else:
+                raise Exception(f'Output directory {output_directory} already exists. '
+                                'Specify `delete_existing=True` to remove or specify another output directory.')
+    for mol in mols:
+        outfile = os.path.join(output_path, mol.properties['method'], f'{mol.name}.sdf')
+        if (not delete_existing) and os.path.exists(outfile):
+            print(f"... '{mol.name}' : skipping SDF exists")
+            continue
+        mol.to_file(outfile, 'SDF')
 

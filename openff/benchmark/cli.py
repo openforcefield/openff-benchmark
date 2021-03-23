@@ -567,9 +567,13 @@ def ffmerge(schrodinger_path, opls_dir, input_path):
 @click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
 @click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If not specified, NO custom parameters will be used.")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
-@click.option('-o', '--output-path', default=None, help="Path where output files are written to. Defaults to 8-schrodinger-mm-default or 9-schrodinger-mm_-ustom, depending on whether opls-dir is set or not.")
+@click.option('-o', '--output-path', default=None, 
+              help="Path where output files are written to. Defaults to 8-schrodinger-mm-default"\
+              " or 9-schrodinger-mm_-ustom, depending on whether opls-dir is set or not.")
+@click.option('--delete-existing', is_flag=True,
+              help="Delete existing output directory if it exists")
 @click.argument('input-path', nargs=-1)
-def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, output_path):
+def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, output_path, delete_existing):
     """Starts optimizations of molecules from INPUT_PATH with Schrodinger macromodel.
 
     INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
@@ -594,6 +598,8 @@ def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, 
     host_settings=host
     if max_jobs is not None:
         host_settings += f':{max_jobs}'
+    if (not delete_existing) and os.path.exists(output_path):
+        raise Exception(f"Output directory {output_path} exists. If you want to replace it, run this command with --delete-existing.")
 
     optimization.optimization(
         input_path, 
@@ -601,13 +607,17 @@ def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, 
         host_settings=host_settings,
         opls_dir=opls_dir, 
         recursive=recursive,
-        output_path=output_path)
+        output_path=output_path,
+        delete_existing=delete_existing
+    )
 
 @schrodinger.command()
 @click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
 @click.option('-o', '--output-path', default='8-optimize_schrodinger', help="Path where output files are written to.")
 @click.argument('input-paths', nargs=-1)
-def postprocess(input_paths, schrodinger_path, output_path):
+@click.option('--delete-existing', is_flag=True,
+              help="Delete existing output files if they exist. Otherwise files will not be overwritten.")
+def postprocess(input_paths, schrodinger_path, output_path, delete_existing):
     """Postprocesses output from Schrodinger macromodel optimizations.
 
     INPUT_PATH may be any number of single MAE or MAEGZ files, which are the ouput of Schrodinger macromodel optimizations.
@@ -622,7 +632,9 @@ def postprocess(input_paths, schrodinger_path, output_path):
     optimization.postprocess(
         input_paths, 
         schrodinger_path=schrodinger_path, 
-        output_path=output_path)
+        output_path=output_path,
+        delete_existing=delete_existing
+    )
 
 
 
