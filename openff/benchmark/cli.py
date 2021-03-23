@@ -964,7 +964,19 @@ def execute(input_paths, output_directory, stdout, season, nthreads, memory, del
         print(json.dumps(results_processed))
 
 
-def execute_single(filepath, output_directory, stdout, season, nthreads, memory, delete_existing, recursive,
+@torsiondrive.command()
+@click.option("--dihedral", required=True, type=(int, int, int, int), help="Zero-indexed atom indices forming dihedral to drive")
+@click.option("--grid-spacing", required=True, type=int, help="Grid spacing in degrees between optimizations")
+@click.option("--dihedral-range", default=None, help="Upper and lower angles setting the bounds for driving the dihedral")
+@click.option('-s', '--season', required=True, help="Season identifier specifying compute selections applied to molecules")
+@click.option('-t', '--nthreads', default=2, help="Number of threads to utilize for each gradient calculation step")
+@click.option('-m', '--memory', default=2, help="Maximum memory in GiB to allocate for each gradient calculation; set at least 5% *below* desired maximum")
+@click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
+@click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
+@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
+@click.option('--geometric-qccnv', is_flag=True, help="If set, use QChem-style convergence criteria")
+@click.argument('input-path', nargs=1)
+def execute_one_shot(input_path, dihedral, grid_spacing, dihedral_range, season, nthreads, memory,
             scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
     """Execute molecule torsiondrive locally from a set of SDF files.
 
@@ -987,29 +999,31 @@ def execute_single(filepath, output_directory, stdout, season, nthreads, memory,
     import json
     import warnings
 
+    from .utils.io import mols_from_paths
     from .geometry_optimizations.compute import OptimizationExecutor
 
-    if (not delete_existing) and os.path.exists(output_directory):
-        warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
-
+    offmol = mols_from_paths([input_path])[0]
     optexec = OptimizationExecutor()
 
-    results = optexec.execute_optimization_from_molecules(input_paths,
-                                                          output_directory,
-                                                          season,
-                                                          ncores=nthreads,
-                                                          memory=memory,
-                                                          delete_existing=delete_existing,
-                                                          recursive=recursive,
-                                                          scf_maxiter=scf_maxiter,
-                                                          geometric_maxiter=geometric_maxiter,
-                                                          geometric_coordsys=geometric_coordsys,
-                                                          geometric_qccnv=geometric_qccnv)
+    if dihedral_range is not None:
+        dihedral_range = dihedral_range.split(',')
 
+    results = optexec.execute_torsiondrive_oneshot(offmol,
+                                                   [dihedral],
+                                                   [grid_spacing],
+                                                   [dihedral_range],
+                                                   season,
+                                                   ncores=nthreads,
+                                                   memory=memory,
+                                                   scf_maxiter=scf_maxiter,
+                                                   geometric_maxiter=geometric_maxiter,
+                                                   geometric_coordsys=geometric_coordsys,
+                                                   geometric_qccnv=geometric_qccnv)
+
+    print(results)
     # export and read back into JSON for final output
-    if stdout:
-        results_processed = [json.loads(res.json()) for res in results]
-        print(json.dumps(results_processed))
+    #results_processed = [json.loads(res.json()) for res in results]
+    #print(json.dumps(results_processed))
 
 if __name__ == "__main__":
     cli()

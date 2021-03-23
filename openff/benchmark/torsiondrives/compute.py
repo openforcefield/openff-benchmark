@@ -5,42 +5,171 @@ These components leverage the QCArchive software stack for execution.
 
 """
 
+import io
 import os
 import shutil
+import contextlib
+
+from .seasons import SEASONS
 
 class TorsiondriveExecutor:
-
     def __init__(self):
         self.stop = False
 
     def execute_torsiondrive_oneshot(self,
-            offmol, season, ncores=1, memory=2):
+            offmol, dihedrals, grid_spacing, dihedral_ranges,
+            season, ncores=1, memory=2,
+            scf_maxiter=200, geometric_maxiter=300, geometric_coordsys='dlc',
+            geometric_qccnv=False):
         """Torsiondrive executor for a single molecule.
 
+        Parameters
+        ----------
+        dihedrals : List of tuples
+            A list of the dihedrals to scan over.
+        grid_spacing : List of int
+            The grid seperation for each dihedral angle
+        dihedral_ranges: (Optional) List of [low, high] pairs
+            consistent with launch.py, e.g. [[-120, 120], [-90, 150]]
+        energy_decrease_thresh: (Optional) Float
+            Threshold of an energy decrease to triggle activate new grid point. Default is 1e-5
+        energy_upper_limit: (Optional) Float
+            Upper limit of energy relative to current global minimum to spawn new optimization tasks.
+
         """
+        from openff.qcsubmit.factories import OptimizationDatasetFactory
         from torsiondrive import td_api
 
-        # get qcelemental molecule from openff molecule
+        local_options={"ncores": ncores,
+                       "memory": memory}
 
+        # get qcelemental molecule from openff molecule
+        qcmol = offmol.to_qcschema()
 
         # generate initial torsiondrive state
-        initial_state = td_api.create_initial_state(
-                dihedrals=dihedrals,
-                grid_spacing=grid_spacing,
-                elements=elements,
-                init_coords=init_coords,
-                dihedral_ranges=dihedral_ranges,
-                )
+        td_stdout = io.StringIO()
+        with contextlib.redirect_stdout(td_stdout):
+            
+            # this object gets updated through the whole execution,
+            # but it is an implementation detail; we do not return it
+            state = td_api.create_initial_state(
+                    dihedrals=dihedrals,
+                    grid_spacing=grid_spacing,
+                    elements=qcmol.symbols,
+                    init_coords=qcmol.geometry,
+                    dihedral_ranges=dihedral_ranges,
+                    )
 
-        # perform initial optimization
+            # this is the object we care about returning
+            opts = dict()
 
+        for spec_name, compute_spec in SEASONS[season].items():
+            opts[spec_name] = dict()
+            while True:
+                next_jobs = td_api.next_jobs_from_state(state)
 
-        # generate next optimization(s), then execute in a loop
+                # if no next jobs, we are finished
+                if len(next_jobs) == 0:
+                    break
 
+                task_results = {}
+                for gridpoint in next_jobs:
+                    task_results[gridpoint] = []
+
+                    qcmol_s = qcmol.copy(deep=True)
+
+                    # perform initial optimization
+                    input_data = self._generate_optimization_input(qcmol, compute_spec)
+                    result = self._execute_qcengine(input_data,
+                                                    local_options=local_options,
+                                                    scf_maxiter=scf_maxiter,
+                                                    geometric_maxiter=geometric_maxiter,
+                                                    geometric_coordsys=geometric_coordsys,
+                                                    geometric_qccnv=geometric_qccnv)
+
+                    # TODO: consider if we need to do multiple optimizations per grid point to
+                    # get robust results?
+                    task_results[gridpoint].append((result['initial_molecule'].geometry,
+                                                    result['final_molecule'].geometry,
+                                                    result['energies'][-1]))
+
+                    opts[spec_name][gridpoint] = result
+
+                td_api.update_state(state, task_results)
 
         # when complete, return output as a JSON-serializable blob
+        return opts
 
 
+    def _execute_qcengine(
+            self, input_data, procedure="geometric", local_options=None,
+            scf_maxiter=None, geometric_maxiter=None, geometric_coordsys=None,
+            geometric_qccnv=None):
+        import qcengine
+
+        # inject reset=True fix, set coordsys to 'dlc'
+        input_data['keywords']['reset'] = True
+        input_data['keywords']['coordsys'] = 'dlc'
+
+        # inject exposed convergence parameters, if specified
+        if scf_maxiter is not None:
+            input_data['input_specification']['keywords']['maxiter'] = scf_maxiter
+        if geometric_maxiter is not None:
+            input_data['keywords']['maxiter'] = geometric_maxiter
+        if geometric_coordsys is not None:
+            input_data['keywords']['coordsys'] = geometric_coordsys
+        if geometric_qccnv is not None:
+            input_data['keywords']['qccnv'] = geometric_qccnv
+
+        return qcengine.compute_procedure(
+                input_data, procedure=procedure, local_options=local_options)
+
+    @staticmethod
+    def _generate_optimization_input(qcmol, compute_spec):
+        import ast
+        from qcelemental.models import OptimizationInput
+
+        method = compute_spec['method']
+        basis = compute_spec['basis']
+        program = compute_spec['program']
+
+        # generate optimization inputs
+        input_data = OptimizationInput(
+                keywords={
+                      "coordsys": "dlc",
+                      "enforce": 0,
+                      "epsilon": 1e-05,
+                      "reset": True,
+                      "qccnv": False,
+                      "molcnv": False,
+                      "check": 0,
+                      "trust": 0.1,
+                      "tmax": 0.3,
+                      "maxiter": 300,
+                      "convergence_set": "gau",
+                      "program": program
+                    },
+                extras={},
+                protocols={},
+                input_specification={
+                    "driver": "gradient",
+                    "model": {
+                      "method": method,
+                      "basis": basis,
+                    },
+                    "keywords": {
+                      "maxiter": 200,
+                      "scf_properties": [
+                        "dipole",
+                        "quadrupole",
+                        "wiberg_lowdin_indices",
+                        "mayer_indices"
+                      ]
+                    },
+                },
+                initial_molecule=qcmol)
+
+        return input_data.dict()
 
     def execute_torsiondrive_old(self):
         """
