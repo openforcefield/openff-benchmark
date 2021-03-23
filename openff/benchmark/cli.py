@@ -453,40 +453,6 @@ def execute(input_paths, output_directory, stdout, season, nthreads, memory, del
         print(json.dumps(results_processed))
 
 
-
-@cli.group()
-def report():
-    """Analyze the results and create plots.
-
-    """
-    pass
-
-@report.command()
-@click.option('--input-path', default='./', multiple=True, required=True)
-@click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='5-compare_forcefields', required=True)
-def compare_forcefields(input_path, ref_method, output_directory):
-    from .analysis import analysis
-    analysis.main(input_path, ref_method, output_directory)
-
-@report.command()
-@click.option('--input-path', default='./', multiple=True, required=True)
-@click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='5-match_minima', required=True)
-def match_minima(input_path, ref_method, output_directory):
-    from .analysis import analysis
-    analysis.match_minima(input_path, ref_method, output_directory)
-
-@report.command()
-@click.option('--input-path', default='5-compare_forcefields', multiple=True, required=True)
-@click.option('--ref-method', default='default', required=True)
-@click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
-def plots(input_path, ref_method, output_directory):
-    from .analysis import draw
-    draw.plot_compare_ffs(input_path, ref_method, output_directory)
-
-
-
 @cli.group()
 def preprocess():
     """Prepare input molecules for compute.
@@ -875,6 +841,154 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
         reporter.write(data)
         # TODO do we want the list of errors in the coverage report as well?
     
+
+@cli.group()
+def report():
+    """Analyze the results and create plots.
+
+    """
+    pass
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref-method', default='b3lyp-d3bj', required=True)
+@click.option('--output-directory', default='5-compare_forcefields', required=True)
+def compare_forcefields(input_path, ref_method, output_directory):
+    from .analysis import analysis
+    analysis.main(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref-method', default='b3lyp-d3bj', required=True)
+@click.option('--output-directory', default='5-match_minima', required=True)
+def match_minima(input_path, ref_method, output_directory):
+    from .analysis import analysis
+    analysis.match_minima(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='5-compare_forcefields', multiple=True, required=True)
+@click.option('--ref-method', default='default', required=True)
+@click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
+def plots(input_path, ref_method, output_directory):
+    from .analysis import draw
+    draw.plot_compare_ffs(input_path, ref_method, output_directory)
+
+
+@cli.group()
+def torsiondrive():
+    """Execute torsiondrives.
+
+    """
+    pass
+
+@torsiondrive.command()
+@click.option('-s', '--season', required=True, help="Season identifier specifying compute selections applied to molecules")
+@click.option('-t', '--nthreads', default=2, help="Number of threads to utilize for each gradient calculation step")
+@click.option('-m', '--memory', default=2, help="Maximum memory in GiB to allocate for each gradient calculation; set at least 5% *below* desired maximum")
+@click.option('--delete-existing', is_flag=True,
+              help="Delete existing output directory if it exists")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to include")
+@click.option('-o', '--output-directory', required=True, help="Output directory to use for results")
+@click.option('--stdout', is_flag=True, help="If set, results also output to STDOUT")
+@click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
+@click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
+@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
+@click.option('--geometric-qccnv', is_flag=True, help="If set, use QChem-style convergence criteria")
+@click.argument('input-paths', nargs=-1)
+def execute(input_paths, output_directory, stdout, season, nthreads, memory, delete_existing, recursive,
+            scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
+    """Execute molecule torsiondrive locally from a set of SDF files.
+
+    Molecule optimizations specified will be executed locally using provided `--nthreads` and `--memory` parameters.
+
+    In case you hit problems, you may also modify parameters used for the optimization, such as `--scf-maxiter`.
+    This allows for experimentation and debugging of problematic cases.
+    Please avoid changing parameters for production benchmarking data, taking care to output results to a different directory with `-o OUTPUT_DIRECTORY`.
+
+    You must output to a directory by specifying `-o OUTPUT_DIRECTORY`.
+    Calculation results can also be returned on STDOUT with the `--stdout` flag.
+    Note that results will only be printed to STDOUT when all results are complete.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
+    import os
+    import json
+    import warnings
+
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    if (not delete_existing) and os.path.exists(output_directory):
+        warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
+
+    optexec = OptimizationExecutor()
+
+    results = optexec.execute_optimization_from_molecules(input_paths,
+                                                          output_directory,
+                                                          season,
+                                                          ncores=nthreads,
+                                                          memory=memory,
+                                                          delete_existing=delete_existing,
+                                                          recursive=recursive,
+                                                          scf_maxiter=scf_maxiter,
+                                                          geometric_maxiter=geometric_maxiter,
+                                                          geometric_coordsys=geometric_coordsys,
+                                                          geometric_qccnv=geometric_qccnv)
+
+    # export and read back into JSON for final output
+    if stdout:
+        results_processed = [json.loads(res.json()) for res in results]
+        print(json.dumps(results_processed))
+
+
+def execute_single(filepath, output_directory, stdout, season, nthreads, memory, delete_existing, recursive,
+            scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
+    """Execute molecule torsiondrive locally from a set of SDF files.
+
+    Molecule optimizations specified will be executed locally using provided `--nthreads` and `--memory` parameters.
+
+    In case you hit problems, you may also modify parameters used for the optimization, such as `--scf-maxiter`.
+    This allows for experimentation and debugging of problematic cases.
+    Please avoid changing parameters for production benchmarking data, taking care to output results to a different directory with `-o OUTPUT_DIRECTORY`.
+
+    You must output to a directory by specifying `-o OUTPUT_DIRECTORY`.
+    Calculation results can also be returned on STDOUT with the `--stdout` flag.
+    Note that results will only be printed to STDOUT when all results are complete.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
+    import os
+    import json
+    import warnings
+
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    if (not delete_existing) and os.path.exists(output_directory):
+        warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
+
+    optexec = OptimizationExecutor()
+
+    results = optexec.execute_optimization_from_molecules(input_paths,
+                                                          output_directory,
+                                                          season,
+                                                          ncores=nthreads,
+                                                          memory=memory,
+                                                          delete_existing=delete_existing,
+                                                          recursive=recursive,
+                                                          scf_maxiter=scf_maxiter,
+                                                          geometric_maxiter=geometric_maxiter,
+                                                          geometric_coordsys=geometric_coordsys,
+                                                          geometric_qccnv=geometric_qccnv)
+
+    # export and read back into JSON for final output
+    if stdout:
+        results_processed = [json.loads(res.json()) for res in results]
+        print(json.dumps(results_processed))
 
 if __name__ == "__main__":
     cli()
