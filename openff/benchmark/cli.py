@@ -57,6 +57,27 @@ def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
     optexec.submit_molecules(
             fractal_uri, input_path, season, dataset_name, recursive=recursive)
 
+@optimize.command()
+@click.option('-o', '--output-path', help="Path for serialized QCSubmit dataset")
+@click.option('-d', '--dataset-name', required=True, help="Dataset name to submit molecules under")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
+@click.option('-s', '--season', required=True, type=click.Choice(['1:1', '1:2']), help="Season identifier specifying compute selections applied to molecules")
+@click.argument('input-path', nargs=-1)
+def create_submittable(output_path, input_path, season, dataset_name, recursive):
+    """Create submittable, serialized QCSubmit OptimizationDataset from INPUT_PATH.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to submit molecules to.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+    optexec.create_submittable(
+            output_path, input_path, season, dataset_name, recursive=recursive)
+
 #@optimize.command()
 #def submit_compute(fractal_uri, dataset_name, spec_name, method, basis, program):
 #    pass
