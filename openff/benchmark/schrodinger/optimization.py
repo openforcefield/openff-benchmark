@@ -182,6 +182,9 @@ def postprocess(
         mol.properties[
             "final_energy"
         ] = f'{mol.properties["r_mmod_Potential_Energy-OPLS3e"]} kJ / mole'
+        mol.properties[
+            "initial_energy"
+        ] = '0.0 kJ / mole'
         mol.properties["molecule_index"] = f"{mol.properties['molecule_index']:05d}"
         mol.properties["conformer_index"] = f"{mol.properties['conformer_index']:02d}"
         methods.add(mol.properties["method"])

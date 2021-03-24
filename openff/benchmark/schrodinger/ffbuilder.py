@@ -71,7 +71,6 @@ def ffbuilder(
         "-JOBNAME",
         "ffb_openff_benchmark",
         "ffb_input.sdf",
-        "-fit_advanced",
         "-OPLSDIR",
         opls_dir,
         "-HOST",
