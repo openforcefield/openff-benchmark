@@ -10,7 +10,7 @@ import os
 import shutil
 import contextlib
 
-from .seasons import SEASONS
+from ..geometry_optimizations.seasons import SEASONS
 
 class TorsiondriveExecutor:
     def __init__(self):
@@ -37,15 +37,18 @@ class TorsiondriveExecutor:
             Upper limit of energy relative to current global minimum to spawn new optimization tasks.
 
         """
+        import numpy as np
+        from qcelemental.models import Molecule
         from openff.qcsubmit.factories import OptimizationDatasetFactory
         from torsiondrive import td_api
+        from geometric.nifty import bohr2ang, ang2bohr
 
         local_options={"ncores": ncores,
                        "memory": memory}
 
         # get qcelemental molecule from openff molecule
         qcmol = offmol.to_qcschema()
-
+        
         # generate initial torsiondrive state
         td_stdout = io.StringIO()
         with contextlib.redirect_stdout(td_stdout):
@@ -56,44 +59,55 @@ class TorsiondriveExecutor:
                     dihedrals=dihedrals,
                     grid_spacing=grid_spacing,
                     elements=qcmol.symbols,
-                    init_coords=qcmol.geometry,
+                    init_coords=[qcmol.geometry.flatten().tolist()],
                     dihedral_ranges=dihedral_ranges,
                     )
 
-            # this is the object we care about returning
-            opts = dict()
+        # this is the object we care about returning
+        opts = dict()
 
         for spec_name, compute_spec in SEASONS[season].items():
+            print("Processing spec: '{}'".format(spec_name))
             opts[spec_name] = dict()
+
+            # generate new grid points and optimize them until exhausted
             while True:
-                next_jobs = td_api.next_jobs_from_state(state)
+                next_jobs = td_api.next_jobs_from_state(state, verbose=True)
 
                 # if no next jobs, we are finished
                 if len(next_jobs) == 0:
                     break
 
-                task_results = {}
+                task_results = dict()
                 for gridpoint in next_jobs:
-                    task_results[gridpoint] = []
+                    opts[spec_name][gridpoint] = list()
+                    task_results[gridpoint] = list()
 
-                    qcmol_s = qcmol.copy(deep=True)
+                    # each gridpoint may have more than one job
+                    for job in next_jobs[gridpoint]:
+                        print(f"... '{gridpoint}'")
 
-                    # perform initial optimization
-                    input_data = self._generate_optimization_input(qcmol, compute_spec)
-                    result = self._execute_qcengine(input_data,
-                                                    local_options=local_options,
-                                                    scf_maxiter=scf_maxiter,
-                                                    geometric_maxiter=geometric_maxiter,
-                                                    geometric_coordsys=geometric_coordsys,
-                                                    geometric_qccnv=geometric_qccnv)
+                        # set geometry of molecule to that of next job
+                        qcmol_s = qcmol.copy(deep=True).dict()
+                        qcmol_s['geometry'] = np.array(job).reshape(len(qcmol_s['symbols']), 3)
+                        qcmol_s = Molecule.from_data(qcmol_s)
 
-                    # TODO: consider if we need to do multiple optimizations per grid point to
-                    # get robust results?
-                    task_results[gridpoint].append((result['initial_molecule'].geometry,
-                                                    result['final_molecule'].geometry,
-                                                    result['energies'][-1]))
+                        # perform optimization
+                        input_data = self._generate_optimization_input(qcmol_s, compute_spec)
+                        result = self._execute_qcengine(input_data,
+                                                        local_options=local_options,
+                                                        scf_maxiter=scf_maxiter,
+                                                        geometric_maxiter=geometric_maxiter,
+                                                        geometric_coordsys=geometric_coordsys,
+                                                        geometric_qccnv=geometric_qccnv)
 
-                    opts[spec_name][gridpoint] = result
+                        # TODO: consider if we need to do multiple optimizations per grid point to
+                        # get robust results?
+                        task_results[gridpoint].append((result.initial_molecule.geometry.flatten().tolist(),
+                                                        result.final_molecule.geometry.flatten().tolist(),
+                                                        result.energies[-1]))
+
+                        opts[spec_name][gridpoint].append(result)
 
                 td_api.update_state(state, task_results)
 

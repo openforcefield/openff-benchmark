@@ -1000,25 +1000,25 @@ def execute_one_shot(input_path, dihedral, grid_spacing, dihedral_range, season,
     import warnings
 
     from .utils.io import mols_from_paths
-    from .geometry_optimizations.compute import OptimizationExecutor
+    from .torsiondrives.compute import TorsiondriveExecutor
 
     offmol = mols_from_paths([input_path])[0]
-    optexec = OptimizationExecutor()
+    tdexec = TorsiondriveExecutor()
 
     if dihedral_range is not None:
-        dihedral_range = dihedral_range.split(',')
+        dihedral_range = [[int(i) for i in dihedral_range.split(',')]]
 
-    results = optexec.execute_torsiondrive_oneshot(offmol,
-                                                   [dihedral],
-                                                   [grid_spacing],
-                                                   [dihedral_range],
-                                                   season,
-                                                   ncores=nthreads,
-                                                   memory=memory,
-                                                   scf_maxiter=scf_maxiter,
-                                                   geometric_maxiter=geometric_maxiter,
-                                                   geometric_coordsys=geometric_coordsys,
-                                                   geometric_qccnv=geometric_qccnv)
+    results = tdexec.execute_torsiondrive_oneshot(offmol,
+                                                  [dihedral],
+                                                  [grid_spacing],
+                                                  dihedral_range,
+                                                  season,
+                                                  ncores=nthreads,
+                                                  memory=memory,
+                                                  scf_maxiter=scf_maxiter,
+                                                  geometric_maxiter=geometric_maxiter,
+                                                  geometric_coordsys=geometric_coordsys,
+                                                  geometric_qccnv=geometric_qccnv)
 
     print(results)
     # export and read back into JSON for final output
