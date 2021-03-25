@@ -92,8 +92,15 @@ class TorsiondriveExecutor:
                         qcmol_s['geometry'] = np.array(job).reshape(len(qcmol_s['symbols']), 3)
                         qcmol_s = Molecule.from_data(qcmol_s)
 
+                        # generate constraints input
+                        angles = gridpoint.split()
+                        constraints = {"set":
+                                [{"type": "dihedral", "indices": dihedral, "value": int(angle)}
+                                    for dihedral, angle in zip(dihedrals, angles)]}
+
+
                         # perform optimization
-                        input_data = self._generate_optimization_input(qcmol_s, compute_spec)
+                        input_data = self._generate_optimization_input(qcmol_s, compute_spec, constraints)
                         result = self._execute_qcengine(input_data,
                                                         local_options=local_options,
                                                         scf_maxiter=scf_maxiter,
@@ -139,7 +146,7 @@ class TorsiondriveExecutor:
                 input_data, procedure=procedure, local_options=local_options)
 
     @staticmethod
-    def _generate_optimization_input(qcmol, compute_spec):
+    def _generate_optimization_input(qcmol, compute_spec, constraints):
         import ast
         from qcelemental.models import OptimizationInput
 
@@ -154,15 +161,16 @@ class TorsiondriveExecutor:
                       "enforce": 0,
                       "epsilon": 1e-05,
                       "reset": True,
-                      "qccnv": False,
+                      "qccnv": True,
                       "molcnv": False,
                       "check": 0,
                       "trust": 0.1,
                       "tmax": 0.3,
                       "maxiter": 300,
                       "convergence_set": "gau",
-                      "program": program
-                    },
+                      "program": program,
+                      "constraints": constraints,
+                      },
                 extras={},
                 protocols={},
                 input_specification={
