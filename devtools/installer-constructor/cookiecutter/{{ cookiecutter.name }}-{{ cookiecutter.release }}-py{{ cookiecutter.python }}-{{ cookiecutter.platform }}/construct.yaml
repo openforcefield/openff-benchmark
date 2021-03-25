@@ -85,6 +85,7 @@ specs:
 post_install: post_install.sh  [unix]
 
 channels: &id1
+  - omnia/label/benchchmark-sch
   - conda-forge
   - psi4/label/dev
   - omnia
