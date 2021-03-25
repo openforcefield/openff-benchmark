@@ -9,7 +9,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          ref: schrodinger
+          ref: sch_tree_installer
 
       - name: Additional info about the build
         shell: bash
