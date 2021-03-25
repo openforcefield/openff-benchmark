@@ -29,7 +29,7 @@ specs:
   - gau2grid =2.0.3
 
   # Benchmarking
-  - openff-benchmark >2021.03.23
+  - openff-benchmark =2021.03.25.0sch
 
   # Storage dependencies
   - alembic
@@ -85,7 +85,7 @@ specs:
 post_install: post_install.sh  [unix]
 
 channels: &id1
-  - omnia/label/benchchmark-sch
+  - omnia/label/benchmark-sch
   - conda-forge
   - psi4/label/dev
   - omnia
