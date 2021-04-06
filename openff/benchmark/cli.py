@@ -7,6 +7,7 @@ import click
 import logging
 import csv
 import sys
+from typing import List
 
 # Deregister OpenEye for any ToolkitRegistry calls that happen in this file
 logger = logging.getLogger('openforcefield.utils.toolkits')
@@ -895,7 +896,58 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
     with open(os.path.join(output_directory, "coverage_report.json"), "w") as reporter:
         reporter.write(data)
         # TODO do we want the list of errors in the coverage report as well?
-    
+
+
+@cli.group()
+def filter():
+    """A group of useful filters for benchmarking.
+    """
+    pass
+
+
+@filter.command()
+@click.argument("input_directory")
+@click.argument("output-directory")
+@click.option("-s", "--smirks", multiple=True)
+@click.option("-p", "--processors",
+              default=None,
+              type=click.INT, help="Number of parellel processes to use to generate coverage report")
+def smirks(input_directory, output_directory, smirks, processors):
+    """
+    Run a smirks filer which seperates the molecules, all molecules that pass the filter are put in the output directory.
+    Those that fail are put in the error mols directory in the output.
+    """
+    from openff.benchmark.utils.filters import smirks_filter
+    from openforcefield.topology import Molecule
+    from openff.benchmark.utils.utils import prepare_folders
+    import glob
+    import os
+    import shutil
+
+    logging.basicConfig(filename='filter-smirks.log',
+                        level=logging.DEBUG
+                        )
+    error_dir = prepare_folders(output_directory=output_directory, delete_existing=True, add=False)
+    # Search for the 00th conformer so we dont double-count any moleucles
+    input_files = glob.glob(os.path.join(input_directory, "*00.sdf"))
+    # now load each molecule they should already be unique
+    molecules = [Molecule.from_file(mol_file, file_format="sdf", allow_undefined_stereo=True) for mol_file in
+                 input_files]
+    result = smirks_filter(input_molecules=molecules, filtered_smirks=smirks, processors=processors)
+    # move the passed molecules
+    for molecule in result.molecules:
+        common_id = f"{molecule.properties['group_name']}-{str(molecule.properties['molecule_index']).zfill(5)}"
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
+        for file in conformer_files:
+            shutil.copy(file, output_directory)
+
+    # now error mols
+    for error_mol in result.filtered:
+        error_id = f"{error_mol.properties['group_name']}-{str(error_mol.properties['molecule_index']).zfill(5)}"
+        conformer_error_files = glob.glob(os.path.join(input_directory, f"{error_id}-*.sdf"))
+        for file in conformer_error_files:
+            shutil.copy(file, error_dir)
+
 
 if __name__ == "__main__":
     cli()
