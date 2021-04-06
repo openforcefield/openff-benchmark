@@ -13,8 +13,8 @@ def smirks_filter(input_molecules: List["Molecule"], filtered_smirks: List[str],
     Parameters
     ----------
     input_molecules: A list of molecules to be processed by the filter.
-    smirks: A list of smirks to be queried agasint the molecules:
-    processors: The number of prcessors that should be used when filtering.
+    filtered_smirks: A list of smirks to be queried against the molecules:
+    processors: The number of processors that should be used when filtering.
 
     Returns
     -------
