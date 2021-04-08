@@ -911,11 +911,11 @@ def filter():
 @click.option("-s", "--smirks", multiple=True)
 @click.option("-p", "--processors",
               default=None,
-              type=click.INT, help="Number of parellel processes to use to generate coverage report")
+              type=click.INT, help="Number of parellel processes to use apply SMIRKS filter")
 def smirks(input_directory, output_directory, smirks, processors):
     """
-    Run a smirks filer which seperates the molecules, all molecules that pass the filter are put in the output directory.
-    Those that fail are put in the error mols directory in the output.
+    Filter out molecules that match specified smirks pattern(s). Molecules that do not match the filter are put in the output directory.
+    Those that do match the pattern are put in the error mols directory.
     """
     from openff.benchmark.utils.filters import smirks_filter
     from openforcefield.topology import Molecule

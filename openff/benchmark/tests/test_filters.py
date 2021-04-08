@@ -10,7 +10,7 @@ runner = CliRunner()
 
 
 def test_single_smirks():
-    """Test filtering based on a single smikrs."""
+    """Test filtering based on a single smirks."""
     molecules = []
     for i in [0, 1, 2, 3, 5]:
         molecules.append(Molecule.from_file(get_data_file_path(f'1-validate_and_assign_graphs_and_confs/BBB-0000{i}-00.sdf'), "sdf" ))
@@ -26,7 +26,7 @@ def test_double_smirks():
     for i in [0, 1, 2, 3, 5]:
         molecules.append(
             Molecule.from_file(get_data_file_path(f'1-validate_and_assign_graphs_and_confs/BBB-0000{i}-00.sdf'), "sdf"))
-    # filter P should only be one molecule
+    # filter P should only be one molecule, and F should also be one molecule
     result = smirks_filter(input_molecules=molecules, filtered_smirks=["[P:1]", "[F:1]"], processors=1)
     assert result.n_filtered == 2
     assert result.n_molecules == 3

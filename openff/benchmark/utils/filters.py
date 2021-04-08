@@ -8,12 +8,12 @@ if TYPE_CHECKING:
 
 def smirks_filter(input_molecules: List["Molecule"], filtered_smirks: List[str], processors: Optional[int] = None) -> "ComponentResult":
     """
-    Filter a list of openforcefield.topology.Molecules based on a list of unwated smirks patterns.
+    Filter a list of openforcefield.topology.Molecules based on a list of unwanted smirks patterns.
 
     Parameters
     ----------
     input_molecules: A list of molecules to be processed by the filter.
-    filtered_smirks: A list of smirks to be queried against the molecules:
+    filtered_smirks: A list of smirks to be queried against the molecules. Molecules matching any of these smirks will be filtered out.
     processors: The number of processors that should be used when filtering.
 
     Returns
