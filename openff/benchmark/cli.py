@@ -853,9 +853,9 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
 
     # Copy successfully processed mols and all conformers to the new folder
     for success_mol in success_mols:
-        common_id = f"{success_mol.properties['group_name']}-{success_mol.properties['molecule_index']}"
+        common_id = f"{success_mol.properties['group_name']}-{str(success_mol.properties['molecule_index']).zfill(5)}"
         # get all conformer files
-        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}*"))
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
         for file in conformer_files:
             shutil.copy(file, output_directory)
     # Copy all conformers of an error mol to the error dir
@@ -864,8 +864,9 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
             of.write(f'source: {error_mol.name}\n')
             of.write(f'error text: {e}\n')
         # now get all conformers and move them
-        common_id = f"{error_mol.properties['group_name']}-{error_mol.properties['molecule_index']}"
-        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}*"))
+        mol_index = str(error_mol.properties["molecule_index"]).zfill(5)
+        common_id = f"{error_mol.properties['group_name']}-{mol_index}"
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
         for file in conformer_files:
             shutil.copy(file, error_dir)
 
