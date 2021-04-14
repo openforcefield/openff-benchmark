@@ -54,29 +54,63 @@ class OptimizationExecutor:
     
         # extract molecules from SDF inputs
         mols = mols_from_paths(input_paths, recursive=recursive)
-    
-        # create OptimizationDataset with QCSubmit
-        ds = OptimizationDataset(dataset_name=dataset_name)
-        factory = OptimizationDatasetFactory()
-    
-        for mol in mols:
-            id = self._mol_to_id(mol)
 
-            attributes = factory.create_cmiles_metadata(mol)
-            ds.add_molecule(index=id, molecule=mol, attributes=attributes)
-    
-        ds.qc_specifications = SEASONS[season]
-    
-        ds.metadata.long_description_url = "https://localhost.local/null"
-
-        # add in known modifications to `OptimizationDataset` defaults
-        ds.optimization_procedure.coordsys = 'dlc'
-        ds.optimization_procedure.reset = True
+        ds = self._create_qcsubmit_dataset(dataset_name, mols, season)
     
         print("Submitting...")
         client = FractalClient(fractal_uri, verify=False)
         ds.submit(verbose=True, client=client)
         print("Submitted!")
+
+    def create_submittable(self, output_path, input_paths, season,
+            dataset_name, recursive=False):
+        """Create serialized QCSubmit dataset from given directory.
+
+        Parameters
+        ----------
+        output_path : Path-like
+            Path for written submittable; often `dataset.json.bz2` or similar.
+        input_paths : iterable of Path-like
+            Paths to SDF files or directories; for directories, all SDF files are loaded.
+        season : str
+            Benchmark season identifier. Indicates the mix of compute specs to utilize.
+        dataset_name : str
+            Dataset name to use for submission on the QCFractal server.
+        recursive : bool
+            If True, recursively load SDFs from any directories given in `input_paths`.
+
+        """
+
+        # extract molecules from SDF inputs
+        mols = mols_from_paths(input_paths, recursive=recursive)
+
+        ds = self._create_qcsubmit_dataset(dataset_name, mols, season)
+
+        print(f"Exporting to '{output_path}'...")
+        ds.export_dataset(output_path)
+        print("Exported!")
+
+    def _create_qcsubmit_dataset(self, dataset_name, mols, season):
+        from openff.qcsubmit.factories import OptimizationDataset, OptimizationDatasetFactory
+        # create OptimizationDataset with QCSubmit
+        ds = OptimizationDataset(dataset_name=dataset_name)
+        factory = OptimizationDatasetFactory()
+
+        for mol in mols:
+            id = self._mol_to_id(mol)
+
+            attributes = factory.create_cmiles_metadata(mol)
+            ds.add_molecule(index=id, molecule=mol, attributes=attributes)
+
+        ds.qc_specifications = SEASONS[season]
+
+        ds.metadata.long_description_url = "https://localhost.local/null"
+
+        # add in known modifications to `OptimizationDataset` defaults
+        ds.optimization_procedure.coordsys = 'dlc'
+        ds.optimization_procedure.reset = True
+
+        return ds
     
     @staticmethod
     def _mol_from_qcserver(record):
@@ -89,7 +123,15 @@ class OptimizationExecutor:
         except toolkits.ToolkitUnavailableException:
             pass
     
-        return Molecule.from_qcschema(record)
+        offmol = Molecule.from_qcschema(record)
+
+        # we really don't want the molecule populated with a conformer
+        # we're actually feeding this function an entry in our usage below,
+        # so it won't get one, but to be safe we set it to None so we can put
+        # just our final molecule there
+        offmol._conformers = None
+
+        return offmol
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
                              delete_existing=False, keep_existing=True):
@@ -832,8 +874,15 @@ class OptimizationExecutor:
         # TODO: bug report in openff where `atom_map` is a string
         if isinstance(mol.properties.get('atom_map'), str):
             mol.properties['atom_map'] = ast.literal_eval(mol.properties['atom_map'])
-    
-        attributes = factory.create_cmiles_metadata(mol)
+
+        # This block will fail for OFF Toolkit 0.8.4, but succeed for 0.8.4rc1
+        try:
+            attributes = factory.create_cmiles_metadata(mol)
+            qcmol = mol.to_qcschema(extras=attributes)
+        # In OFFTK 0.8.4, the CMILES field is automatically populated by this method
+        except:
+            qcmol = mol.to_qcschema()
+
         method = compute_spec['method']
         basis = compute_spec['basis']
         program = compute_spec['program']
@@ -872,8 +921,7 @@ class OptimizationExecutor:
                       ]
                     },
                 },
-                initial_molecule=mol.to_qcschema(extras=attributes)
-            )
+                initial_molecule=qcmol)
 
         return input_data.dict()
 
