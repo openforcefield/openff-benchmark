@@ -539,8 +539,10 @@ def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive,
 
 @schrodinger.command()
 @click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
-@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If it is not given, NO custom parameters will be used.")
-@click.option('-i', '--input-path', default='7-schrodinger-ffb', help="Path where ffbuilder was run")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. "
+              "If it is not given, the default path $HOME/.schrodinger/opls_dir is used. "
+              "If the default or specified path does not exist, it will be created.")
+@click.argument("input-path", default='7-schrodinger-ffb')
 def ffmerge(schrodinger_path, opls_dir, input_path):
     """Merge Built OPLS3e force field parameters into custom parameter path.
 
@@ -554,7 +556,7 @@ def ffmerge(schrodinger_path, opls_dir, input_path):
         raise ValueError("A valid SCHRODINGER path is not given.")
     input_path = os.path.join(input_path, "ffb_openff_benchmark_oplsdir")
     if not os.path.isdir(input_path):
-        raise ValueError("No ffbuilder job output files in the specified input directory."
+        raise ValueError("No ffbuilder job output files in the specified input directory. "
                          "Maybe the ffbuilder job is not yet finished.")
     if opls_dir is None:
         warnings.warn("The specified OPLS custom parameter path is not given. A default path is used.")
@@ -591,7 +593,6 @@ def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, 
     INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
 
     To recurse directory INPUT_PATHs, use the `--recursive` flag.
-
     """
     from .schrodinger import optimization
 
@@ -600,7 +601,7 @@ def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, 
     if not os.path.isdir(schrodinger_path):
         raise ValueError("A valid SCHRODINGER path is not given.")
     if opls_dir is not None and not os.path.isdir(opls_dir):
-        warnings.warn("The specified OPLS custom parameter path is not found. Default parameters and no custom parameters will be used..")
+        warnings.warn("The specified OPLS custom parameter path is not found. Default parameters and no custom parameters will be used.")
         opls_dir = None       
     if output_path is None:
         if opls_dir is None:
@@ -625,7 +626,7 @@ def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, 
 
 @schrodinger.command()
 @click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
-@click.option('-o', '--output-path', default='8-optimize_schrodinger', help="Path where output files are written to.")
+@click.option('-o', '--output-path', default='4-compute-mm', help="Path where output files are written to.")
 @click.argument('input-paths', nargs=-1)
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output files if they exist. Otherwise files will not be overwritten.")
