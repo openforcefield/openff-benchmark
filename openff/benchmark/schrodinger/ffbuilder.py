@@ -50,7 +50,7 @@ def ffbuilder(
             f"Schrodinger ffbuilder has been run already. "
             f"Merging parameters and moving files to backup."
         )
-        ffb_merge(schrodinger_path, opls_dir, output_path)
+        ffb_merge(schrodinger_path, opls_dir, os.path.join(output_path, "ffb_openff_benchmark_oplsdir"))
         ffb_backup(output_path)
 
     mol_ids = set()
@@ -71,27 +71,31 @@ def ffbuilder(
         "-JOBNAME",
         "ffb_openff_benchmark",
         "ffb_input.sdf",
-        "-OPLSDIR",
-        opls_dir,
         "-HOST",
         host_settings,
         "-TMPLAUNCHDIR",
     ]
+    if opls_dir is not None:
+        command.append("-OPLSDIR")
+        command.append(opls_dir)
+
     subprocess.run(command, cwd=output_path)
 
 
 def ffb_merge(schrodinger_path, opls_dir, input_path):
-    if os.path.exists(os.path.join(input_path, "ffb_openff_benchmark_oplsdir")):
+    if os.path.exists(input_path):
         command = [
-            os.path.join(schrodinger_path, "run"),
-            "-FROM",
-            "ffld",
-            "merge_opls_data.py",
-            os.path.join(input_path, "ffb_openff_benchmark_oplsdir"),
-            "-o",
-            opls_dir,
-        ]
+                os.path.join(schrodinger_path, "run"),
+                "-FROM",
+                "ffld",
+                "merge_opls_data.py",
+                input_path,
+                "-o",
+                opls_dir,
+            ]
         subprocess.run(command)
+    else:
+        raise ValueError("The ffbuilder directory does not exist.")
 
 
 def ffb_backup(output_path):

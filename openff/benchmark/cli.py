@@ -517,10 +517,13 @@ def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive,
     if not os.path.isdir(schrodinger_path):
         raise ValueError("A valid SCHRODINGER path is not given.")
     if opls_dir is None:
-        warnings.warn("The specified OPLS custom parameter path is not given. A default path is used.")
         opls_dir = os.path.join(os.getenv('HOME'), '.schrodinger', 'opls_dir')
-    if not os.path.isdir(opls_dir):
-        raise ValueError("The specified OPLS custom parameter path is not found. Exiting.")
+        if os.path.isdir(opls_dir):
+            warnings.warn("The OPLS custom parameter path is not given. A default path is used.")
+        else:
+            opls_dir = None
+            warnings.warn("The OPLS custom parameter path is not given. All parameters are recalculated. "
+                          "This is correct if you have no custom parameters yet.")
 
     host_settings=host
     if max_jobs is not None:
@@ -549,11 +552,20 @@ def ffmerge(schrodinger_path, opls_dir, input_path):
         schrodinger_path = os.getenv('SCHRODINGER')
     if not os.path.isdir(schrodinger_path):
         raise ValueError("A valid SCHRODINGER path is not given.")
+    input_path = os.path.join(input_path, "ffb_openff_benchmark_oplsdir")
+    if not os.path.isdir(input_path):
+        raise ValueError("No ffbuilder job output files in the specified input directory."
+                         "Maybe the ffbuilder job is not yet finished.")
     if opls_dir is None:
         warnings.warn("The specified OPLS custom parameter path is not given. A default path is used.")
         opls_dir = os.path.join(os.getenv('HOME'), '.schrodinger', 'opls_dir')
-    if not os.path.isdir(opls_dir):
-        raise ValueError("The specified OPLS custom parameter path is not found. Exiting.")
+        if not os.path.isdir(opls_dir):
+            warnings.warn("The default OPLS custom parameter path does not exist."
+                          "A new OPLS directory is initialized in $HOME/.schrodinger/opls_dir/.")
+    else:
+        if not os.path.isdir(opls_dir):
+            warnings.warn("The specified OPLS custom parameter path does not exist."
+                          "A new OPLS directory is initialized at the specified path.")
 
     ffbuilder.ffb_merge(
         schrodinger_path=schrodinger_path, 
