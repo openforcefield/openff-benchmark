@@ -8,6 +8,8 @@ import logging
 import csv
 import sys
 from typing import List
+import os
+import warnings
 
 # Deregister OpenEye for any ToolkitRegistry calls that happen in this file
 logger = logging.getLogger('openforcefield.utils.toolkits')
@@ -506,6 +508,168 @@ def match_minima(input_path, ref_method, output_directory):
 def plots(input_path, ref_method, output_directory):
     from .analysis import draw
     draw.plot_compare_ffs(input_path, ref_method, output_directory)
+
+
+@cli.group()
+def schrodinger():
+    """Generate OPLS parameters and optimize using Schrodinger tools.
+    """
+    pass
+
+@schrodinger.command()
+@click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
+@click.option('--host', default='localhost', help="Host name as specified in SCHRODINGER_HOSTS.")
+@click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If it is not given, a default path ($HOME/.schrodinger/opls_dir) will be used.")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
+@click.option('-o', '--output-path', default='7-schrodinger_ffb', help="Path where output files are written to.")
+@click.argument('input-path', nargs=-1)
+def ffbuilder(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, output_path):
+    """Build OPLS3e force field parameters using molecules from INPUT_PATH.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
+    from .schrodinger import ffbuilder
+
+    if schrodinger_path is None:
+        schrodinger_path = os.getenv('SCHRODINGER')
+    if not os.path.isdir(schrodinger_path):
+        raise ValueError("A valid SCHRODINGER path is not given.")
+    if opls_dir is None:
+        opls_dir = os.path.join(os.getenv('HOME'), '.schrodinger', 'opls_dir')
+        if os.path.isdir(opls_dir):
+            warnings.warn("The OPLS custom parameter path is not given. A default path is used.")
+        else:
+            opls_dir = None
+            warnings.warn("The OPLS custom parameter path is not given. All parameters are recalculated. "
+                          "This is correct if you have no custom parameters yet.")
+
+    host_settings=host
+    if max_jobs is not None:
+        host_settings += f':{max_jobs}'
+
+    ffbuilder.ffbuilder(
+        input_path, 
+        schrodinger_path=schrodinger_path, 
+        host_settings=host_settings,
+        opls_dir=opls_dir, 
+        recursive=recursive,
+        output_path=output_path)
+
+@schrodinger.command()
+@click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. "
+              "If it is not given, the default path $HOME/.schrodinger/opls_dir is used. "
+              "If the default or specified path does not exist, it will be created.")
+@click.argument("input-path", default='7-schrodinger-ffb')
+def ffmerge(schrodinger_path, opls_dir, input_path):
+    """Merge Built OPLS3e force field parameters into custom parameter path.
+
+    The input directory has to be the directory, where output of ffbuilder was written to.
+    """
+    from .schrodinger import ffbuilder
+
+    if schrodinger_path is None:
+        schrodinger_path = os.getenv('SCHRODINGER')
+    if not os.path.isdir(schrodinger_path):
+        raise ValueError("A valid SCHRODINGER path is not given.")
+    input_path = os.path.join(input_path, "ffb_openff_benchmark_oplsdir")
+    if not os.path.isdir(input_path):
+        raise ValueError("No ffbuilder job output files in the specified input directory. "
+                         "Maybe the ffbuilder job is not yet finished.")
+    if opls_dir is None:
+        warnings.warn("The specified OPLS custom parameter path is not given. A default path is used.")
+        opls_dir = os.path.join(os.getenv('HOME'), '.schrodinger', 'opls_dir')
+        if not os.path.isdir(opls_dir):
+            warnings.warn("The default OPLS custom parameter path does not exist."
+                          "A new OPLS directory is initialized in $HOME/.schrodinger/opls_dir/.")
+    else:
+        if not os.path.isdir(opls_dir):
+            warnings.warn("The specified OPLS custom parameter path does not exist."
+                          "A new OPLS directory is initialized at the specified path.")
+
+    ffbuilder.ffb_merge(
+        schrodinger_path=schrodinger_path, 
+        opls_dir=opls_dir, 
+        input_path=input_path)
+
+
+@schrodinger.command()
+@click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
+@click.option('--host', default='localhost', help="Host name as specified in SCHRODINGER_HOSTS.")
+@click.option('--max-jobs', default=None, help="Maximal number of subjobs. Defaults to no limit on subjobs.")
+@click.option('--opls-dir', default=None, help="Path to the custom OPLSDIR. If not specified, NO custom parameters will be used.")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
+@click.option('-o', '--output-path', default=None, 
+              help="Path where output files are written to. Defaults to 8-schrodinger-mm-default"\
+              " or 9-schrodinger-mm_-ustom, depending on whether opls-dir is set or not.")
+@click.option('--delete-existing', is_flag=True,
+              help="Delete existing output directory if it exists")
+@click.argument('input-path', nargs=-1)
+def optimize(input_path, schrodinger_path, host, max_jobs, opls_dir, recursive, output_path, delete_existing):
+    """Starts optimizations of molecules from INPUT_PATH with Schrodinger macromodel.
+
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+    """
+    from .schrodinger import optimization
+
+    if schrodinger_path is None:
+        schrodinger_path = os.getenv('SCHRODINGER')
+    if not os.path.isdir(schrodinger_path):
+        raise ValueError("A valid SCHRODINGER path is not given.")
+    if opls_dir is not None and not os.path.isdir(opls_dir):
+        warnings.warn("The specified OPLS custom parameter path is not found. Default parameters and no custom parameters will be used.")
+        opls_dir = None       
+    if output_path is None:
+        if opls_dir is None:
+            output_path = "8-schrodinger-mm-default"
+        else:
+            output_path = "9-schrodinger-mm-custom"
+    host_settings=host
+    if max_jobs is not None:
+        host_settings += f':{max_jobs}'
+    if (not delete_existing) and os.path.exists(output_path):
+        raise Exception(f"Output directory {output_path} exists. If you want to replace it, run this command with --delete-existing.")
+
+    optimization.optimization(
+        input_path, 
+        schrodinger_path=schrodinger_path, 
+        host_settings=host_settings,
+        opls_dir=opls_dir, 
+        recursive=recursive,
+        output_path=output_path,
+        delete_existing=delete_existing
+    )
+
+@schrodinger.command()
+@click.option('--schrodinger-path', default=None, help="Path to schrodinger binaries. Defaults to $SCHRODINGER.")
+@click.option('-o', '--output-path', default='4-compute-mm', help="Path where output files are written to.")
+@click.argument('input-paths', nargs=-1)
+@click.option('--delete-existing', is_flag=True,
+              help="Delete existing output files if they exist. Otherwise files will not be overwritten.")
+def postprocess(input_paths, schrodinger_path, output_path, delete_existing):
+    """Postprocesses output from Schrodinger macromodel optimizations.
+
+    INPUT_PATH may be any number of single MAE or MAEGZ files, which are the ouput of Schrodinger macromodel optimizations.
+    """
+    from .schrodinger import optimization
+
+    if schrodinger_path is None:
+        schrodinger_path = os.getenv('SCHRODINGER')
+    if not os.path.isdir(schrodinger_path):
+        raise ValueError("A valid SCHRODINGER path is not given.")
+
+    optimization.postprocess(
+        input_paths, 
+        schrodinger_path=schrodinger_path, 
+        output_path=output_path,
+        delete_existing=delete_existing
+    )
 
 
 
