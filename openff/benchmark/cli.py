@@ -902,85 +902,29 @@ def torsiondrive():
     """
     pass
 
-@torsiondrive.command()
-@click.option('-s', '--season', required=True, help="Season identifier specifying compute selections applied to molecules")
-@click.option('-t', '--nthreads', default=2, help="Number of threads to utilize for each gradient calculation step")
-@click.option('-m', '--memory', default=2, help="Maximum memory in GiB to allocate for each gradient calculation; set at least 5% *below* desired maximum")
-@click.option('--delete-existing', is_flag=True,
-              help="Delete existing output directory if it exists")
-@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to include")
-@click.option('-o', '--output-directory', required=True, help="Output directory to use for results")
-@click.option('--stdout', is_flag=True, help="If set, results also output to STDOUT")
-@click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
-@click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
-@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
-@click.option('--geometric-qccnv', is_flag=True, help="If set, use QChem-style convergence criteria")
-@click.argument('input-paths', nargs=-1)
-def execute(input_paths, output_directory, stdout, season, nthreads, memory, delete_existing, recursive,
-            scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
-    """Execute molecule torsiondrive locally from a set of SDF files.
-
-    Molecule optimizations specified will be executed locally using provided `--nthreads` and `--memory` parameters.
-
-    In case you hit problems, you may also modify parameters used for the optimization, such as `--scf-maxiter`.
-    This allows for experimentation and debugging of problematic cases.
-    Please avoid changing parameters for production benchmarking data, taking care to output results to a different directory with `-o OUTPUT_DIRECTORY`.
-
-    You must output to a directory by specifying `-o OUTPUT_DIRECTORY`.
-    Calculation results can also be returned on STDOUT with the `--stdout` flag.
-    Note that results will only be printed to STDOUT when all results are complete.
-
-    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
-
-    To recurse directory INPUT_PATHs, use the `--recursive` flag.
-
-    """
-    import os
-    import json
-    import warnings
-
-    from .geometry_optimizations.compute import OptimizationExecutor
-
-    if (not delete_existing) and os.path.exists(output_directory):
-        warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
-
-    optexec = OptimizationExecutor()
-
-    results = optexec.execute_optimization_from_molecules(input_paths,
-                                                          output_directory,
-                                                          season,
-                                                          ncores=nthreads,
-                                                          memory=memory,
-                                                          delete_existing=delete_existing,
-                                                          recursive=recursive,
-                                                          scf_maxiter=scf_maxiter,
-                                                          geometric_maxiter=geometric_maxiter,
-                                                          geometric_coordsys=geometric_coordsys,
-                                                          geometric_qccnv=geometric_qccnv)
-
-    # export and read back into JSON for final output
-    if stdout:
-        results_processed = [json.loads(res.json()) for res in results]
-        print(json.dumps(results_processed))
-
 
 @torsiondrive.command()
-@click.option("--dihedral", required=True, type=(int, int, int, int), help="Zero-indexed atom indices forming dihedral to drive")
+@click.option("--dihedral", required=False, type=(int, int, int, int), default=None, 
+              help="1-based atom indices forming dihedral to drive; if not specified, all rotatable bonds will be driven")
 @click.option("--grid-spacing", required=True, type=int, help="Grid spacing in degrees between optimizations")
 @click.option("--dihedral-range", default=None, help="Upper and lower angles setting the bounds for driving the dihedral")
-@click.option('-s', '--season', required=True, help="Season identifier specifying compute selections applied to molecules")
+@click.option('-s', '--season', required=False, default=None, help="Season identifier specifying compute selections applied to molecules")
+@click.option('-p', '--program', required=False, help="Program to use for calculation")
+@click.option('-d', '--method', required=False, help="Method to use within program")
+@click.option('-b', '--basis', required=False, help="Basis to use for method")
 @click.option('-t', '--nthreads', default=2, help="Number of threads to utilize for each gradient calculation step")
 @click.option('-m', '--memory', default=2, help="Maximum memory in GiB to allocate for each gradient calculation; set at least 5% *below* desired maximum")
 @click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
 @click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
 @click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
-@click.option('--geometric-qccnv', is_flag=True, help="If set, use QChem-style convergence criteria")
+@click.option('--geometric-qccnv/--no-geometric-qccnv', default=True, help="If set, use QChem-style convergence criteria")
 @click.argument('input-path', nargs=1)
-def execute_one_shot(input_path, dihedral, grid_spacing, dihedral_range, season, nthreads, memory,
+def execute_single(input_path, dihedral, grid_spacing, dihedral_range, season, 
+            program, method, basis, nthreads, memory,
             scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
-    """Execute molecule torsiondrive locally from a set of SDF files.
+    """Execute molecule torsiondrive locally from a single molecule in an SDF file.
 
-    Molecule optimizations specified will be executed locally using provided `--nthreads` and `--memory` parameters.
+    Molecule optimizations for the torsiondrive will be executed locally using provided `--nthreads` and `--memory` parameters.
 
     In case you hit problems, you may also modify parameters used for the optimization, such as `--scf-maxiter`.
     This allows for experimentation and debugging of problematic cases.
@@ -988,11 +932,6 @@ def execute_one_shot(input_path, dihedral, grid_spacing, dihedral_range, season,
 
     You must output to a directory by specifying `-o OUTPUT_DIRECTORY`.
     Calculation results can also be returned on STDOUT with the `--stdout` flag.
-    Note that results will only be printed to STDOUT when all results are complete.
-
-    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
-
-    To recurse directory INPUT_PATHs, use the `--recursive` flag.
 
     """
     import os
@@ -1008,22 +947,42 @@ def execute_one_shot(input_path, dihedral, grid_spacing, dihedral_range, season,
     if dihedral_range is not None:
         dihedral_range = [[int(i) for i in dihedral_range.split(',')]]
 
-    results = tdexec.execute_torsiondrive_oneshot(offmol,
-                                                  [dihedral],
-                                                  [grid_spacing],
-                                                  dihedral_range,
-                                                  season,
-                                                  ncores=nthreads,
-                                                  memory=memory,
-                                                  scf_maxiter=scf_maxiter,
-                                                  geometric_maxiter=geometric_maxiter,
-                                                  geometric_coordsys=geometric_coordsys,
-                                                  geometric_qccnv=geometric_qccnv)
+    if dihedral is None:
+        # drive all rotatable bonds
+        rotatable_bonds = offmol.find_rotatable_bonds()
+
+        # TODO: need to turn these into dihedrals
+        #offmol.propers?
+
+
+    elif isinstance(dihedral, tuple) and len(dihedral) == 4:
+        # we must subtract 1 from all indices to make them 0-based from 1-based input
+        dihedral = (i-1 for i in dihedral)
+    else:
+        raise ValueError("--dihedral must have only 4 elements, or be left unspecified to drive all rotatable bonds")
+
+    results = tdexec.execute_torsiondrive_single(offmol,
+                                                 [dihedral],
+                                                 [grid_spacing],
+                                                 dihedral_range,
+                                                 season,
+                                                 ncores=nthreads,
+                                                 memory=memory,
+                                                 scf_maxiter=scf_maxiter,
+                                                 geometric_maxiter=geometric_maxiter,
+                                                 geometric_coordsys=geometric_coordsys,
+                                                 geometric_qccnv=geometric_qccnv)
 
     print(results)
+
     # export and read back into JSON for final output
-    #results_processed = [json.loads(res.json()) for res in results]
-    #print(json.dumps(results_processed))
+    output = dict()
+    for spec_name in results:
+        output[spec_name] = dict()
+        for gridpoint in results[spec_name]:
+            output[spec_name][gridpoint] = [json.loads(opt.json()) for opt in results[spec_name][gridpoint]]
+
+    print(json.dumps(output))
 
 if __name__ == "__main__":
     cli()
