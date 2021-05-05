@@ -475,40 +475,6 @@ def execute(input_paths, output_directory, stdout, season, nthreads, memory, del
         print(json.dumps(results_processed))
 
 
-
-@cli.group()
-def report():
-    """Analyze the results and create plots.
-
-    """
-    pass
-
-@report.command()
-@click.option('--input-path', default='./', multiple=True, required=True)
-@click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='5-compare_forcefields', required=True)
-def compare_forcefields(input_path, ref_method, output_directory):
-    from .analysis import analysis
-    analysis.main(input_path, ref_method, output_directory)
-
-@report.command()
-@click.option('--input-path', default='./', multiple=True, required=True)
-@click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='5-match_minima', required=True)
-def match_minima(input_path, ref_method, output_directory):
-    from .analysis import analysis
-    analysis.match_minima(input_path, ref_method, output_directory)
-
-@report.command()
-@click.option('--input-path', default='5-compare_forcefields', multiple=True, required=True)
-@click.option('--ref-method', default='default', required=True)
-@click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
-def plots(input_path, ref_method, output_directory):
-    from .analysis import draw
-    draw.plot_compare_ffs(input_path, ref_method, output_directory)
-
-
-
 @cli.group()
 def preprocess():
     """Prepare input molecules for compute.
@@ -949,6 +915,127 @@ def smirks(input_directory, output_directory, smirks, processors):
         for file in conformer_error_files:
             shutil.copy(file, error_dir)
 
+
+@cli.group()
+def report():
+    """Analyze the results and create plots.
+
+    """
+    pass
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref-method', default='b3lyp-d3bj', required=True)
+@click.option('--output-directory', default='5-compare_forcefields', required=True)
+def compare_forcefields(input_path, ref_method, output_directory):
+    from .analysis import analysis
+    analysis.main(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref-method', default='b3lyp-d3bj', required=True)
+@click.option('--output-directory', default='5-match_minima', required=True)
+def match_minima(input_path, ref_method, output_directory):
+    from .analysis import analysis
+    analysis.match_minima(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='5-compare_forcefields', multiple=True, required=True)
+@click.option('--ref-method', default='default', required=True)
+@click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
+def plots(input_path, ref_method, output_directory):
+    from .analysis import draw
+    draw.plot_compare_ffs(input_path, ref_method, output_directory)
+
+
+@cli.group()
+def torsiondrive():
+    """Execute torsiondrives.
+
+    """
+    pass
+
+
+@torsiondrive.command()
+@click.option("--dihedral", required=False, type=(int, int, int, int), default=None, 
+              help="1-based atom indices forming dihedral to drive; if not specified, all rotatable bonds will be driven")
+@click.option("--grid-spacing", required=True, type=int, help="Grid spacing in degrees between optimizations")
+@click.option("--dihedral-range", default=None, help="Upper and lower angles setting the bounds for driving the dihedral")
+@click.option('-s', '--season', required=False, default=None, help="Season identifier specifying compute selections applied to molecules")
+@click.option('-p', '--program', required=False, help="Program to use for calculation")
+@click.option('-d', '--method', required=False, help="Method to use within program")
+@click.option('-b', '--basis', required=False, help="Basis to use for method")
+@click.option('-t', '--nthreads', default=2, help="Number of threads to utilize for each gradient calculation step")
+@click.option('-m', '--memory', default=2, help="Maximum memory in GiB to allocate for each gradient calculation; set at least 5% *below* desired maximum")
+@click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
+@click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
+@click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
+@click.option('--geometric-qccnv/--no-geometric-qccnv', default=True, help="If set, use QChem-style convergence criteria")
+@click.argument('input-path', nargs=1)
+def execute_single(input_path, dihedral, grid_spacing, dihedral_range, season, 
+            program, method, basis, nthreads, memory,
+            scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
+    """Execute molecule torsiondrive locally from a single molecule in an SDF file.
+
+    Molecule optimizations for the torsiondrive will be executed locally using provided `--nthreads` and `--memory` parameters.
+
+    In case you hit problems, you may also modify parameters used for the optimization, such as `--scf-maxiter`.
+    This allows for experimentation and debugging of problematic cases.
+    Please avoid changing parameters for production benchmarking data, taking care to output results to a different directory with `-o OUTPUT_DIRECTORY`.
+
+    You must output to a directory by specifying `-o OUTPUT_DIRECTORY`.
+    Calculation results can also be returned on STDOUT with the `--stdout` flag.
+
+    """
+    import os
+    import json
+    import warnings
+
+    from .utils.io import mols_from_paths
+    from .torsiondrives.compute import TorsiondriveExecutor
+
+    offmol = mols_from_paths([input_path])[0]
+    tdexec = TorsiondriveExecutor()
+
+    if dihedral_range is not None:
+        dihedral_range = [[int(i) for i in dihedral_range.split(',')]]
+
+    if dihedral is None:
+        # drive all rotatable bonds
+        rotatable_bonds = offmol.find_rotatable_bonds()
+
+        # TODO: need to turn these into dihedrals
+        #offmol.propers?
+
+
+    elif isinstance(dihedral, tuple) and len(dihedral) == 4:
+        # we must subtract 1 from all indices to make them 0-based from 1-based input
+        dihedral = (i-1 for i in dihedral)
+    else:
+        raise ValueError("--dihedral must have only 4 elements, or be left unspecified to drive all rotatable bonds")
+
+    results = tdexec.execute_torsiondrive_single(offmol,
+                                                 [dihedral],
+                                                 [grid_spacing],
+                                                 dihedral_range,
+                                                 season,
+                                                 ncores=nthreads,
+                                                 memory=memory,
+                                                 scf_maxiter=scf_maxiter,
+                                                 geometric_maxiter=geometric_maxiter,
+                                                 geometric_coordsys=geometric_coordsys,
+                                                 geometric_qccnv=geometric_qccnv)
+
+    print(results)
+
+    # export and read back into JSON for final output
+    output = dict()
+    for spec_name in results:
+        output[spec_name] = dict()
+        for gridpoint in results[spec_name]:
+            output[spec_name][gridpoint] = [json.loads(opt.json()) for opt in results[spec_name][gridpoint]]
+
+    print(json.dumps(output))
 
 if __name__ == "__main__":
     cli()
