@@ -1,8 +1,9 @@
-name: openff-benchmark-optimization
+name: openff-benchmark-torsiondrive
 channels:
   - conda-forge
   - psi4/label/dev
   - omnia
+  - pytorch
   - defaults
   - omnia/label/rc
   - omnia/label/benchmark
@@ -45,6 +46,9 @@ dependencies:
   - conda-forge::libiconv
   - ambertools =20.4
 
+  # ML calculations
+  - pytorch =1.6.0
+
   # procedures
   - geometric
 
@@ -63,3 +67,6 @@ dependencies:
   - pint
   - matplotlib
   - seaborn
+
+  - pip:
+    - torchani ==2.2

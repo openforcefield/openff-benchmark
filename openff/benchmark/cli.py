@@ -905,24 +905,29 @@ def torsiondrive():
 
 @torsiondrive.command()
 @click.option("--dihedral", required=False, type=(int, int, int, int), default=None, 
-              help="1-based atom indices forming dihedral to drive; if not specified, all rotatable bonds will be driven")
+              help="1-based atom indices forming dihedral to drive")
 @click.option("--grid-spacing", required=True, type=int, help="Grid spacing in degrees between optimizations")
 @click.option("--dihedral-range", default=None, help="Upper and lower angles setting the bounds for driving the dihedral")
-@click.option('-s', '--season', required=False, default=None, help="Season identifier specifying compute selections applied to molecules")
 @click.option('-p', '--program', required=False, help="Program to use for calculation")
 @click.option('-d', '--method', required=False, help="Method to use within program")
 @click.option('-b', '--basis', required=False, help="Basis to use for method")
+@click.option('-s', '--season', required=False, default=None, help="Season identifier specifying compute selections applied to molecules")
 @click.option('-t', '--nthreads', default=2, help="Number of threads to utilize for each gradient calculation step")
 @click.option('-m', '--memory', default=2, help="Maximum memory in GiB to allocate for each gradient calculation; set at least 5% *below* desired maximum")
+@click.option('-o', '--output-path', required=True, help="Output path to use for results")
 @click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
 @click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
 @click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
 @click.option('--geometric-qccnv/--no-geometric-qccnv', default=True, help="If set, use QChem-style convergence criteria")
 @click.argument('input-path', nargs=1)
-def execute_single(input_path, dihedral, grid_spacing, dihedral_range, season, 
-            program, method, basis, nthreads, memory,
+def execute_single(input_path, dihedral, grid_spacing, dihedral_range,
+            program, method, basis, season,
+            nthreads, memory, output_path,
             scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
     """Execute molecule torsiondrive locally from a single molecule in an SDF file.
+
+    You must specify either SEASON or a combination of PROGRAM, METHOD, and BASIS.
+    Specifying SEASON, e.g. '1:1', will execute a set of predefined PROGRAM, METHOD, and BASIS sets.
 
     Molecule optimizations for the torsiondrive will be executed locally using provided `--nthreads` and `--memory` parameters.
 
@@ -930,8 +935,7 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range, season,
     This allows for experimentation and debugging of problematic cases.
     Please avoid changing parameters for production benchmarking data, taking care to output results to a different directory with `-o OUTPUT_DIRECTORY`.
 
-    You must output to a directory by specifying `-o OUTPUT_DIRECTORY`.
-    Calculation results can also be returned on STDOUT with the `--stdout` flag.
+    You can output to a file by specifying `-o OUTPUT_PATH`.
 
     """
     import os
@@ -947,17 +951,16 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range, season,
     if dihedral_range is not None:
         dihedral_range = [[int(i) for i in dihedral_range.split(',')]]
 
-    if dihedral is None:
-        # drive all rotatable bonds
-        rotatable_bonds = offmol.find_rotatable_bonds()
+    #if dihedral is None:
+    #    # drive all rotatable bonds
+    #    rotatable_bonds = offmol.find_rotatable_bonds()
 
-        # TODO: need to turn these into dihedrals
-        #offmol.propers?
+    #    # TODO: need to turn these into dihedrals
+    #    #offmol.propers?
 
-
-    elif isinstance(dihedral, tuple) and len(dihedral) == 4:
+    if isinstance(dihedral, tuple) and len(dihedral) == 4:
         # we must subtract 1 from all indices to make them 0-based from 1-based input
-        dihedral = (i-1 for i in dihedral)
+        dihedral = tuple(i-1 for i in dihedral)
     else:
         raise ValueError("--dihedral must have only 4 elements, or be left unspecified to drive all rotatable bonds")
 
@@ -965,6 +968,9 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range, season,
                                                  [dihedral],
                                                  [grid_spacing],
                                                  dihedral_range,
+                                                 program,
+                                                 method,
+                                                 basis,
                                                  season,
                                                  ncores=nthreads,
                                                  memory=memory,
@@ -973,7 +979,6 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range, season,
                                                  geometric_coordsys=geometric_coordsys,
                                                  geometric_qccnv=geometric_qccnv)
 
-    print(results)
 
     # export and read back into JSON for final output
     output = dict()
@@ -982,7 +987,9 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range, season,
         for gridpoint in results[spec_name]:
             output[spec_name][gridpoint] = [json.loads(opt.json()) for opt in results[spec_name][gridpoint]]
 
-    print(json.dumps(output))
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, 'w') as f:
+        json.dump(output, f)
 
 if __name__ == "__main__":
     cli()

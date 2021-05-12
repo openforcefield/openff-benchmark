@@ -11,6 +11,7 @@ import shutil
 import contextlib
 
 from ..geometry_optimizations.seasons import SEASONS
+from ..exceptions import QCEngineError
 
 
 class TorsiondriveExecutor:
@@ -19,7 +20,8 @@ class TorsiondriveExecutor:
 
     def execute_torsiondrive_single(self,
             offmol, dihedrals, grid_spacing, dihedral_ranges,
-            season, ncores=1, memory=2,
+            program, method, basis, season, 
+            ncores=1, memory=2,
             scf_maxiter=200, geometric_maxiter=300, geometric_coordsys='dlc',
             geometric_qccnv=False):
         """Torsiondrive executor for a single molecule.
@@ -54,7 +56,23 @@ class TorsiondriveExecutor:
         # this is the object we care about returning
         opts = dict()
 
-        for spec_name, compute_spec in SEASONS[season].items():
+        if (season is not None) and any((program, method, basis)):
+            raise ValueError("Cannot specify both `season` and any of (`program`, `method`, `basis`)")
+        elif season is not None:
+            specs = SEASONS[season].items()
+        elif all((program, method)):
+            specs = {'single': {
+                        "method": method,
+                        "basis": basis,
+                        "program": program,
+                        "spec_name": 'single',
+                        "spec_description": 'user-specified compute specification'
+                        },
+                    }
+        else:
+            raise ValueError("Must specify at least (`program`, `method`) or `season`")
+
+        for spec_name, compute_spec in specs.items():
             print("Processing spec: '{}'".format(spec_name))
             opts[spec_name] = dict()
 
@@ -109,14 +127,18 @@ class TorsiondriveExecutor:
                                                         geometric_maxiter=geometric_maxiter,
                                                         geometric_coordsys=geometric_coordsys,
                                                         geometric_qccnv=geometric_qccnv)
+                        
+                        if result.success:
 
-                        # TODO: consider if we need to do multiple optimizations per grid point to
-                        # get robust results?
-                        task_results[gridpoint].append((result.initial_molecule.geometry.flatten().tolist(),
-                                                        result.final_molecule.geometry.flatten().tolist(),
-                                                        result.energies[-1]))
+                            # TODO: consider if we need to do multiple optimizations per grid point to
+                            # get robust results?
+                            task_results[gridpoint].append((result.initial_molecule.geometry.flatten().tolist(),
+                                                            result.final_molecule.geometry.flatten().tolist(),
+                                                            result.energies[-1]))
 
-                        opts[spec_name][gridpoint].append(result)
+                            opts[spec_name][gridpoint].append(result)
+                        else:
+                            raise QCEngineError(f"QCEngine failure: {result.error.error_message}")
 
                 td_api.update_state(state, task_results)
 
