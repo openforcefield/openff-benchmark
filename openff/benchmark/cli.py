@@ -42,8 +42,10 @@ def optimize():
 @click.option('-d', '--dataset-name', required=True, help="Dataset name to submit molecules under")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
 @click.option('-s', '--season', required=True, type=click.Choice(['1:1', '1:2']), help="Season identifier specifying compute selections applied to molecules")
+@click.option('--std-ids/--nonstd-ids', default=True,
+              help="Treat molecule optimization ids as if in standard form `<group>-<molecule>-<conformer>`; can be disabled to avoid parsing")
 @click.argument('input-path', nargs=-1)
-def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
+def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive, std_ids):
     """Submit molecules from INPUT_PATH.
 
     INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
@@ -54,7 +56,7 @@ def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
     """
     from .geometry_optimizations.compute import OptimizationExecutor
 
-    optexec = OptimizationExecutor()
+    optexec = OptimizationExecutor(std_ids=std_ids)
     optexec.submit_molecules(
             fractal_uri, input_path, season, dataset_name, recursive=recursive)
 
@@ -63,8 +65,10 @@ def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
 @click.option('-d', '--dataset-name', required=True, help="Dataset name to submit molecules under")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
 @click.option('-s', '--season', required=True, type=click.Choice(['1:1', '1:2']), help="Season identifier specifying compute selections applied to molecules")
+@click.option('--std-ids/--nonstd-ids', default=True,
+              help="Treat molecule optimization ids as if in standard form `<group>-<molecule>-<conformer>`; can be disabled to avoid parsing")
 @click.argument('input-path', nargs=-1)
-def create_submittable(output_path, input_path, season, dataset_name, recursive):
+def create_submittable(output_path, input_path, season, dataset_name, recursive, std_ids):
     """Create submittable, serialized QCSubmit OptimizationDataset from INPUT_PATH.
 
     INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
@@ -75,7 +79,7 @@ def create_submittable(output_path, input_path, season, dataset_name, recursive)
     """
     from .geometry_optimizations.compute import OptimizationExecutor
 
-    optexec = OptimizationExecutor()
+    optexec = OptimizationExecutor(std_ids=std_ids)
     optexec.create_submittable(
             output_path, input_path, season, dataset_name, recursive=recursive)
 
@@ -88,8 +92,12 @@ def create_submittable(output_path, input_path, season, dataset_name, recursive)
 @click.option('-d', '--dataset-name', required=True, help="Dataset name to export molecule optimization data from")
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
+@click.option('--delete-existing', is_flag=True,
+              help="Delete existing output directory if it exists")
+@click.option('--std-ids/--nonstd-ids', default=True,
+              help="Treat molecule optimization ids as if in standard form `<group>-<molecule>-<conformer>`; can be disabled to avoid parsing")
 @click.option('-o', '--output-directory', required=True, help="Output directory to use for results")
-def export(fractal_uri, output_directory, dataset_name, delete_existing):
+def export(fractal_uri, output_directory, dataset_name, delete_existing, std_ids):
     """Export molecule optimization data from a given dataset into an output directory.
 
     You must provide the dataset name via `-d DATASET_NAME` that you wish to export.
@@ -103,7 +111,7 @@ def export(fractal_uri, output_directory, dataset_name, delete_existing):
     if (not delete_existing) and os.path.exists(output_directory):
         warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
 
-    optexec = OptimizationExecutor()
+    optexec = OptimizationExecutor(std_ids=std_ids)
     optexec.export_molecule_data(
             fractal_uri, output_directory, dataset_name, delete_existing)
 

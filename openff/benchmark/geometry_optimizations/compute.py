@@ -21,16 +21,19 @@ from ..utils.io import mols_from_paths
 
 class OptimizationExecutor:
 
-    def __init__(self):
-        self.stop = False
+    def __init__(self, std_ids=True):
+        self.std_ids = std_ids
 
-    @staticmethod
-    def _mol_to_id(mol):
-        id = "{org}-{molecule:05}-{conformer:02}".format(
-                org=mol.properties['group_name'],
-                molecule=mol.properties['molecule_index'],
-                conformer=mol.properties['conformer_index'])
-        return id
+    def _mol_to_id(self, mol):
+        if self.std_ids:
+            output_id = "{org}-{molecule:05}-{conformer:02}".format(
+                            org=mol.properties['group_name'],
+                            molecule=mol.properties['molecule_index'],
+                            conformer=mol.properties['conformer_index'])
+        else:
+            output_id = mol.to_smiles()
+
+        return output_id 
 
     def submit_molecules(self, fractal_uri, input_paths, season,
             dataset_name, recursive=False):
@@ -97,10 +100,10 @@ class OptimizationExecutor:
         factory = OptimizationDatasetFactory()
 
         for mol in mols:
-            id = self._mol_to_id(mol)
+            output_id = self._mol_to_id(mol)
 
             attributes = factory.create_cmiles_metadata(mol)
-            ds.add_molecule(index=id, molecule=mol, attributes=attributes)
+            ds.add_molecule(index=output_id, molecule=mol, attributes=attributes)
 
         ds.qc_specifications = SEASONS[season]
 
@@ -181,18 +184,12 @@ class OptimizationExecutor:
     
             records = optds.data.dict()['records']
     
-            for id, opt in optds.df[spec].iteritems():
+            for output_id, opt in optds.df[spec].iteritems():
     
                 # skip incomplete cases
                 if opt.final_molecule is None:
-                    print("... '{}' : skipping INCOMPLETE".format(id))
+                    print("... '{}' : skipping INCOMPLETE".format(output_id))
                     continue
-    
-                # fix to ensure output fidelity of ids; losing 02 padding on conformer
-                org, molecule, conformer = id.split('-')
-                output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
-                                                                        molecule=int(molecule),
-                                                                        conformer=int(conformer))
     
                 # subfolders for each compute spec, files named according to molecule ids
                 outfile = "{}".format(
@@ -449,9 +446,10 @@ class OptimizationExecutor:
     
         in_out_path_map = defaultdict(list)
         for sourcefile, mol in mols.items():
-            id = self._mol_to_id(mol)
+            output_id = self._mol_to_id(mol)
+
             for spec in specs:
-                in_out_path_map[sourcefile].append("{}.sdf".format(os.path.join(output_directory, spec, id)))
+                in_out_path_map[sourcefile].append("{}.sdf".format(os.path.join(output_directory, spec, output_id)))
     
         return in_out_path_map
     
@@ -684,8 +682,7 @@ class OptimizationExecutor:
                 return True
         return False
 
-    @staticmethod
-    def _process_final_mol(output_id, offmol, qcmol, method, basis, program, energies):
+    def _process_final_mol(self, output_id, offmol, qcmol, method, basis, program, energies):
         from openforcefield.topology.molecule import unit
         import numpy as np
         import pint
@@ -704,9 +701,10 @@ class OptimizationExecutor:
         # set molecule metadata
         offmol.name = output_id
     
-        (offmol.properties['group_name'],
-         offmol.properties['molecule_index'],
-         offmol.properties['conformer_index']) = output_id.split('-')
+        if self.std_ids:
+            (offmol.properties['group_name'],
+             offmol.properties['molecule_index'],
+             offmol.properties['conformer_index']) = output_id.split('-')
     
         # SDF key-value pairs should be used for method, basis, program, provenance, `openff-benchmark` version
         offmol.properties['method'] = method
@@ -792,13 +790,7 @@ class OptimizationExecutor:
             os.makedirs(os.path.join(output_directory, spec_name, 'error_mols'), exist_ok=True)
 
             for mol in mols:
-                id = self._mol_to_id(mol)
-
-                # fix to ensure output fidelity of ids; losing 02 padding on conformer
-                org, molecule, conformer = id.split('-')
-                output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
-                                                                        molecule=int(molecule),
-                                                                        conformer=int(conformer))
+                output_id = self._mol_to_id(mol)
 
                 # subfolders for each compute spec, files named according to molecule ids
                 outfile = "{}".format(
