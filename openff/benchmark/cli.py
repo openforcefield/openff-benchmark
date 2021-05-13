@@ -987,7 +987,7 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range,
         for gridpoint in results[spec_name]:
             output[spec_name][gridpoint] = [json.loads(opt.json()) for opt in results[spec_name][gridpoint]]
 
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, 'w') as f:
         json.dump(output, f)
 
