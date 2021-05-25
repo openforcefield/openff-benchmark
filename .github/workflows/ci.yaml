@@ -17,12 +17,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: 
-          - ubuntu-latest
-         #- macOS-latest 
-         #python-version: 
-         #  - 3.6
-         #  - 3.7
+        include:
+          - name: prod
+            os: ubuntu-latest
+            envfile: 'devtools/prod-envs/openff-benchmark-optimization.yaml'
+            envname: 'openff-benchmark-optimization'
+          - name: latest
+            os: ubuntu-latest
+            envfile: 'devtools/conda-envs/ci-latest.yaml'
+            envname: 'ci-latest'
     env:
       CI_OS: ${{ matrix.os }}
       #PYVER: ${{ matrix.python-version }}
@@ -33,13 +36,13 @@ jobs:
     - name: Cache conda
       uses: actions/cache@v2
       env:
-        # Increase this value to reset cache if etc/example-environment.yml has not changed
+        # Increase this value to reset cache manually
         CACHE_NUMBER: 0
       with:
         path: ~/conda_pkgs_dir
         key:
           ${{ matrix.os }}-conda-${{ env.CACHE_NUMBER }}-${{
-          hashFiles('devtools/prod-envs/openff-benchmark-optimization.yaml') }}
+          hashFiles(${{ matrix.envfile }}) }}
 
     - name: Configure conda
       uses: conda-incubator/setup-miniconda@v2
@@ -71,7 +74,7 @@ jobs:
     - name: Install package
       shell: bash -l {0}
       run: |
-        conda remove --force openff-benchmark
+        conda remove --force openff-benchmark || echo "openff-benchmark not present"
         python -m pip install --no-deps -e .
 
     - name: Run tests
