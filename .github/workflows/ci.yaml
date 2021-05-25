@@ -42,7 +42,7 @@ jobs:
         path: ~/conda_pkgs_dir
         key:
           ${{ matrix.os }}-conda-${{ env.CACHE_NUMBER }}-${{
-          hashFiles(${{ matrix.envfile }}) }}
+          hashFiles( matrix.envfile ) }}
 
     - name: Configure conda
       uses: conda-incubator/setup-miniconda@v2
