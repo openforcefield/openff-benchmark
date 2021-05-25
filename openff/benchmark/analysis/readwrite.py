@@ -17,8 +17,8 @@ import pandas as pd
 import pint
 ureg = pint.UnitRegistry()
 
-from openforcefield.topology import Molecule
-from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+from openff.toolkit.topology import Molecule
+from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 
 
 oetk_loaded = False

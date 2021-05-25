@@ -2,13 +2,13 @@ from openff.qcsubmit.workflow_components import SmartsFilter
 from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:
-    from openforcefield.topology import Molecule
+    from openff.toolkit.topology import Molecule
     from openff.qcsubmit.datasets import ComponentResult
 
 
 def smirks_filter(input_molecules: List["Molecule"], filtered_smirks: List[str], processors: Optional[int] = None) -> "ComponentResult":
     """
-    Filter a list of openforcefield.topology.Molecules based on a list of unwanted smirks patterns.
+    Filter a list of openff.toolkit.topology.Molecules based on a list of unwanted smirks patterns.
 
     Parameters
     ----------

@@ -10,11 +10,11 @@ import sys
 from typing import List
 
 # Deregister OpenEye for any ToolkitRegistry calls that happen in this file
-logger = logging.getLogger('openforcefield.utils.toolkits')
+logger = logging.getLogger('openff.toolkit.utils.toolkits')
 prev_log_level = logger.getEffectiveLevel()
 logger.setLevel(logging.ERROR)
 
-from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 
 logger.setLevel(prev_log_level)
 
@@ -561,7 +561,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     Where possible, these cases write both an SDF file of the molecule (with key-value pairs indicating the file the structure came from),
     and a correspondingly-named txt file containing more details about the error.
     """
-    from openforcefield.topology import Molecule
+    from openff.toolkit.topology import Molecule
     from openff.benchmark.utils.validate_and_assign_ids import validate_and_assign
     from openff.benchmark.utils.utils import prepare_folders
     import glob
@@ -591,7 +591,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
         # Squelch reading warnings
         # We'll recover the full text of the warning/error during the file round trip tests in validate_and_assign_ids.py.
         try:
-            toolkit_logger = logging.getLogger('openforcefield.utils.toolkits')
+            toolkit_logger = logging.getLogger('openff.toolkit.utils.toolkits')
             prev_log_level = toolkit_logger.getEffectiveLevel()
             toolkit_logger.setLevel(logging.ERROR)
             loaded_mols = Molecule.from_file(molecule_3d_file,
@@ -711,7 +711,7 @@ def generate_conformers(input_directory, output_directory, add, delete_existing)
     
 
     """
-    from openforcefield.topology import Molecule
+    from openff.toolkit.topology import Molecule
     from openff.benchmark.utils.generate_conformers import generate_conformers
     from openff.benchmark.utils.utils import prepare_folders
     import glob
@@ -813,7 +813,7 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
     Generate a coverage report for the set of validated input molecules.
     """
     from openff.benchmark.utils.coverage_report import generate_coverage_report, _update_coverage
-    from openforcefield.topology import Molecule
+    from openff.toolkit.topology import Molecule
     from openff.benchmark.utils.utils import prepare_folders
     import json
     import glob
@@ -919,7 +919,7 @@ def smirks(input_directory, output_directory, smirks, processors):
     Those that do match the pattern are put in the error mols directory.
     """
     from openff.benchmark.utils.filters import smirks_filter
-    from openforcefield.topology import Molecule
+    from openff.toolkit.topology import Molecule
     from openff.benchmark.utils.utils import prepare_folders
     import glob
     import os
