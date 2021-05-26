@@ -615,6 +615,7 @@ class OptimizationExecutor:
     @staticmethod
     def _execute_output_results(output_id, resultjson, final_molecule, outfile, success, perfd):
         import json
+        import bz2
         if success:
             try:
                 final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
@@ -624,17 +625,16 @@ class OptimizationExecutor:
             print("Optimization failed for '{}'; check JSON results output".format(output_id))
 
         try:
-            with open("{}.json".format(outfile), 'w') as f:
-                f.write(resultjson)
+            with open("{}.json.bz2".format(outfile), 'w') as f:
+                f.write(bz2.compress(resultjson.encode('utf-8')))
         except:
                 print("Failed to write result JSON for '{}'".format(output_id))
 
         try:
-            with open("{}.perf.json".format(outfile), 'w') as f:
-                json.dump(perfd, f)
+            with open("{}.perf.json.bz2".format(outfile), 'wb') as f:
+                f.write(bz2.compress(json.dumps(perfd).encode('utf-8')))
         except:
                 print("Failed to write performance JSON for '{}'".format(output_id))
-
 
     @staticmethod
     def _args_from_optimizationrecord(opt, client):
