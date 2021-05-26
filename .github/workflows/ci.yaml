@@ -44,8 +44,8 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         #python-version: ${{ matrix.python-version }}
-        activate-environment: openff-benchmark-optimization
-        environment-file: devtools/prod-envs/openff-benchmark-optimization.yaml
+        activate-environment: ${{ matrix.envname }}
+        environment-file: ${{ matrix.envfile }}
         auto-activate-base: false
         use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
 
