@@ -18,10 +18,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: prod
-            os: ubuntu-latest
-            envfile: 'devtools/prod-envs/openff-benchmark-optimization.yaml'
-            envname: 'openff-benchmark-optimization'
           - name: latest
             os: ubuntu-latest
             envfile: 'devtools/conda-envs/ci-latest.yaml'
