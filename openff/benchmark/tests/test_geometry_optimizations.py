@@ -140,7 +140,7 @@ def test_cli_optimize_execute_from_server_qm(fractal_compute_server, tmpdir, eth
         assert response.exit_code == 0
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json.bz2", "perf.json.bz2"])
 
 
 def test_cli_optimize_submit_molecules_mm(fractal_compute_server, tmpdir, ethane_qm_optimized):
@@ -195,7 +195,7 @@ def test_cli_optimize_execute_from_server_mm(fractal_compute_server, tmpdir, eth
         assert response.exit_code == 0
         for season in SEASONS["1:2"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json.bz2", "perf.json.bz2"])
 
 
 def test_cli_optimize_export_qm(fractal_compute_server, tmpdir, ethane_preprocessed):
@@ -218,12 +218,12 @@ def test_cli_optimize_export_qm(fractal_compute_server, tmpdir, ethane_preproces
         if response.exception:
             print(response.exception)
         assert response.exit_code == 0
-        assert "exporting COMPLETE" in response.output
+        assert "exported COMPLETE" in response.output
         assert "Failed to write" not in response.output
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json.bz2", "perf.json.bz2"])
 
 
 def test_cli_optimize_export_qm_proton_transfer(fractal_compute_server, tmpdir, acetic_acid_optimized_proton_transfer):
@@ -265,14 +265,13 @@ def test_cli_optimize_export_qm_proton_transfer(fractal_compute_server, tmpdir, 
             print(response.exception)
 
         assert response.exit_code == 0
-        assert "... 'OFF-00001-00' : exporting COMPLETE" in response.output
         assert "... 'OFF-00001-00' : export error" in response.output
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
             assert set(exported_files) == set(['error_mols'])
             exported_error_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season, 'error_mols'))
-            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json", "perf.json"])
+            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json.bz2", "perf.json.bz2"])
 
 
 def test_cli_optimize_execute_from_server_qm_proton_transfer(fractal_compute_server, tmpdir, acetic_acid_optimized_proton_transfer):
@@ -303,7 +302,7 @@ def test_cli_optimize_execute_from_server_qm_proton_transfer(fractal_compute_ser
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
             assert set(exported_files) == set(['error_mols'])
             exported_error_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season, 'error_mols'))
-            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json", "perf.json"])
+            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json.bz2", "perf.json.bz2"])
 
 
 def test_cli_optimize_export_mm(fractal_compute_server, tmpdir, ethane_qm_optimized):
@@ -326,12 +325,12 @@ def test_cli_optimize_export_mm(fractal_compute_server, tmpdir, ethane_qm_optimi
         if response.exception:
             print(response.exception)
         assert response.exit_code == 0
-        assert "exporting COMPLETE" in response.output
+        assert "exported COMPLETE" in response.output
         assert "Failed to write" not in response.output
 
         for season in SEASONS["1:2"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json.bz2", "perf.json.bz2"])
 
 
 def test_cli_optimize_status(fractal_compute_server, tmpdir, ethane_preprocessed):
@@ -379,7 +378,7 @@ def test_cli_optimize_execute_qm(tmpdir, ethane_preprocessed):
 
         for season in SEASONS["1:1"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json.bz2", "perf.json.bz2"])
 
 
 def test_cli_optimize_execute_qm_proton_transfer(tmpdir, acetic_acid_optimized_proton_transfer):
@@ -405,7 +404,7 @@ def test_cli_optimize_execute_qm_proton_transfer(tmpdir, acetic_acid_optimized_p
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
             assert set(exported_files) == set(['error_mols'])
             exported_error_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season, 'error_mols'))
-            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json", "perf.json"])
+            assert set(exported_error_files) - set(['error_mols']) == set(f"OFF-00001-00.{suffix}" for suffix in ["txt", "json.bz2", "perf.json.bz2"])
 
 
 def test_cli_optimize_execute_mm(tmpdir, ethane_qm_optimized):
@@ -428,7 +427,7 @@ def test_cli_optimize_execute_mm(tmpdir, ethane_qm_optimized):
 
         for season in SEASONS["1:2"]:
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
-            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json.bz2", "perf.json.bz2"])
 
 
 class TestOptimizationExecutor:

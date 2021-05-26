@@ -625,7 +625,7 @@ class OptimizationExecutor:
             print("Optimization failed for '{}'; check JSON results output".format(output_id))
 
         try:
-            with open("{}.json.bz2".format(outfile), 'w') as f:
+            with open("{}.json.bz2".format(outfile), 'wb') as f:
                 f.write(bz2.compress(resultjson.encode('utf-8')))
         except:
                 print("Failed to write result JSON for '{}'".format(output_id))
