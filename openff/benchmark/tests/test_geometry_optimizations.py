@@ -8,7 +8,7 @@ import pytest
 import pint
 from click.testing import CliRunner
 
-from openforcefield.topology import Molecule
+from openff.toolkit.topology import Molecule
 
 from openff.benchmark.geometry_optimizations import compute
 from openff.benchmark.geometry_optimizations.seasons import SEASONS

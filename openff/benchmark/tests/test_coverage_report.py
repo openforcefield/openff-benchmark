@@ -1,7 +1,7 @@
 from openff.benchmark.utils.coverage_report import generate_coverage_report
 from openff.benchmark.utils.utils import get_data_file_path
 from openff.benchmark.cli import cli
-from openforcefield.topology import Molecule
+from openff.toolkit.topology import Molecule
 import shutil
 import json
 import glob
