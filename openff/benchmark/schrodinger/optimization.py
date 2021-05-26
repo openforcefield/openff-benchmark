@@ -91,17 +91,18 @@ def optimization(
 
     mols = mols_from_paths(input_paths, recursive=recursive)
     if len(mols) == 0:
-        raise Exception("No molecules are selected for the ffbuilder job. "
-                        "Check the input path.")
-        
+        raise Exception(
+            "No molecules are selected for the ffbuilder job. " "Check the input path."
+        )
+
     with open(sdf_file, "w") as file:
         for i, mol in enumerate(mols):
             if opls_dir is None:
-                mol.properties["method"] = "opls3e_default"
+                mol.properties["method"] = "default"
                 mol.properties["basis"] = "opls"
                 mol.properties["program"] = "macromodel"
             else:
-                mol.properties["method"] = "opls3e_custom"
+                mol.properties["method"] = "custom"
                 mol.properties["basis"] = "opls"
                 mol.properties["program"] = "macromodel"
             mol.to_file(file, "SDF")
@@ -178,15 +179,51 @@ def postprocess(
 
     methods = set()
     for mol in mols:
-        mol.properties.pop("initial_energy")
-        mol.properties[
-            "final_energy"
-        ] = f'{mol.properties["r_mmod_Potential_Energy-OPLS3e"]} kJ / mole'
-        mol.properties[
-            "initial_energy"
-        ] = '0.0 kJ / mole'
-        mol.properties["molecule_index"] = f"{mol.properties['molecule_index']:05d}"
-        mol.properties["conformer_index"] = f"{mol.properties['conformer_index']:02d}"
+        # for backwards compatibility with former versions of the command - rename method to new identifiers
+        if (
+            mol.properties["method"] == "opls3e_default"
+            or mol.properties["method"] == "opls3e_custom"
+        ):
+            mol.properties["method"] = mol.properties["method"].split("_")[1]
+        # check whether program, basis and method keywords are compatible with Schrodinger output.
+        if (
+            mol.properties["program"] != "macromodel"
+            or mol.properties["basis"] != "opls"
+        ):
+            raise Exception(
+                f"Molecule {mol.properties['name']} does not have any Schrodinger "
+                "OPLS geometry optimization results."
+            )
+        if mol.properties["method"] not in ["custom", "default"]:
+            raise Exception(
+                f"Molecule {mol.properties['name']} does not have any Schrodinger "
+                "OPLS geometry optimization results."
+            )
+        if "r_mmod_Potential_Energy-OPLS3e" in mol.properties:
+            mol.properties[
+                "final_energy"
+            ] = f'{mol.properties["r_mmod_Potential_Energy-OPLS3e"]} kJ / mole'
+            mol.properties["initial_energy"] = "0.0 kJ / mole"
+            mol.properties["molecule_index"] = f"{mol.properties['molecule_index']:05d}"
+            mol.properties[
+                "conformer_index"
+            ] = f"{mol.properties['conformer_index']:02d}"
+            mol.properties["method"] = f"opls3e_{mol.properties['method']}"
+        elif "r_mmod_Potential_Energy-S-OPLS" in mol.properties:
+            mol.properties[
+                "final_energy"
+            ] = f'{mol.properties["r_mmod_Potential_Energy-S-OPLS"]} kJ / mole'
+            mol.properties["initial_energy"] = "0.0 kJ / mole"
+            mol.properties["molecule_index"] = f"{mol.properties['molecule_index']:05d}"
+            mol.properties[
+                "conformer_index"
+            ] = f"{mol.properties['conformer_index']:02d}"
+            mol.properties["method"] = f"opls4_{mol.properties['method']}"
+        else:
+            raise Exception(
+                f"Molecule {mol.properties['name']} does not have any knwon Schrodinger "
+                "OPLS geometry optimization results."
+            )
         methods.add(mol.properties["method"])
 
     os.makedirs(output_path, exist_ok=True)
