@@ -1487,9 +1487,6 @@ def coverage_report(
         reporter.write(data)
         # TODO do we want the list of errors in the coverage report as well?
 
-<<<<<<< HEAD
-=======
-
 @cli.group()
 def filter():
     """A group of useful filters for benchmarking.
@@ -1539,8 +1536,6 @@ def smirks(input_directory, output_directory, smirks, processors):
         conformer_error_files = glob.glob(os.path.join(input_directory, f"{error_id}-*.sdf"))
         for file in conformer_error_files:
             shutil.copy(file, error_dir)
-
->>>>>>> 2891ce299fb9d91d8c281e0d2f5b12111703fb1a
 
 if __name__ == "__main__":
     cli()
