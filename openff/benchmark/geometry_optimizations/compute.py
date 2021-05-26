@@ -134,7 +134,7 @@ class OptimizationExecutor:
         return offmol
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
-                             delete_existing=False, keep_existing=True):
+                             delete_existing=False, keep_existing=True, processes=None):
         """Export all molecule data from target QCFractal server to the given directory.
     
         Parameters
@@ -151,9 +151,13 @@ class OptimizationExecutor:
             If True, keep existing files in export directory.
             Files corresponding to server data will not be re-exported.
             Relies *only* on filepaths of existing files for determining match.
+        processes : int
+            Number of processes to use for export;
+            if `None`, no separate process pool will be used.
     
         """
         import json
+        from concurrent.futures import ProcessPoolExecutor, as_completed
 
         # get dataset
         client = FractalClient(fractal_uri, verify=False)
@@ -170,6 +174,17 @@ class OptimizationExecutor:
             else:
                 raise Exception(f'Output directory {output_directory} already exists. '
                                  'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
+
+
+        # set up process pool for compute submission
+        # if processes == 0, perform in-process, no pool
+        if processes is None:
+            def execute(func, *args, **kwargs):
+                return func(*args, **kwargs)
+
+        else:
+            pool = ProcessPoolExecutor(max_workers=processes)
+            execute = pool.submit
     
         # for each compute spec, create a folder in the output directory
         # deposit SDF giving final molecule, energy
@@ -181,76 +196,103 @@ class OptimizationExecutor:
     
             records = optds.data.dict()['records']
     
+            work = []
             for id, opt in optds.df[spec].iteritems():
+                qcmol = records[id.lower()]
+                task = execute(self._export_id_mol,
+                        id, opt, output_directory, 
+                        spec, 
+                        optentspec,
+                        client=client,
+                        qcmol=qcmol,
+                        delete_existing=delete_existing)
+                if processes is not None:
+                    work.append(task)
+                else:
+                    print(task)
+
+            if processes is not None:
+                for completed_task in as_completed(work):
+                    print(completed_task.result())
+
+                    # conserve memory
+                    work.remove(completed_task)
+                    del completed_task
+
+    def _export_id_mol(
+            self, id, opt, output_directory, 
+            spec, optentspec, client, qcmol,
+            delete_existing=False):
+        import json
+
+        # skip incomplete cases
+        if opt.final_molecule is None:
+            return ("... '{}' : skipping INCOMPLETE".format(id))
     
-                # skip incomplete cases
-                if opt.final_molecule is None:
-                    print("... '{}' : skipping INCOMPLETE".format(id))
-                    continue
+        # fix to ensure output fidelity of ids; losing 02 padding on conformer
+        org, molecule, conformer = id.split('-')
+        output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
+                                                                molecule=int(molecule),
+                                                                conformer=int(conformer))
     
-                # fix to ensure output fidelity of ids; losing 02 padding on conformer
-                org, molecule, conformer = id.split('-')
-                output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
-                                                                        molecule=int(molecule),
-                                                                        conformer=int(conformer))
-    
-                # subfolders for each compute spec, files named according to molecule ids
-                outfile = "{}".format(
-                        os.path.join(output_directory, spec, output_id))
+        # subfolders for each compute spec, files named according to molecule ids
+        outfile = "{}".format(
+                os.path.join(output_directory, spec, output_id))
 
-                # if we did not delete everything at the start and the path already exists,
-                # skip this one; reduces processing and writes to filesystem
-                if (not delete_existing) and os.path.exists("{}.sdf".format(outfile)):
-                    print("... '{}' : skipping SDF exists".format(id))
-                    continue
+        # if we did not delete everything at the start and the path already exists,
+        # skip this one; reduces processing and writes to filesystem
+        if (not delete_existing) and os.path.exists("{}.sdf".format(outfile)):
+            return ("... '{}' : skipping SDF exists".format(id))
 
-                print("... '{}' : exporting COMPLETE".format(id))
-                optd = self._get_complete_optimization_result(opt, client)
-                optdjson = json.dumps(optd)
+        #print("... '{}' : exporting COMPLETE".format(id))
+        optd = self._get_complete_optimization_result(opt, client)
+        optdjson = json.dumps(optd)
 
-                perfd = {'walltime': opt.provenance.wall_time,
-                         'completed': opt.modified_on.isoformat()}
+        perfd = {'walltime': opt.provenance.wall_time,
+                 'completed': opt.modified_on.isoformat()}
 
-                try:
-                    offmol = self._mol_from_qcserver(records[id.lower()])
+        try:
+            offmol = self._mol_from_qcserver(qcmol)
 
-                    # set conformer as final, optimized geometry
-                    final_qcmol = opt.get_final_molecule()
-                    final_molecule = self._process_final_mol(output_id,
-                                                             offmol,
-                                                             final_qcmol,
-                                                             optentspec.qc_spec.method,
-                                                             optentspec.qc_spec.basis,
-                                                             optentspec.qc_spec.program,
-                                                             opt.energies)
+            # set conformer as final, optimized geometry
+            final_qcmol = opt.get_final_molecule()
+            final_molecule = self._process_final_mol(output_id,
+                                                     offmol,
+                                                     final_qcmol,
+                                                     optentspec.qc_spec.method,
+                                                     optentspec.qc_spec.basis,
+                                                     optentspec.qc_spec.program,
+                                                     opt.energies)
 
 
-                    self._execute_output_results(output_id=output_id,
-                                                 resultjson=optdjson,
-                                                 final_molecule=final_molecule,
-                                                 outfile=outfile,
-                                                 success=True,
-                                                 perfd=perfd)
+            self._execute_output_results(output_id=output_id,
+                                         resultjson=optdjson,
+                                         final_molecule=final_molecule,
+                                         outfile=outfile,
+                                         success=True,
+                                         perfd=perfd)
 
-                except Exception as e:
-                    print("... '{}' : export error".format(id))
-                    final_molecule = None
+        except Exception as e:
+            final_molecule = None
 
-                    error_outfile = "{}".format(
-                        os.path.join(output_directory, spec, 'error_mols', output_id))
+            error_outfile = "{}".format(
+                os.path.join(output_directory, spec, 'error_mols', output_id))
 
-                    try:
-                        with open("{}.txt".format(error_outfile), 'w') as f:
-                            f.write(str(e))
-                    except:
-                        pass
+            try:
+                with open("{}.txt".format(error_outfile), 'w') as f:
+                    f.write(str(e))
+            except:
+                pass
 
-                    self._execute_output_results(output_id=output_id,
-                                                 resultjson=optdjson,
-                                                 final_molecule=final_molecule,
-                                                 outfile=error_outfile,
-                                                 success=False,
-                                                 perfd=perfd)
+            self._execute_output_results(output_id=output_id,
+                                         resultjson=optdjson,
+                                         final_molecule=final_molecule,
+                                         outfile=error_outfile,
+                                         success=False,
+                                         perfd=perfd)
+            return ("... '{}' : export error".format(id))
+
+        return ("... '{}' : exported COMPLETE".format(id))
 
     def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):

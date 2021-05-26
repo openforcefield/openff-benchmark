@@ -88,8 +88,11 @@ def create_submittable(output_path, input_path, season, dataset_name, recursive)
 @click.option('-d', '--dataset-name', required=True, help="Dataset name to export molecule optimization data from")
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
+@click.option("-p", "--processes",
+              default=None,
+              type=click.INT, help="Number of parellel processes to use for export; if not specified, export done in series.")
 @click.option('-o', '--output-directory', required=True, help="Output directory to use for results")
-def export(fractal_uri, output_directory, dataset_name, delete_existing):
+def export(fractal_uri, output_directory, dataset_name, delete_existing, processes):
     """Export molecule optimization data from a given dataset into an output directory.
 
     You must provide the dataset name via `-d DATASET_NAME` that you wish to export.
@@ -105,7 +108,7 @@ def export(fractal_uri, output_directory, dataset_name, delete_existing):
 
     optexec = OptimizationExecutor()
     optexec.export_molecule_data(
-            fractal_uri, output_directory, dataset_name, delete_existing)
+            fractal_uri, output_directory, dataset_name, delete_existing, processes=processes)
 
 @optimize.command()
 @click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
