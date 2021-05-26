@@ -484,7 +484,7 @@ def report():
     pass
 
 @report.command()
-@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--input-path', multiple=True, required=True)
 @click.option('--ref-method', default='b3lyp-d3bj', required=True)
 @click.option('--output-directory', default='5-compare_forcefields', required=True)
 def compare_forcefields(input_path, ref_method, output_directory):
@@ -492,7 +492,7 @@ def compare_forcefields(input_path, ref_method, output_directory):
     analysis.main(input_path, ref_method, output_directory)
 
 @report.command()
-@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--input-path', multiple=True, required=True)
 @click.option('--ref-method', default='b3lyp-d3bj', required=True)
 @click.option('--output-directory', default='5-match_minima', required=True)
 def match_minima(input_path, ref_method, output_directory):
@@ -500,7 +500,7 @@ def match_minima(input_path, ref_method, output_directory):
     analysis.match_minima(input_path, ref_method, output_directory)
 
 @report.command()
-@click.option('--input-path', default='5-compare_forcefields', multiple=True, required=True)
+@click.option('--input-path', multiple=True, required=True)
 @click.option('--ref-method', default='default', required=True)
 @click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
 def plots(input_path, ref_method, output_directory):
