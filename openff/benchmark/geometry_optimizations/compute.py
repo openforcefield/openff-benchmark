@@ -114,8 +114,8 @@ class OptimizationExecutor:
     
     @staticmethod
     def _mol_from_qcserver(record):
-        from openff.toolkit.topology import Molecule
-        from openff.toolkit.utils import toolkits
+        from openforcefield.topology import Molecule
+        from openforcefield.utils import toolkits
         
         # make sure we deregister OpenEye, if it is present
         try:
@@ -640,7 +640,7 @@ class OptimizationExecutor:
                 input_data, procedure=procedure, local_options=local_options)
 
     def _process_optimization_result(self, output_id, result):
-        from openff.toolkit.topology import Molecule
+        from openforcefield.topology import Molecule
 
         cmiles = result.initial_molecule.extras['canonical_isomeric_explicit_hydrogen_mapped_smiles']
         
@@ -686,7 +686,7 @@ class OptimizationExecutor:
 
     @staticmethod
     def _process_final_mol(output_id, offmol, qcmol, method, basis, program, energies):
-        from openff.toolkit.topology.molecule import unit
+        from openforcefield.topology.molecule import unit
         import numpy as np
         import pint
     

@@ -1,7 +1,7 @@
 from openff.benchmark.utils.filters import smirks_filter
 from openff.benchmark.utils.utils import get_data_file_path
 from openff.benchmark.cli import cli
-from openff.toolkit.topology import Molecule
+from openforcefield.topology import Molecule
 import glob
 import os
 import pytest

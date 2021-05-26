@@ -1,4 +1,4 @@
-from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper, RDKitToolkitWrapper
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper, RDKitToolkitWrapper
 from openff.benchmark.utils.validate_and_assign_ids import validate_and_assign
 from openff.benchmark.cli import validate, cli
 from openff.benchmark.utils.utils import get_data_file_path

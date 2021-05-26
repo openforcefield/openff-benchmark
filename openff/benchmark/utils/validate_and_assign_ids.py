@@ -6,12 +6,12 @@ import copy
 import shutil
 from openff.benchmark.utils.generate_conformers import align_offmol_conformers, greedy_conf_deduplication
 
-logger = logging.getLogger('openff.toolkit.utils.toolkits')
+logger = logging.getLogger('openforcefield.utils.toolkits')
 prev_log_level = logger.getEffectiveLevel()
 logger.setLevel(logging.ERROR)
 
-from openff.toolkit.topology import Molecule
-from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+from openforcefield.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 
 logger.setLevel(prev_log_level)
 

@@ -6,8 +6,8 @@ import pytest
 import glob
 import shutil
 from openff.benchmark.utils.utils import get_data_file_path
-from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper, RDKitToolkitWrapper
-from openff.toolkit.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper, RDKitToolkitWrapper
+from openforcefield.topology import Molecule
 from click.testing import CliRunner
 runner = CliRunner()
 

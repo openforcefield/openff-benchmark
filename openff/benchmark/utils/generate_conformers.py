@@ -11,12 +11,12 @@ import numpy as np
 from tqdm import tqdm
 import io
 
-off_logger = logging.getLogger('openff.toolkit.utils.toolkits')
+off_logger = logging.getLogger('openforcefield.utils.toolkits')
 prev_log_level = off_logger.getEffectiveLevel()
 off_logger.setLevel(logging.ERROR)
 
-from openff.toolkit.topology import Molecule
-from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+from openforcefield.topology import Molecule
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 
 off_logger.setLevel(prev_log_level)
 
@@ -36,7 +36,7 @@ def greedy_conf_deduplication(offmol, rms_cutoff, user_confs=None):
     """
     Parameters
     ----------
-    offmol : An openff.toolkit.topology.Molecule object
+    offmol : An openforcefield.topology.Molecule object
         A molecule with one or more conformers
     rms_cutoff : float
         The RMSD cutoff (in angstroms) to apply during deduplication
@@ -119,7 +119,7 @@ def gen_confs_preserving_orig_confs(conformer_mols,
     """
     Parameters
     ----------
-    conformer_mols : dict of openff.toolkit.topology.Molecule
+    conformer_mols : dict of openforcefield.topology.Molecule
         A dict of single-conformer openFF Molecule objects. This must contain
         at least one item, and all items in this list must be of the same molecule.
         Keys are strings of the form '00', '01', ...
@@ -137,7 +137,7 @@ def gen_confs_preserving_orig_confs(conformer_mols,
         
     Returns
     -------
-    final_confs : dict of {str: openff.toolkit.topology.Molecule}
+    final_confs : dict of {str: openforcefield.topology.Molecule}
         A dict of single-conformer openFF Molecule objects. 
         Keys are strings of the form '00', '01', ...
         The keys and values from the conformer_mols input are guaranteed to appear here.
