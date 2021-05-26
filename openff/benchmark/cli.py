@@ -7,6 +7,7 @@ import click
 import logging
 import csv
 import sys
+from typing import List
 import os
 import warnings
 
@@ -77,9 +78,29 @@ def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
         fractal_uri, input_path, season, dataset_name, recursive=recursive
     )
 
+@optimize.command()
+@click.option('-o', '--output-path', help="Path for serialized QCSubmit dataset")
+@click.option('-d', '--dataset-name', required=True, help="Dataset name to submit molecules under")
+@click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
+@click.option('-s', '--season', required=True, type=click.Choice(['1:1', '1:2']), help="Season identifier specifying compute selections applied to molecules")
+@click.argument('input-path', nargs=-1)
+def create_submittable(output_path, input_path, season, dataset_name, recursive):
+    """Create submittable, serialized QCSubmit OptimizationDataset from INPUT_PATH.
 
-# @optimize.command()
-# def submit_compute(fractal_uri, dataset_name, spec_name, method, basis, program):
+    INPUT_PATH may be any number of single SDF files, or any number of directories containing SDF files to submit.
+    You must provide the dataset name via `-d DATASET_NAME` that you wish to submit molecules to.
+
+    To recurse directory INPUT_PATHs, use the `--recursive` flag.
+
+    """
+    from .geometry_optimizations.compute import OptimizationExecutor
+
+    optexec = OptimizationExecutor()
+    optexec.create_submittable(
+            output_path, input_path, season, dataset_name, recursive=recursive)
+
+#@optimize.command()
+#def submit_compute(fractal_uri, dataset_name, spec_name, method, basis, program):
 #    pass
 
 
@@ -1418,9 +1439,9 @@ def coverage_report(
 
     # Copy successfully processed mols and all conformers to the new folder
     for success_mol in success_mols:
-        common_id = f"{success_mol.properties['group_name']}-{success_mol.properties['molecule_index']}"
+        common_id = f"{success_mol.properties['group_name']}-{str(success_mol.properties['molecule_index']).zfill(5)}"
         # get all conformer files
-        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}*"))
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
         for file in conformer_files:
             shutil.copy(file, output_directory)
     # Copy all conformers of an error mol to the error dir
@@ -1429,8 +1450,9 @@ def coverage_report(
             of.write(f"source: {error_mol.name}\n")
             of.write(f"error text: {e}\n")
         # now get all conformers and move them
-        common_id = f"{error_mol.properties['group_name']}-{error_mol.properties['molecule_index']}"
-        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}*"))
+        mol_index = str(error_mol.properties["molecule_index"]).zfill(5)
+        common_id = f"{error_mol.properties['group_name']}-{mol_index}"
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
         for file in conformer_files:
             shutil.copy(file, error_dir)
 
@@ -1465,6 +1487,60 @@ def coverage_report(
         reporter.write(data)
         # TODO do we want the list of errors in the coverage report as well?
 
+<<<<<<< HEAD
+=======
+
+@cli.group()
+def filter():
+    """A group of useful filters for benchmarking.
+    """
+    pass
+
+
+@filter.command()
+@click.argument("input_directory")
+@click.argument("output-directory")
+@click.option("-s", "--smirks", multiple=True)
+@click.option("-p", "--processors",
+              default=None,
+              type=click.INT, help="Number of parellel processes to use apply SMIRKS filter")
+def smirks(input_directory, output_directory, smirks, processors):
+    """
+    Filter out molecules that match specified smirks pattern(s). Molecules that do not match the filter are put in the output directory.
+    Those that do match the pattern are put in the error mols directory.
+    """
+    from openff.benchmark.utils.filters import smirks_filter
+    from openforcefield.topology import Molecule
+    from openff.benchmark.utils.utils import prepare_folders
+    import glob
+    import os
+    import shutil
+
+    logging.basicConfig(filename='filter-smirks.log',
+                        level=logging.DEBUG
+                        )
+    error_dir = prepare_folders(output_directory=output_directory, delete_existing=True, add=False)
+    # Search for the 00th conformer so we dont double-count any moleucles
+    input_files = glob.glob(os.path.join(input_directory, "*00.sdf"))
+    # now load each molecule they should already be unique
+    molecules = [Molecule.from_file(mol_file, file_format="sdf", allow_undefined_stereo=True) for mol_file in
+                 input_files]
+    result = smirks_filter(input_molecules=molecules, filtered_smirks=smirks, processors=processors)
+    # move the passed molecules
+    for molecule in result.molecules:
+        common_id = f"{molecule.properties['group_name']}-{str(molecule.properties['molecule_index']).zfill(5)}"
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
+        for file in conformer_files:
+            shutil.copy(file, output_directory)
+
+    # now error mols
+    for error_mol in result.filtered:
+        error_id = f"{error_mol.properties['group_name']}-{str(error_mol.properties['molecule_index']).zfill(5)}"
+        conformer_error_files = glob.glob(os.path.join(input_directory, f"{error_id}-*.sdf"))
+        for file in conformer_error_files:
+            shutil.copy(file, error_dir)
+
+>>>>>>> 2891ce299fb9d91d8c281e0d2f5b12111703fb1a
 
 if __name__ == "__main__":
     cli()

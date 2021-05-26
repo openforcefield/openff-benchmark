@@ -67,9 +67,10 @@ def generate_coverage_report(input_molecules: List[Molecule],
     ff = ForceField(forcefield_name)
     # For speed, don't test charge assignment for now
     ff.deregister_parameter_handler('ToolkitAM1BCC')
+    # ff.deregister_parameter_handler("Electrostatics")
     ff.get_parameter_handler('ChargeIncrementModel',
-                             {'partial_charge_method':'formal_charge',
-                              'version':'0.3'})
+                             {'partial_charge_method': 'formal_charge',
+                              'version': '0.3'})
     # now run coverage on each molecule
     success_mols = []
     error_mols = []

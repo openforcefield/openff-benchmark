@@ -102,8 +102,8 @@ def test_cli_error_mol(tmpdir):
         os.mkdir(input_folder)
         mol = Molecule.from_file(get_data_file_path('missing_valence_params.sdf'), "sdf", allow_undefined_stereo=True)
         mol.properties["group_name"] = "OFF"
-        mol.properties["molecule_index"] = "00000"
-        mol.to_file(os.path.join(input_folder, "OFF-00000-00.sdf"), "sdf")
+        mol.properties["molecule_index"] = "00001"
+        mol.to_file(os.path.join(input_folder, "OFF-00001-00.sdf"), "sdf")
         response = runner.invoke(cli, ["preprocess", "coverage-report",
                                        "-p", 1,
                                        "-o", test_dir,
