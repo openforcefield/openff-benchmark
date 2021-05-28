@@ -333,6 +333,35 @@ def test_cli_optimize_export_mm(fractal_compute_server, tmpdir, ethane_qm_optimi
             assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json.bz2", "perf.json.bz2"])
 
 
+def test_cli_optimize_export_mm_multiprocessing(fractal_compute_server, tmpdir, ethane_qm_optimized):
+    """Test export of molecule MM data from a Fractal server via the CLI, with multiprocessing.
+
+    """
+
+    # need to submit first; should be quick if already there
+    test_cli_optimize_submit_molecules_mm(fractal_compute_server, tmpdir, ethane_qm_optimized)
+
+    fc = FractalClient(fractal_compute_server)
+
+    with tmpdir.as_cwd():
+        outdir = '4-compute-qm'
+        response = runner.invoke(cli, ['optimize', 'export',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - MM"',
+                                       '-p', 2,
+                                       '-o', outdir])
+
+        if response.exception:
+            print(response.exception)
+        assert response.exit_code == 0
+        assert "exported COMPLETE" in response.output
+        assert "Failed to write" not in response.output
+
+        for season in SEASONS["1:2"]:
+            exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json.bz2", "perf.json.bz2"])
+
+
 def test_cli_optimize_status(fractal_compute_server, tmpdir, ethane_preprocessed):
     """Test status output from a Fractal server via the CLI.
 
