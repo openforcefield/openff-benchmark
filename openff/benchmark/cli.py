@@ -7,14 +7,13 @@ import click
 import logging
 import csv
 import sys
-from typing import List
 
 # Deregister OpenEye for any ToolkitRegistry calls that happen in this file
-logger = logging.getLogger('openff.toolkit.utils.toolkits')
+logger = logging.getLogger('openforcefield.utils.toolkits')
 prev_log_level = logger.getEffectiveLevel()
 logger.setLevel(logging.ERROR)
 
-from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 
 logger.setLevel(prev_log_level)
 
@@ -484,7 +483,7 @@ def report():
     pass
 
 @report.command()
-@click.option('--input-path', multiple=True, required=True)
+@click.option('--input-path', default='./', multiple=True, required=True)
 @click.option('--ref-method', default='b3lyp-d3bj', required=True)
 @click.option('--output-directory', default='5-compare_forcefields', required=True)
 def compare_forcefields(input_path, ref_method, output_directory):
@@ -492,7 +491,7 @@ def compare_forcefields(input_path, ref_method, output_directory):
     analysis.main(input_path, ref_method, output_directory)
 
 @report.command()
-@click.option('--input-path', multiple=True, required=True)
+@click.option('--input-path', default='./', multiple=True, required=True)
 @click.option('--ref-method', default='b3lyp-d3bj', required=True)
 @click.option('--output-directory', default='5-match_minima', required=True)
 def match_minima(input_path, ref_method, output_directory):
@@ -500,14 +499,46 @@ def match_minima(input_path, ref_method, output_directory):
     analysis.match_minima(input_path, ref_method, output_directory)
 
 @report.command()
-@click.option('--input-path', multiple=True, required=True)
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref-method', default='b3lyp-d3bj', required=True)
+@click.option('--output-directory', default='5-results-xavier', required=True)
+def xavier(input_path, ref_method, output_directory):
+     from .analysis import new_analysis
+     new_analysis.xavier(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='./', multiple=True, required=True)
+@click.option('--ref-method', default='b3lyp-d3bj', required=True)
+@click.option('--output-directory', default='5-results-bill', required=True)
+def bill(input_path, ref_method, output_directory):
+    from .analysis import new_analysis
+    new_analysis.bill(input_path, ref_method, output_directory)
+
+@report.command()
+@click.option('--input-path', default='5-compare_forcefields', multiple=True, required=True)
 @click.option('--ref-method', default='default', required=True)
-@click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
+@click.option('--output-directory', default='6-plots-compare-forcefields', required=True)
 def plots(input_path, ref_method, output_directory):
     from .analysis import draw
     draw.plot_compare_ffs(input_path, ref_method, output_directory)
 
+@report.command()
+@click.option('--input-path', default='5-results-xavier', multiple=True, required=True)
+@click.option('--ref-method', default='default', required=True)
+@click.option('--output-directory', default='6-plots-xavier', required=True)
+def plots_xavier(input_path, ref_method, output_directory):
+    from .analysis import new_draw
+    new_draw.plot_xavier(input_path, ref_method, output_directory)
 
+@report.command()
+@click.option('--input-path', default='5-results-bill', multiple=True, required=True)
+@click.option('--ref-method', default='default', required=True)
+@click.option('--de-cutoff', default='default', required=True)
+@click.option('--rmsd-cutoff', default='default', required=True)
+@click.option('--output-directory', default='6-plots-bill', required=True)
+def plots_bill(input_path, ref_method, de_cutoff, rmsd_cutoff, output_directory):
+    from .analysis import new_draw
+    new_draw.plot_bill(input_path, ref_method, de_cutoff, rmsd_cutoff, output_directory)
 
 @cli.group()
 def preprocess():
@@ -561,7 +592,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
     Where possible, these cases write both an SDF file of the molecule (with key-value pairs indicating the file the structure came from),
     and a correspondingly-named txt file containing more details about the error.
     """
-    from openff.toolkit.topology import Molecule
+    from openforcefield.topology import Molecule
     from openff.benchmark.utils.validate_and_assign_ids import validate_and_assign
     from openff.benchmark.utils.utils import prepare_folders
     import glob
@@ -591,7 +622,7 @@ def validate(input_3d_molecules, output_directory, group_name, delete_existing, 
         # Squelch reading warnings
         # We'll recover the full text of the warning/error during the file round trip tests in validate_and_assign_ids.py.
         try:
-            toolkit_logger = logging.getLogger('openff.toolkit.utils.toolkits')
+            toolkit_logger = logging.getLogger('openforcefield.utils.toolkits')
             prev_log_level = toolkit_logger.getEffectiveLevel()
             toolkit_logger.setLevel(logging.ERROR)
             loaded_mols = Molecule.from_file(molecule_3d_file,
@@ -711,7 +742,7 @@ def generate_conformers(input_directory, output_directory, add, delete_existing)
     
 
     """
-    from openff.toolkit.topology import Molecule
+    from openforcefield.topology import Molecule
     from openff.benchmark.utils.generate_conformers import generate_conformers
     from openff.benchmark.utils.utils import prepare_folders
     import glob
@@ -813,7 +844,7 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
     Generate a coverage report for the set of validated input molecules.
     """
     from openff.benchmark.utils.coverage_report import generate_coverage_report, _update_coverage
-    from openff.toolkit.topology import Molecule
+    from openforcefield.topology import Molecule
     from openff.benchmark.utils.utils import prepare_folders
     import json
     import glob
@@ -854,9 +885,9 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
 
     # Copy successfully processed mols and all conformers to the new folder
     for success_mol in success_mols:
-        common_id = f"{success_mol.properties['group_name']}-{str(success_mol.properties['molecule_index']).zfill(5)}"
+        common_id = f"{success_mol.properties['group_name']}-{success_mol.properties['molecule_index']}"
         # get all conformer files
-        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}*"))
         for file in conformer_files:
             shutil.copy(file, output_directory)
     # Copy all conformers of an error mol to the error dir
@@ -865,9 +896,8 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
             of.write(f'source: {error_mol.name}\n')
             of.write(f'error text: {e}\n')
         # now get all conformers and move them
-        mol_index = str(error_mol.properties["molecule_index"]).zfill(5)
-        common_id = f"{error_mol.properties['group_name']}-{mol_index}"
-        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
+        common_id = f"{error_mol.properties['group_name']}-{error_mol.properties['molecule_index']}"
+        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}*"))
         for file in conformer_files:
             shutil.copy(file, error_dir)
 
@@ -897,58 +927,7 @@ def coverage_report(input_directory, forcefield_name, output_directory, processo
     with open(os.path.join(output_directory, "coverage_report.json"), "w") as reporter:
         reporter.write(data)
         # TODO do we want the list of errors in the coverage report as well?
-
-
-@cli.group()
-def filter():
-    """A group of useful filters for benchmarking.
-    """
-    pass
-
-
-@filter.command()
-@click.argument("input_directory")
-@click.argument("output-directory")
-@click.option("-s", "--smirks", multiple=True)
-@click.option("-p", "--processors",
-              default=None,
-              type=click.INT, help="Number of parellel processes to use apply SMIRKS filter")
-def smirks(input_directory, output_directory, smirks, processors):
-    """
-    Filter out molecules that match specified smirks pattern(s). Molecules that do not match the filter are put in the output directory.
-    Those that do match the pattern are put in the error mols directory.
-    """
-    from openff.benchmark.utils.filters import smirks_filter
-    from openff.toolkit.topology import Molecule
-    from openff.benchmark.utils.utils import prepare_folders
-    import glob
-    import os
-    import shutil
-
-    logging.basicConfig(filename='filter-smirks.log',
-                        level=logging.DEBUG
-                        )
-    error_dir = prepare_folders(output_directory=output_directory, delete_existing=True, add=False)
-    # Search for the 00th conformer so we dont double-count any moleucles
-    input_files = glob.glob(os.path.join(input_directory, "*00.sdf"))
-    # now load each molecule they should already be unique
-    molecules = [Molecule.from_file(mol_file, file_format="sdf", allow_undefined_stereo=True) for mol_file in
-                 input_files]
-    result = smirks_filter(input_molecules=molecules, filtered_smirks=smirks, processors=processors)
-    # move the passed molecules
-    for molecule in result.molecules:
-        common_id = f"{molecule.properties['group_name']}-{str(molecule.properties['molecule_index']).zfill(5)}"
-        conformer_files = glob.glob(os.path.join(input_directory, f"{common_id}-*.sdf"))
-        for file in conformer_files:
-            shutil.copy(file, output_directory)
-
-    # now error mols
-    for error_mol in result.filtered:
-        error_id = f"{error_mol.properties['group_name']}-{str(error_mol.properties['molecule_index']).zfill(5)}"
-        conformer_error_files = glob.glob(os.path.join(input_directory, f"{error_id}-*.sdf"))
-        for file in conformer_error_files:
-            shutil.copy(file, error_dir)
-
+    
 
 if __name__ == "__main__":
     cli()

@@ -17,6 +17,7 @@ from scipy.interpolate import interpn
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
+import warnings
 
 def draw_scatter(
     x_data, y_data, method_label, x_label, y_label, out_file, what_for="talk"
@@ -538,6 +539,20 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
                         method = '.'.join(file.split('.')[:-1])
                         results[method] = pd.read_csv(path)
 
+    # these lines are necessary for the results intersection, however the density plot
+    # will fail in this case
+    
+    for m, df in results.items():
+        results[m].set_index('name', inplace=True)
+    
+    index_intersect = results[ref_method].index
+    for m in results:
+        index_intersect = index_intersect.intersection(results[m].index)
+    for m, df in results.items():
+        results[m] = df.loc[index_intersect]
+        if results[m].shape != df.shape:
+            warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
+    
     plot_mol_minima(results, ref_method,  out_file=os.path.join(output_directory, 'minimaE.png'))
     # we do not want to plot the ref_method in the following plots
     # remove it
