@@ -502,44 +502,10 @@ def match_minima(input_path, ref_method, output_directory):
 @report.command()
 @click.option('--input-path', multiple=True, required=True)
 @click.option('--ref-method', default='default', required=True)
-@click.option('--output-directory', default='6-plots-compare-forcefields', required=True)
+@click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
 def plots(input_path, ref_method, output_directory):
     from .analysis import draw
     draw.plot_compare_ffs(input_path, ref_method, output_directory)
-
-@report.command()
-@click.option('--input-path', default='./', multiple=True, required=True)
-@click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='5-results-xavier', required=True)
-def xavier(input_path, ref_method, output_directory):
-     from .analysis import new_analysis
-          new_analysis.xavier(input_path, ref_method, output_directory)
-
-@report.command()
-@click.option('--input-path', default='./', multiple=True, required=True)
-@click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='5-results-bill', required=True)
-def bill(input_path, ref_method, output_directory):
-    from .analysis import new_analysis
-        new_analysis.bill(input_path, ref_method, output_directory)
-
-@report.command()
-@click.option('--input-path', default='5-results-xavier', multiple=True, required=True)
-@click.option('--ref-method', default='default', required=True)
-@click.option('--output-directory', default='6-plots-xavier', required=True)
-def plots_xavier(input_path, ref_method, output_directory):
-    from .analysis import new_draw
-        new_draw.plot_xavier(input_path, ref_method, output_directory)
-
-@report.command()
-@click.option('--input-path', default='5-results-bill', multiple=True, required=True)
-@click.option('--ref-method', default='default', required=True)
-@click.option('--de-cutoff', default='default', required=True)
-@click.option('--rmsd-cutoff', default='default', required=True)
-@click.option('--output-directory', default='6-plots-bill', required=True)
-def plots_bill(input_path, ref_method, de_cutoff, rmsd_cutoff, output_directory):
-    from .analysis import new_draw
-        new_draw.plot_bill(input_path, ref_method, de_cutoff, rmsd_cutoff, output_directory)
 
 
 
