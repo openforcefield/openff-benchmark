@@ -1,344 +1,978 @@
-#!/usr/bin/env python
+#! /usr/bin/env python
 
 """
-new_analysis.py
-
-For 2+ sets of SDF files that are analogous in terms of molecules and their conformers,
-assess them (e.g., having FF geometries) with respective to a reference SDF
-file (e.g., having QM geometries). Metrics include: RMSD of conformers, TFD
-(another geometric evaluation), and relative energy differences.
-
+new_draw.py
+Plot generation for openff-benchmark
 By:      David F. Hahn, Lorenzo D'Amore
-Version: May 6 2021
-
+Version: Jun 2 2021
 """
 
 import os
 import numpy as np
 import pandas as pd
+from scipy.interpolate import interpn
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import seaborn as sns
 import warnings
 
-from rdkit import Chem
-from rdkit.Chem import rdMolAlign
-from tqdm import tqdm
 
-from . import metrics, readwrite
+def plot_bill(results_dir, ref_method, de_cutoff, rmsd_cutoff, output_directory):
+    global results
+    os.makedirs(output_directory, exist_ok=True)
+    results = {}
+    for path in results_dir:
+        if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
+            method = '.'.join(os.path.split(path)[1].split('.')[:-1])
+            results[method] = pd.read_csv(path)
+        elif os.path.isdir(path):
+            for root, dirs, files in os.walk(path):
+                for file in files:
+                    path = os.path.join(root, file)
+                    if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
+                        method = '.'.join(file.split('.')[:-1])
+                        results[method] = pd.read_csv(path)
 
-def xavier(input_path, ref_method, output_directory="./results_xavier"):
-    mols = {}
-    dataframes = {}
-    for path in tqdm(input_path, desc='Reading files'):
-        # read in molecules
-        m_mols = readwrite.read_sdfs(path)
+    # these lines are necessary for the results intersection, however the density plot
+    # will fail in this case
 
-        # assert that all molecules of path are from the same method
-        for mol in m_mols:
-            # specify method of molecules
-            method = mol.properties['method']
-            if method in mols:
-                mols[method].append(mol)
-            else:
-                mols[method] = [ mol ]
-                
-    # convert molecules to dataframes
-    for method in mols:
-        dataframes[method] = readwrite.mols_to_dataframe(mols[method])
+    # df['name'] for compare_forcefield, match_minima; df['mm_conf'] for bill; df['mm_ref'] for xavier
 
-    assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
-     
-    index_intersect = dataframes[ref_method].index
-    for m in tqdm(dataframes, desc='Checking input'):
-        index_intersect = index_intersect.intersection(dataframes[m].index)
-    for m, df in tqdm(dataframes.items(), desc='Checking input'):
-        dataframes[m] = df.loc[index_intersect]
-        if dataframes[m].shape != df.shape:
+#    for m, df in results.items():
+#        results[m].index = df['mm_conf']
+
+    for m, df in results.items():
+        results[m].set_index('mm_conf', inplace=True)
+
+    index_intersect = results[ref_method].index
+    for m in results:
+        index_intersect = index_intersect.intersection(results[m].index)
+    for m, df in results.items():
+        results[m] = df.loc[index_intersect]
+        if results[m].shape != df.shape:
             warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
 
-    dataframe = dataframes[ref_method]
+    combined_df = pd.concat(results, names=['method']).reset_index(0)
 
-    # find QM minimas qm_mins
-    qm_mins = {}
-    dataframe.loc[:,'qm_min_check'] = False
-    for mid in tqdm(dataframe.molecule_index.unique(), desc='Finding QM minima'):
-        confs = dataframe.loc[dataframe.molecule_index==mid]
-        if confs.shape[0] == 1:
-            qm_min = confs.name[0]
+    new = combined_df[(combined_df['rmsd (qm_min / mm_conf)']<float(rmsd_cutoff))]
+    new = new.reset_index()
+    new.drop('mm_conf', axis='columns', inplace=True)
+    new = new[['qm_min', 'mm_min', 'rmsd (qm_min / mm_conf)', 'dE (mm_conf - mm_min)', 'method']]
+    new = new.rename(columns={'rmsd (qm_min / mm_conf)': 'rmsd ($\AA$)', 'dE (mm_conf - mm_min)': 'dE (kcal/mol)'})
+
+    new2 = combined_df[(combined_df['dE (mm_conf - mm_min)']<float(de_cutoff))]
+    new2 = new2.reset_index()
+    new2.drop('mm_conf', axis='columns', inplace=True)
+    new2 = new2[['qm_min', 'mm_min', 'rmsd (qm_min / mm_conf)', 'dE (mm_conf - mm_min)', 'method']]
+    new2 = new2.rename(columns={'rmsd (qm_min / mm_conf)': 'rmsd ($\AA$)', 'dE (mm_conf - mm_min)': 'dE (kcal/mol)'})
+
+    draw_ridge_bill(
+        new,
+        'dE (mm_conf - mm_min)',
+        'dE (kcal/mol)',
+        out_file=os.path.join(output_directory, f'fig_ridge_de_rmsd_cutoff_{rmsd_cutoff}.png'),
+        what_for="talk",
+        bw="hist",
+        same_subplot=True,
+        sym_log=False,
+        hist_range=(-1.67,15)
+    )
+
+    draw_ridge_bill(
+        new2,
+        'rmsd (qm_min / mm_conf)',
+        'rmsd ($\AA$)',
+        out_file=os.path.join(output_directory, f'fig_ridge_rmsd_de_cutoff_{de_cutoff}.png'),
+        what_for="talk",
+        bw="hist",
+        same_subplot=True,
+        sym_log=False,
+        hist_range=(0, 3)
+    )
+
+
+def draw_ridge_bill(
+    dataframes,
+    key,
+    x_label,
+    out_file,
+    what_for="paper",
+    bw="hist",
+    same_subplot=False,
+    sym_log=False,
+    hist_range=(-15, 15)
+):
+    # Define and use a simple function to label the plot in axes coordinates
+    def label(x, color, label):
+        ax = plt.gca()
+
+        # set axis font size
+        if what_for == "paper":
+            fs = 14
+        elif what_for == "talk":
+            fs = 14
+
+        ax.text(
+            0,
+            0.2,
+            label,
+            fontweight="bold",
+            color=color,
+            fontsize=fs,
+            ha="left",
+            va="center",
+            transform=ax.transAxes,
+        )
+
+    if what_for == "paper":
+        ridgedict = {
+            "h": 0.9,
+            "lw": 2.0,
+            "vl": 1.0,
+            "xfontsize": 14,
+        }
+        
+    elif what_for == "talk":
+        ridgedict = {
+            "h": 2.0,
+            "lw": 3.0,
+            "vl": 1.0,
+            "xfontsize": 16,
+        }
+
+    num_methods = len(dataframes)
+
+    # Initialize the FacetGrid object
+    my_cmap = "tab10"
+    sns.palplot(sns.color_palette(my_cmap))
+    colors = sns.color_palette(my_cmap)
+
+    #temp = []
+    #for method, result in dataframes.items():
+    #    result = result.rename(columns={key: x_label})
+    #    result["method"] = method
+    #    temp.append(result)
+        
+        # list of dataframes concatenated to single dataframe
+    #df = pd.concat(temp, ignore_index=True)
+    g = sns.FacetGrid(
+            dataframes, row="method", hue="method", aspect=10, height=ridgedict["h"], palette=colors
+    )
+
+    if not same_subplot:
+
+        # draw filled-in densities
+        if bw == "hist":
+            histoptions = {
+                "histtype": "bar",
+                "alpha": 0.6,
+                "linewidth": ridgedict["lw"],
+                "range": hist_range,
+                "align": "mid",
+            }
+            g.map(
+                sns.displot,
+                x_label,
+                kind="hist",
+                bins=15,
+                stat="count",
+                hist_kws=histoptions,
+            )
         else:
-            qm_min = confs.final_energy.idxmin()
-        qm_mins[mid] = qm_min
-        dataframe.loc[qm_min, 'qm_min_check'] = True
+            g.map(
+                sns.kdeplot,
+                x_label,
+                clip_on=False,
+                shade=True,
+                alpha=0.5,
+                lw=ridgedict["lw"],
+                bw=bw,
+            )
 
+        # draw colored horizontal line below densities
+        g.map(plt.axhline, y=0, lw=ridgedict["lw"], clip_on=False)
+
+    else:
+
+        # draw black horizontal line below densities
+        plt.axhline(y=0, color="black")
+        
+        # draw outline around densities; can also single outline color: color="k"
+    if bw == "hist":
+        histoptions = {
+            "element": "step",
+            "alpha": 1.0,
+            "linewidth": ridgedict["lw"],
+            "fill": False,
+            "binrange": hist_range,
+        }
+        g.map(
+            sns.histplot,
+            x_label,
+            bins=15,
+            stat="count",
+            **histoptions,
+        )
+
+    else:
+        g.map(sns.kdeplot, x_label, clip_on=False, lw=ridgedict["lw"], bw=bw)
+
+    # draw a vertical line at x=0 for visual reference
+    g.map(plt.axvline, x=0, lw=ridgedict["vl"], ls="--", color="gray", clip_on=False)
+
+    # optional: add custom vertical line
+    # g.map(plt.axvline, x=0.12, lw=1, ls='--', color='gray', clip_on=False)
+
+    # add labels to each level
+    if not same_subplot:
+        g.map(label, x_label)
+
+    # else if single subplot, generate a custom legend
+    else:
+        cmap = mpl.cm.tab10
+        patches = []
+        for i, label in enumerate(results):
+            patches.append(
+                mpl.patches.Patch(
+                    color=cmap(i/10),
+                    label=label,
+                )
+            )
+        plt.legend(handles=patches, fontsize=ridgedict["xfontsize"] / 1.2)
+    
+        # optional: set symmetric log scale on x-axis
+    if sym_log:
+        g.set(xscale="symlog")
+
+    # Set the subplots to overlap
+    if not same_subplot:
+        g.fig.subplots_adjust(hspace=-0.45)
+    else:
+        g.fig.subplots_adjust(hspace=-1.0)
+    
+    # Remove axes details that don't play well with overlap
+    g.set_titles("")
+    #    g.set(yticks=[])
+    g.despine(bottom=True) #, left=True)
+    # ax = plt.gca()
+    # ax.spines['left'].set_visible(True)
+    # ax.spines['left'].set_position('zero')
+    # ax.set_yticks([0.4])
+    if what_for == "paper":
+        plt.gcf().set_size_inches(7, 3)
+    elif what_for == "talk":
+        plt.gcf().set_size_inches(12, 9)
+
+    # adjust font sizes
+    plt.xlabel(x_label, fontsize=ridgedict["xfontsize"])
+    plt.ylabel("Count", fontsize=ridgedict["xfontsize"])
+    plt.xticks(fontsize=ridgedict["xfontsize"])
+#    plt.yticks(fontsize=ridgedict["xfontsize"])
+
+    # save with transparency for overlapping plots
+    plt.savefig(out_file, transparent=True, bbox_inches="tight")
+    plt.clf()
+
+
+def plot_xavier(results_dir, ref_method, output_directory):
     os.makedirs(output_directory, exist_ok=True)
-    matches = {}
+    results = {}
+    for path in results_dir:
+        if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
+            method = '.'.join(os.path.split(path)[1].split('.')[:-1])
+            results[method] = pd.read_csv(path)
+        elif os.path.isdir(path):
+            for root, dirs, files in os.walk(path):
+                for file in files:
+                    path = os.path.join(root, file)
+                    if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
+                        method = '.'.join(file.split('.')[:-1])
+                        results[method] = pd.read_csv(path)
 
-    # find the MM conformer closest to QM qm_min based on rmsd
-    # loop over methods
+    # these lines are necessary for the results intersection, however the density plot
+    # will fail in this case
+    
+    # df['name'] for compare_forcefield, match_minima; df['mm_conf'] for bill; df['mm_ref'] for xavier
+    
+    for m, df in results.items():
+        results[m].index = df['mm_ref']
 
-    for m in dataframes:
+    index_intersect = results[ref_method].index
+    for m in results:
+        index_intersect = index_intersect.intersection(results[m].index)
+    for m, df in results.items():
+        results[m] = df.loc[index_intersect]
+        if results[m].shape != df.shape:
+            warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
+
+
+    for method, result in results.items():
+        # ddE vs RMSD scatter
+        draw_scatter(result.loc[:, 'rmsd (mm_ref / mm_min)'],
+                     result.loc[:,'dE (mm_ref - mm_min)'],
+                     method,
+                     'rmsd ($\AA$)',
+                     'dE (kcal/mol)',
+                     os.path.join(output_directory, f'fig_{method}_scatter_rmsd_dde.png'),
+                     what_for="talk"
+                     )
         
-        # if the method is the reference method, we do not do the comparison
-        # because it's just a comparison with itself
-        if m == ref_method:
-            continue
+        # draw density 2D
+        draw_density2d(
+            result.loc[:, 'rmsd (mm_ref / mm_min)'],
+            result.loc[:,'dE (mm_ref - mm_min)'],
+            method,
+            'rmsd ($\AA$)',
+            'dE (kcal/mol)',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_dde_linear.png'),
+            what_for="talk",
+            # x_range=(0,3.7),
+            # y_range=(-30,30),
+            # z_range=(-260,5200),
+            z_interp=True,
+            symlog=False
+        )
 
-        mm_dataframe = dataframes[m]    
-                                                                                                            
-        match = compare_conformers(dataframes[ref_method], dataframes[m])
-        mm_ref_confs = {molecule_id: 
-                                    match[ match['name'] == ref_conformer ]['ff_mol_name'].values[0]
-                                    for molecule_id, ref_conformer in qm_mins.items() }
-        matches[m] = match
-                                                                                                                                                                            
-        # find MM minimas mm_mins
-        mm_mins = {}
-        mm_dataframe.loc[:,'mm_min_check'] = False
-        for mid in tqdm(mm_dataframe.molecule_index.unique(), desc='Finding QM minima'):
-            confs = mm_dataframe.loc[mm_dataframe.molecule_index==mid]
-            if confs.shape[0] == 1:
-                mm_min = confs.name[0]
-            else:
-                mm_min = confs.final_energy.idxmin()
-            mm_mins[mid] = mm_min
-            mm_dataframe.loc[mm_min, 'mm_min_check'] = True
+        # draw correlation plots between methods
+        for method2 in list(results.keys())[list(results.keys()).index(method)+1:]:
+            draw_corr(
+                result.loc[:, 'rmsd (mm_ref / mm_min)'],
+                results[method2].loc[:, 'rmsd (mm_ref / mm_min)'],
+                f"{method2} vs. {method}",
+                f"rmsd {method} ($\AA$)",
+                f"rmsd {method2} ($\AA$)",
+                os.path.join(output_directory, f"fig_scatter_rmsd_{method2}_{method}.png"),
+                "paper"
+            )
 
-        # calculate dE between mm_ref_conf and mm_min
-        for i, row in mm_dataframe.iterrows():
-            mm_min = mm_mins[row['molecule_index']]
-            mm_ref_conf = mm_ref_confs[row['molecule_index']]
-            if row['mm_min_check'] == True:
-                mm_dataframe.loc[i, 'final_energy'] = mm_dataframe.loc[mm_ref_conf,'final_energy'] - mm_dataframe.loc[mm_min,'final_energy']
+#            draw_corr(
+#                result.loc[:, 'tfd'],
+#                results[method2].loc[:, 'tfd'],
+#                f"{method2} vs. {method}",
+#                f"TFD {method}",
+#                f"TFD {method2}",
+#                os.path.join(output_directory, f"fig_scatter_tfd_{method2}_{method}.png"),
+#                "paper"
+#            )
 
-        # calculate RMSD between mm_min and mm_ref_conf
-        for i, row in mm_dataframe.iterrows():
-            mm_min = mm_mins[row['molecule_index']]
-            mm_ref_conf = mm_ref_confs[row['molecule_index']]
-            if row['mm_min_check'] == True:
-                mm_dataframe.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(
-                                dataframe.loc[mm_ref_conf, 'mol'].to_rdkit(), dataframe.loc[mm_min, 'mol'].to_rdkit())
+            draw_corr(
+                result.loc[:, 'dE (mm_ref - mm_min)'],
+                results[method2].loc[:, 'dE (mm_ref - mm_min)'],
+                f"{method2} vs. {method}",
+                f"dE {method} (kcal/mol)",
+                f"dE {method2} (kcal/mol)",
+                os.path.join(output_directory, f"fig_scatter_dde_{method2}_{method}.png"),
+                "paper"
+            )
+            
         
-        # take only the mm_min = True of the dataframe
-        mm_results = mm_dataframe.loc[mm_dataframe.mm_min_check]
-        
-        # adds qm_min and mm_ref_conf to the new dataframe
-        for i, row in mm_results.iterrows():
-            qm_min = qm_mins[row['molecule_index']]
-            mm_ref_conf = mm_ref_confs[row['molecule_index']]
-            mm_results.loc[i, 'qm_min'] = qm_min
-            mm_results.loc[i, 'mm_ref_conf'] = mm_ref_conf
-
-        mm_results = mm_results.rename(columns={'name':'mm_min', 'mm_ref_conf':'mm_ref', 
-                                                'rmsd':'rmsd (mm_ref / mm_min)', 'final_energy':'dE (mm_ref - mm_min)'})
-        
-        mm_results = mm_results[['qm_min', 'mm_ref', 'mm_min', 'rmsd (mm_ref / mm_min)', 'dE (mm_ref - mm_min)']]
-        
-        mm_results.to_csv(os.path.join(output_directory, f"xavier_{m}.csv"), index=False, float_format='%15.8e')
-
-
-def compare_conformers(reference, result):
+    draw_ridgeplot(
+        results,
+        'dE (mm_ref - mm_min)',
+        'dE (kcal/mol)',
+        out_file=os.path.join(output_directory, f'fig_ridge_dde.png'),
+        what_for="talk",
+        bw="hist",
+        same_subplot=True,
+        sym_log=False,
+        hist_range=(-1.67,15)
+    )
+    draw_ridgeplot(
+        results,
+        'rmsd (mm_ref / mm_min)',
+        'rmsd ($\AA$)',
+        out_file=os.path.join(output_directory, f'fig_ridge_rmsd.png'),
+        what_for="talk",
+        bw="hist",
+        same_subplot=True,
+        sym_log=False,
+        hist_range=(0, 3)
+    )
+    
+def draw_scatter(
+    x_data, y_data, method_label, x_label, y_label, out_file, what_for="talk"
+):
     """
-    For different methods, match the conformer minima to those of the reference
-    method. Ex. Conf G of reference method matches with conf R of method 2.
-
+    Draw scatter plot, such as of (ddE vs RMSD) or (ddE vs TFD).
     Parameters
     ----------
-    in_dict : OrderedDict
-        dictionary from input file, where key is method and value is dictionary
-        first entry should be reference method
-        in sub-dictionary, keys are 'sdfile' and 'sdtag'
-    rmsd_cutoff : float
-        cutoff above which two structures are considered diff conformers
-
-    Returns
-    -------
-    mol_dict : dict of dicts
-        mol_dict['mol_name']['energies'] =
-            [[file1_conf1_E file1_conf2_E] [file2_conf1_E file2_conf2_E]]
-        An analogous structure is followed for mol_dict['mol_name']['indices'].
-
+    x_data : list
+        x_data[i] represents ith molecular structure
+    y_data : list
+        should have same shape and correspond to x_data
+    method_label : str
+        list of all the method names including reference method first
+    x_label : string
+        name of the x-axis label
+    y_label : string
+        name of the y-axis label
+    out_file : string
+        name of the output file
+    what_for : string
+        dictates figure size, text size of axis labels, legend, etc.
+        "paper" or "talk"
     """
-    
-    conformer_match = reference.copy()
-    for mid in tqdm(reference.molecule_index.unique(), desc='Matching conformers'):
-        ref_confs = reference.loc[reference.molecule_index==mid]
-        query_confs = result.loc[result.molecule_index==mid]
-        rms_matrix = {i: {} for i, ref_row in ref_confs.iterrows()}
-        for i, ref_row in ref_confs.iterrows():
-            for j, query_row in query_confs.iterrows():
-                rmsd = rdMolAlign.GetBestRMS(ref_row['mol'].to_rdkit(), query_row['mol'].to_rdkit())
-                rms_matrix[i][j] = rmsd
-        for ref, rms_list in rms_matrix.items():
-            conf = min(rms_list, key=rms_list.get)
-            conformer_match.loc[ref, 'ff_mol_name'] = conf
-            conformer_match.loc[ref, 'rmsd'] = rms_list[conf]
+    markers = ["o", "^", "d", "x", "s", "p", "P", "3", ">"]
 
-    return conformer_match
+    p = plt.scatter(
+        x_data,
+        y_data,
+#        marker=markers[i],
+        label=method_label,
+        alpha=0.6,
+    )
+
+    if what_for == "paper":
+        fig = plt.gcf()
+        fig.set_size_inches(4, 3)
+        plt.subplots_adjust(left=0.16, right=0.72, top=0.9, bottom=0.2)
+        plt.xlabel(x_label, fontsize=10)
+        plt.ylabel(y_label, fontsize=10)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        plt.legend(loc=(1.04, 0.4), fontsize=10)
+        # make the marker size smaller
+        p.set_sizes([8.0])
+
+    elif what_for == "talk":
+        plt.xlabel(x_label, fontsize=14)
+        plt.ylabel(y_label, fontsize=14)
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+        plt.legend(loc=(1.04, 0.5), fontsize=12)
+        # make the marker size smaller
+        p.set_sizes([4.0])
+
+    # set log scaling but use symmetric log for negative values
+    #    plt.yscale('symlog')
+
+    plt.savefig(out_file, bbox_inches="tight")
+    plt.clf()
+    # plt.show()
 
 
-def bill(input_path, ref_method, output_directory="./results_bill"):
-    mols = {}
-    dataframes = {}
-    for path in tqdm(input_path, desc='Reading files'):
-        # read in molecules
-        m_mols = readwrite.read_sdfs(path)
 
-# assert that all molecules of path are from the same method
-        for mol in m_mols:
-            # specify method of molecules
-            method = mol.properties['method']
-            if method in mols:
-                mols[method].append(mol)
-            else:
-                mols[method] = [ mol ]
-
-# convert molecules to dataframes
-    for method in mols:
-        dataframes[method] = readwrite.mols_to_dataframe(mols[method])
-        
-    assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
-    
-    index_intersect = dataframes[ref_method].index
-    for m in tqdm(dataframes, desc='Checking input'):
-        index_intersect = index_intersect.intersection(dataframes[m].index)
-    for m, df in tqdm(dataframes.items(), desc='Checking input'):
-        dataframes[m] = df.loc[index_intersect]
-        if dataframes[m].shape != df.shape:
-            warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
-
-    dataframe = dataframes[ref_method]
-    
-    # find QM minimas qm_mins
-    qm_mins = {}
-    dataframe.loc[:,'qm_min_check'] = False
-    for mid in tqdm(dataframe.molecule_index.unique(), desc='Finding QM minima'):
-        confs = dataframe.loc[dataframe.molecule_index==mid]
-        if confs.shape[0] == 1:
-            qm_min = confs.name[0]
-        else:
-            qm_min = confs.final_energy.idxmin()
-        qm_mins[mid] = qm_min
-        dataframe.loc[qm_min, 'qm_min_check'] = True
-
-    os.makedirs(output_directory, exist_ok=True)
-
-    # loop over methods
-    for m in dataframes:
-        # if the method is the reference method, we do not do the comparison
-        # because it's just a comparison with itself
-        if m == ref_method:
-            continue
-
-        mm_dataframe = dataframes[m]
-
-        # find MM minimas mm_mins
-        mm_mins = {}
-        mm_dataframe.loc[:,'mm_min_check'] = False
-        for mid in tqdm(mm_dataframe.molecule_index.unique(), desc='Finding MM minima'):
-            confs = mm_dataframe.loc[mm_dataframe.molecule_index==mid]
-            if confs.shape[0] == 1:
-                mm_min = confs.name[0]
-            else:
-                mm_min = confs.final_energy.idxmin()
-            mm_mins[mid] = mm_min
-            mm_dataframe.loc[mm_min, 'mm_min_check'] = True
-
-        # MM confs dE with respect to mm_min conf        
-        for mid in tqdm(mm_dataframe.molecule_index.unique(), desc='Referencing MM energies'):
-            confs = mm_dataframe.loc[mm_dataframe.molecule_index==mid]
-            mm_min = mm_mins[mid]
-            mm_min_energy = confs.loc[mm_min, 'final_energy']
-            for i, row in confs.iterrows():
-                mm_dataframe.loc[i, 'final_energy'] = row['final_energy'] - mm_min_energy
-
-        # calculate RMSD
-        for i, row in tqdm(mm_dataframe.iterrows(), desc='Calculating RMSD'):
-            qm_min = qm_mins[row['molecule_index']]
-            mm_dataframe.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(
-                             row['mol'].to_rdkit(), dataframe.loc[qm_min, 'mol'].to_rdkit())
-
-        mm_results = mm_dataframe.copy()
-
-        # adds qm_min and mm_minf to the new dataframe
-        for i, row in mm_results.iterrows():
-            qm_min = qm_mins[row['molecule_index']]
-            mm_min = mm_mins[row['molecule_index']]
-            mm_results.loc[i, 'qm_min'] = qm_min
-            mm_results.loc[i, 'mm_min'] = mm_min
-
-        mm_results = mm_results.rename(columns={'name':'mm_conf', 'rmsd':'rmsd (qm_min / mm_conf)', 
-                                                'final_energy':'dE (mm_conf - mm_min)'})
-        mm_results = mm_results[['qm_min', 'mm_conf', 'mm_min', 'rmsd (qm_min / mm_conf)', 
-                                'dE (mm_conf - mm_min)']]
-
-        mm_results.to_csv(os.path.join(output_directory, f"bill_{m}.csv"), index=False, float_format='%15.8e')
-
-def main(input_path, ref_method, output_directory="./results"):
+def draw_corr(
+    x_data, y_data, method, x_label, y_label, out_file, what_for="talk"
+):
     """
-    For 2+ sets of SDF files that are analogous in terms of molecules and their
-    conformers, assess them with respective to a reference SDF file (e.g., QM).
-    Metrics include RMSD of conformers, TFD, and relative energy differences.
-
+    Draw scatter plot, such as of (ddE vs RMSD) or (ddE vs TFD).
     Parameters
     ----------
-    input_path : str
-        Path to directory with SDF files of molecules. 
-        Multiple input paths can be specified.
-    ref_method : str
-        Tag of reference methods. The molecules having this tag in
-        the "method" SDF property will be used as reference
-    output_directory : str
-        Directory path to deposit exported data. If not present, this 
-        directory will be created. default: ./results/
+    x_data : list of lists
+        x_data[i][j] represents ith method and jth molecular structure
+    y_data : list of lists
+        should have same shape and correspond to x_data
+    method_labels : list
+        list of all the method names including reference method first
+    x_label : string
+        name of the x-axis label
+    y_label : string
+        name of the y-axis label
+    out_file : string
+        name of the output file
+    what_for : string
+        dictates figure size, text size of axis labels, legend, etc.
+        "paper" or "talk"
     """
-    mols = {}
-    dataframes = {}
-    for path in tqdm(input_path, desc='Reading files'):
-        # read in molecules
-        m_mols = readwrite.read_sdfs(path)
+    p = plt.scatter(
+        x_data,
+        y_data,
+        label=method,
+        alpha=0.6,
+    )
 
-        # assert that all molecules of path are from the same method
-        for mol in m_mols:
-            # specify method of molecules
-            method = mol.properties['method']
-            if method in mols:
-                mols[method].append(mol)
-            else:
-                mols[method] = [ mol ]
-                
-    # convert molecules to dataframes
-    for method in mols:
-        dataframes[method] = readwrite.mols_to_dataframe(mols[method])
+    if what_for == "paper":
+        fig = plt.gcf()
+        fig.set_size_inches(5, 4)
+        plt.subplots_adjust(left=0.16, right=0.72, top=0.9, bottom=0.2)
+        plt.xlabel(x_label, fontsize=10)
+        plt.ylabel(y_label, fontsize=10)
+        plt.xticks(fontsize=10)
+        plt.yticks(fontsize=10)
+        plt.legend(loc=(1.04, 0.4), fontsize=10)
+        # make the marker size smaller
+        p.set_sizes([8.0])
 
-    assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
+    elif what_for == "talk":
+        plt.xlabel(x_label, fontsize=14)
+        plt.ylabel(y_label, fontsize=14)
+        plt.xticks(fontsize=12)
+        plt.yticks(fontsize=12)
+        plt.legend(loc=(1.04, 0.5), fontsize=12)
+        # make the marker size smaller
+        p.set_sizes([4.0])
 
-    index_intersect = dataframes[ref_method].index
-    for m in tqdm(dataframes, desc='Checking input'):
-        index_intersect = index_intersect.intersection(dataframes[m].index)
-    for m, df in tqdm(dataframes.items(), desc='Checking input'):
-        dataframes[m] = df.loc[index_intersect]
-        if dataframes[m].shape != df.shape:
-            warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
-
-
-    ref_confs = get_ref_confs(dataframes[ref_method])
-    ref_to_ref_confs(dataframes[ref_method], ref_confs)
-
-    os.makedirs(output_directory, exist_ok=True)
-    for m in tqdm(dataframes, desc='Processing data'):
-        ref_to_ref_confs(dataframes[m], ref_confs)
-        calc_rmsd(dataframes[ref_method], dataframes[m])
-        calc_tfd(dataframes[ref_method], dataframes[m])
-        calc_dde(dataframes[ref_method], dataframes[m])
-
-        readwrite.write_results(dataframes[m], os.path.join(output_directory, f"{m}.csv"))
+    plt.savefig(out_file, bbox_inches="tight")
+    plt.clf()
+    # plt.show()
 
 
-### ------------------- Parser -------------------
+def draw_ridgeplot(
+    dataframes,
+    key,
+    x_label,
+    out_file,
+    what_for="paper",
+    bw="hist",
+    same_subplot=False,
+    sym_log=False,
+    hist_range=(-15, 15)
+):
 
-if __name__ == "__main__":
-    import argparse
+    """
+    Draw ridge plot of data (to which kernel density estimate is applied)
+    segregated by each method (representing a different color/level).
+    Modified from the following code:
+    https://seaborn.pydata.org/examples/kde_ridgeplot.html
+    Parameters
+    ----------
+    dataframe : dict of pandas.DataFrame 
+    key : string
+        key specifying the variable to be plotted
+    x_label : string
+        name of the x-axis label
+        also used for pandas dataframe column name
+    out_file : string
+        name of the output file
+    what_for : string
+        dictates figure size, text size of axis labels, legend, etc.
+        "paper" or "talk"
+    bw : string or float
+        defines bandwidth for KDE as called in seaborn.kdeplot, OR don't use
+        kde at all and just histogram the data;
+        options: 'scott' (KDE), 'silverman' (KDE), scalar value (KDE), 'hist'
+    same_subplot : Boolean
+        False is default to have separate and slightly overlapping plots,
+        True to plot all of them showing on the same subplot (no fill)
+    sym_log : Boolean
+        False is default to plot density estimate as is,
+        True to plot x-axis on symmetric log scale
+    hist_range : tuple
+        tuple of min and max values to use for histogram;
+        only needed if bw is set to 'hist'
+    """
+    # Define and use a simple function to label the plot in axes coordinates
+    def label(x, color, label):
+        ax = plt.gca()
 
-    parser = argparse.ArgumentParser()
+        # set axis font size
+        if what_for == "paper":
+            fs = 14
+        elif what_for == "talk":
+            fs = 14
 
-    # run main
-    print("Log file from compare_ffs.py")
-    main()
+        ax.text(
+            0,
+            0.2,
+            label,
+            fontweight="bold",
+            color=color,
+            fontsize=fs,
+            ha="left",
+            va="center",
+            transform=ax.transAxes,
+        )
+
+    if what_for == "paper":
+        ridgedict = {
+            "h": 0.9,
+            "lw": 2.0,
+            "vl": 1.0,
+            "xfontsize": 14,
+        }
+    elif what_for == "talk":
+        ridgedict = {
+            "h": 2.0,
+            "lw": 3.0,
+            "vl": 1.0,
+            "xfontsize": 16,
+        }
+
+    num_methods = len(dataframes)
+
+    # Initialize the FacetGrid object
+    my_cmap = "tab10"
+    sns.palplot(sns.color_palette(my_cmap))
+    colors = sns.color_palette(my_cmap)
+
+    temp = []
+    for method, result in dataframes.items():
+        result = result.rename(columns={key: x_label})
+        result["method"] = method
+        temp.append(result)
+
+    # list of dataframes concatenated to single dataframe
+    df = pd.concat(temp, ignore_index=True)
+    g = sns.FacetGrid(
+        df, row="method", hue="method", aspect=10, height=ridgedict["h"], palette=colors
+    )
+
+    if not same_subplot:
+
+        # draw filled-in densities
+        if bw == "hist":
+            histoptions = {
+                "histtype": "bar",
+                "alpha": 0.6,
+                "linewidth": ridgedict["lw"],
+                "range": hist_range,
+                "align": "mid",
+            }
+            g.map(
+                sns.displot,
+                x_label,
+                kind="hist",
+                bins=15,
+                stat="probability",
+                hist_kws=histoptions,
+            )
+        else:
+            g.map(
+                sns.kdeplot,
+                x_label,
+                clip_on=False,
+                shade=True,
+                alpha=0.5,
+                lw=ridgedict["lw"],
+                bw=bw,
+            )
+
+        # draw colored horizontal line below densities
+        g.map(plt.axhline, y=0, lw=ridgedict["lw"], clip_on=False)
+
+    else:
+
+        # draw black horizontal line below densities
+        plt.axhline(y=0, color="black")
+
+    # draw outline around densities; can also single outline color: color="k"
+    if bw == "hist":
+        histoptions = {
+            "element": "step",
+            "alpha": 1.0,
+            "linewidth": ridgedict["lw"],
+            "fill": False,
+            "binrange": hist_range,
+        }
+        g.map(
+            sns.histplot,
+            x_label,
+            bins=15,
+            stat="probability",
+            **histoptions,
+        )
+
+    else:
+        g.map(sns.kdeplot, x_label, clip_on=False, lw=ridgedict["lw"], bw=bw)
+
+    # draw a vertical line at x=0 for visual reference
+    g.map(plt.axvline, x=0, lw=ridgedict["vl"], ls="--", color="gray", clip_on=False)
+
+    # optional: add custom vertical line
+    # g.map(plt.axvline, x=0.12, lw=1, ls='--', color='gray', clip_on=False)
+
+    # add labels to each level
+    if not same_subplot:
+        g.map(label, x_label)
+
+    # else if single subplot, generate a custom legend
+    else:
+        cmap = mpl.cm.tab10
+        patches = []
+        for i, label in enumerate(dataframes):
+            patches.append(
+                mpl.patches.Patch(
+                    color=cmap(i/10),
+                    label=label,
+                )
+            )
+        plt.legend(handles=patches, fontsize=ridgedict["xfontsize"] / 1.2)
+
+    # optional: set symmetric log scale on x-axis
+    if sym_log:
+        g.set(xscale="symlog")
+
+    # Set the subplots to overlap
+    if not same_subplot:
+        g.fig.subplots_adjust(hspace=-0.45)
+    else:
+        g.fig.subplots_adjust(hspace=-1.0)
+
+    # Remove axes details that don't play well with overlap
+    g.set_titles("")
+    #    g.set(yticks=[])
+    g.despine(bottom=True)  # , left=True)
+    # ax = plt.gca()
+    # ax.spines['left'].set_visible(True)
+    # ax.spines['left'].set_position('zero')
+    # ax.set_yticks([0.4])
+    if what_for == "paper":
+        plt.gcf().set_size_inches(7, 3)
+    elif what_for == "talk":
+        plt.gcf().set_size_inches(12, 9)
+
+    # adjust font sizes
+    plt.xlabel(x_label, fontsize=ridgedict["xfontsize"])
+    plt.ylabel("Density", fontsize=ridgedict["xfontsize"])
+    plt.xticks(fontsize=ridgedict["xfontsize"])
+
+    # save with transparency for overlapping plots
+    plt.savefig(out_file, transparent=True, bbox_inches="tight")
+    plt.clf()
+
+
+def draw_density2d(
+    x_data,
+    y_data,
+    title,
+    x_label,
+    y_label,
+    out_file,
+    what_for="talk",
+    bins=20,
+    x_range=None,
+    y_range=None,
+    z_range=None,
+    z_interp=True,
+    symlog=False,
+):
+
+    """
+    Draw a scatter plot colored smoothly to represent the 2D density.
+    Based on: https://stackoverflow.com/a/53865762/8397754
+    Parameters
+    ----------
+    x_data : 1D list
+        represents x-axis data for all molecules of a given method
+    y_data : 1D list
+        should have same shape and correspond to x_data
+    title : string
+        title of the plot
+    x_label : string
+        name of the x-axis label
+    y_label : string
+        name of the y-axis label
+    out_file : string
+        name of the output file
+    what_for : string
+        dictates figure size, text size of axis labels, legend, etc.
+        "paper" or "talk"
+    bins : int
+        number of bins for np.histogram2d
+    x_range : tuple of two floats
+        min and max values of x-axis
+    y_range : tuple of two floats
+        min and max values of y-axis
+    z_range : tuple of two floats
+        min and max values of density for setting a uniform color bar;
+        these should be at or beyond the bounds of the min and max
+    z_interp : Boolean
+        True to smoothen the color scale for the scatter plot points;
+        False to plot 2d histograms colored by cells (no scatter plot)
+    symlog : Boolean
+        True to represent y-axis on (symmetric) log scale (linear
+        between -1 and 1 ), False for linear y-scaling
+    """
+
+    def colorbar_and_finish(labelsize, fname):
+        cb = plt.colorbar()
+        cb.ax.tick_params(labelsize=labelsize)
+        cb.ax.set_title("counts", size=labelsize)
+
+        plt.savefig(fname, bbox_inches="tight")
+        plt.clf()
+        # plt.show()
+
+    fig = plt.gcf()
+    if what_for == "paper":
+        ms = 1
+        size1 = 10
+        size2 = 10
+        fig.set_size_inches(4, 3)
+    elif what_for == "talk":
+        ms = 4
+        size1 = 14
+        size2 = 16
+        fig.set_size_inches(9, 6)
+    plt_options = {"s": ms, "cmap": "coolwarm_r"}
+
+    # label and adjust plot
+    plt.title(title, fontsize=size2)
+    plt.xlabel(x_label, fontsize=size2)
+    plt.ylabel(y_label, fontsize=size2)
+    plt.xticks(fontsize=size1)
+    plt.yticks(fontsize=size1)
+
+    if x_range is None:
+        x_range = (0, x_data.max())
+    plt.xlim(x_range[0], x_range[1])
+    if y_range is None:
+        yabs = y_data.abs().max()
+        y_range = (-yabs, yabs)
+    plt.ylim(y_range[0], y_range[1])
+
+    # remove any nans from x_data, such as TFD score for urea-like mols
+    nan_inds = x_data.isna()
+    x_data = x_data.dropna()
+    y_data = y_data[~nan_inds]
+#    print('nan', x_data.isna().sum(), y_data.isna().sum())
+#    print('xd', x_data, x_data.max(), x_data.min())
+#    print('yd', y_data, y_data.max(), y_data.min())
+#    print(f"\nNumber of data points in FF scatter plot: {len(x_data)} {len(y_data)}")
+
+    # compute histogram in 2d
+    data, x_e, y_e = np.histogram2d(x_data, y_data, bins=bins)
+ #   print('data', data, data.min(), data.max())
+ #   print('e', x_e, y_e)
+    # plot colored 2d histogram if z_interp not specified
+    if not z_interp:
+        extent = [x_e[0], x_e[-1], y_e[0], y_e[-1]]
+        plt.imshow(
+            data.T,
+            extent=extent,
+            origin="lower",
+            aspect="auto",
+            cmap=plt_options["cmap"],
+            vmin=z_range[0],
+            vmax=z_range[1],
+        )
+
+        colorbar_and_finish(size1, out_file)
+        return
+
+    # smooth/interpolate data
+    z = interpn(
+        (0.5 * (x_e[1:] + x_e[:-1]), 0.5 * (y_e[1:] + y_e[:-1])),
+        data,
+        np.vstack([x_data, y_data]).T,
+        method="splinef2d",
+        bounds_error=False,
+    )
+#    print(z, z.max(), z.min())
+
+    # sort the points by density, so that the densest points are plotted last
+    idx = z.argsort()
+    x, y, z = x_data.reindex(index=idx), y_data.reindex(index=idx), z[idx]
+
+    # print(
+    #     f"{title} ranges of data in density plot:\n\t\tmin\t\tmax"
+    #     f"\nx\t{np.min(x):10.4f}\t{np.max(x):10.4f}"
+    #     f"\ny\t{np.min(y):10.4f}\t{np.max(y):10.4f}"
+    #     f"\nz\t{np.min(data):10.4f}\t{np.max(data):10.4f} (histogrammed)"
+    #     f"\nz'\t{np.nanmin(z):10.4f}\t{np.nanmax(z):10.4f} (interpolated)"
+    # )
+
+
+    if z_range is None:
+        z_range=(0, np.max(z))
+    # # add dummy points of user-specified min/max z for uniform color scaling
+    # # similar to using vmin/vmax in pyplot pcolor
+    x = np.append(x, [-1, -1])
+    y = np.append(y, [0, 0])
+    z = np.append(z, [z_range[0], z_range[1]])
+
+    # print(f"z''\t{np.nanmin(z):10.4f}\t{np.nanmax(z):10.4f} (interp, bounded)")
+
+    # generate the plot
+    plt.scatter(x, y, c=z, vmin=z_range[0], vmax=z_range[1], **plt_options)
+
+    # set log scaling but use symmetric log for negative values
+    if symlog:
+        plt.yscale("symlog")
+
+    # configure color bar and finish plotting
+    colorbar_and_finish(size1, out_file)
+
+def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
+    """
+    Generate violin plots of the mean signed errors
+    of force field energies with respect to QM energies.
+    Parameters
+    ----------
+    msds : 2D numpy array
+        Mean signed deviations for each method with reference to first method
+        msds[i][j] represents ith mol, jth method's MSE
+    ff_list : list
+        list of methods corresponding to energies in msds
+    what_for : string
+        dictates figure size, text size of axis labels, legend, etc.
+        "paper" or "talk"
+    """
+
+    # create dataframe from list of lists
+    df = pd.DataFrame({method: result.loc[:, 'dde[kcal/mol]'] for method, result in dataframes.items()})
+
+    medians = df.median(axis=0)
+
+    # reshape for grouped violin plots
+    df = df.melt(value_vars=list(df.columns))
+    df = df.dropna()
+    
+    # set grid background style
+    sns.set(style="whitegrid")
+
+    if what_for == 'paper':
+#        f, ax = plt.subplots(figsize=(2, 5))
+        f, ax = plt.subplots(figsize=(8, 5))
+        large_font = 10
+        small_font = 8
+        lw = 1
+        med_pt = 5
+        xrot = 45
+        xha = 'right'
+    elif what_for == 'talk':
+        f, ax = plt.subplots(figsize=(10, 8))
+        large_font = 16
+        small_font = 14
+        lw = 2
+        med_pt = 10
+        xrot = 0
+        xha = 'center'
+
+        # overlapping violins
+        #lw=1.0
+        #f, ax = plt.subplots(figsize=(4, 8))
+
+    my_cmap = "tab10"
+    colors = sns.color_palette(my_cmap)
+
+    # show each distribution with both violins and points
+    ax = sns.violinplot(x='variable', y='value', data=df, inner="box",
+                        palette=colors, size=5, aspect=3, linewidth=lw)
+
+    # replot the median point for larger marker, zorder to plot points on top
+    xlocs = ax.get_xticks()
+    for i, x in enumerate(xlocs):
+        plt.scatter(x, medians[i], marker='o', color='white', s=med_pt, zorder=100)
+
+    # represent the y-data on log scale
+    plt.yscale('symlog')
+
+    # set alpha transparency
+    plt.setp(ax.collections, alpha=0.8)
+
+    # hide vertical plot boundaries
+    sns.despine(left=True)
+
+    # add labels and adjust font sizes
+    ax.set_xlabel("")
+    ax.set_ylabel("ddE [kcal/mol]", size=large_font)
+    plt.xticks(fontsize=small_font, rotation=xrot, ha=xha)
+
+    # settings for overlapping violins
+    # plt.xticks([])
+    # locs, labels = plt.yticks(fontsize=large_font)
+    # plt.yticks(locs, [])
+    # plt.xlim(-1, 1)
+    # ax.set_ylabel("", size=large_font)
+
+    # save and close figure
+    plt.savefig(out_file, dpi=600, bbox_inches='tight')
+    #plt.show()
+    plt.clf()
+    plt.close(plt.gcf())
+
+    # reset plot parameters (white grid)
+    sns.reset_orig()
+
