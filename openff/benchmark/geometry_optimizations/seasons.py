@@ -54,7 +54,16 @@ SEASONS = {
                  "program": "openmm",
                  "spec_name": "gaff-2.11",
                  "spec_description": "default gaff-2.11 optimization spec",
-               }             
+               }
+            },
+        "1:3": {
+            "openff-2.0.0-rc.1": {
+                 "method": "openff-2.0.0-rc.1",
+                 "basis": "smirnoff",
+                 "program": "openmm",
+                 "spec_name": "openff-2.0.0-rc.1",
+                 "spec_description": "default openff-2.0.0-rc.1 optimization spec",
+               }
             }
           }
 
