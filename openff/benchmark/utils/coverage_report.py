@@ -132,8 +132,8 @@ def single_molecule_coverage(molecule: Molecule,
 
     Parameters
     ----------
-    molecule: The openforcefield molecule object for which the report should be generated.
-    ff: The openforcefield typing engine that should be used to check coverage and build an openmm system.
+    molecule: The openff-toolkit molecule object for which the report should be generated.
+    ff: The openff-toolkit typing engine that should be used to check coverage and build an openmm system.
 
     Returns
     -------
