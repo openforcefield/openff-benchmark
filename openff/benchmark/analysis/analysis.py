@@ -76,7 +76,7 @@ def match_minima(input_path, ref_method, output_directory="./results"):
     for method in mols:
         dataframes[method] = readwrite.mols_to_dataframe(mols[method])
 
-    assert ref_method in mols, f"Input path for reference method {ref_method} not specified."
+    assert ref_method in mols, f"No molecules for reference method {ref_method} in input path(s)."
     
     index_intersect = dataframes[ref_method].index
     for m in tqdm(dataframes, desc='Checking input'):
@@ -86,20 +86,28 @@ def match_minima(input_path, ref_method, output_directory="./results"):
         if dataframes[m].shape != df.shape:
             warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
 
+    # get a dictionary with molecule index as key and the name of the reference as item
     ref_confs = get_ref_confs(dataframes[ref_method])
+    # reference all final energies to the reference conformer's final energy (the reference conformers final energy will be 0 afterwards)
     ref_to_ref_confs(dataframes[ref_method], ref_confs)
     os.makedirs(output_directory, exist_ok=True)
-    matches = {}
+    # loop over methods
     for m in dataframes:
-        # if m == ref_method:
-        #     continue
+        # if the method is the reference method, we do not do the comparison
+        # because it's just a comparison with itself
+        if m == ref_method:
+            continue
         match = compare_conformers(dataframes[ref_method], dataframes[m], 1.0)
-        new_ref_confs = {i: match[ match['name'] == ref_conf ]['ff_mol_name'].values[0] for i, ref_conf in ref_confs.items() }
+        new_ref_confs = {molecule_id: 
+                         match[ match['name'] == ref_conformer ]['ff_mol_name'].values[0] 
+                         for molecule_id, ref_conformer in ref_confs.items() }
         ref_to_ref_confs(dataframes[m], new_ref_confs)
         for i, row in match.iterrows():
-            match.loc[i, 'tfd'] = metrics.calc_tfd(dataframes[ref_method].loc[row['name'], 'mol'].to_rdkit(), dataframes[m].loc[row['ff_mol_name'], 'mol'].to_rdkit())
+            match.loc[i, 'tfd'] = metrics.calc_tfd(
+                dataframes[ref_method].loc[row['name'], 'mol'].to_rdkit(), 
+                dataframes[m].loc[row['ff_mol_name'], 'mol'].to_rdkit()
+            )
             match.loc[i, 'dde'] = dataframes[m].loc[row['ff_mol_name'], 'final_energy'] - dataframes[ref_method].loc[row['name'], 'final_energy']
-        matches[m] = match
         readwrite.write_results(match, 
                                 os.path.join(output_directory, f"matched_{m}.csv"), 
                                 columns=['name', 'group_name', 'molecule_index', 'conformer_index', 'ff_mol_name', 'rmsd', 'tfd', 'dde']
