@@ -171,6 +171,33 @@ def test_cli_optimize_submit_molecules_mm(fractal_compute_server, tmpdir, ethane
         assert "COMPLETE" in response.output
 
 
+def test_cli_optimize_submit_molecules_mm_13(fractal_compute_server, tmpdir, ethane_qm_optimized):
+    """Test submission of QM to a Fractal server via the CLI.
+
+    """
+
+    fc = FractalClient(fractal_compute_server)
+
+    with tmpdir.as_cwd():
+        response = runner.invoke(cli, ['optimize', 'submit-molecules',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - MM"',
+                                       '--season', '1:3',
+                                       ethane_qm_optimized])
+
+        assert response.exit_code == 0
+        assert "Submitted!" in response.output
+
+        # wait for results
+        fractal_compute_server.await_results()
+
+        response = runner.invoke(cli, ['optimize', 'status',
+                                       '--fractal-uri', fc.address,
+                                       '--dataset-name', '"Test Dataset - MM"'])
+
+        assert response.exit_code == 0
+        assert "COMPLETE" in response.output
+
 def test_cli_optimize_execute_from_server_mm(fractal_compute_server, tmpdir, ethane_qm_optimized):
     """Test execution of MM with QCEngine pulling from the server via the CLI.
 
@@ -244,7 +271,7 @@ def test_cli_optimize_export_qm_proton_transfer(fractal_compute_server, tmpdir, 
 
         assert response.exit_code == 0
         assert "Submitted!" in response.output
-    
+
         # wait for results
         fractal_compute_server.await_results()
 
@@ -430,6 +457,28 @@ def test_cli_optimize_execute_mm(tmpdir, ethane_qm_optimized):
             exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
             assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
 
+
+def test_cli_optimize_execute_mm_13(tmpdir, ethane_qm_optimized):
+    """Test execution of MM via QCEngine via the CLI.
+
+    """
+
+    with tmpdir.as_cwd():
+        outdir = '4-compute-mm'
+        response = runner.invoke(cli, ['optimize', 'execute',
+                                       '--season', '1:3',
+                                       '--nthreads', '2',
+                                       '--memory', '1',
+                                       '-o', outdir,
+                                       ethane_qm_optimized])
+
+        assert response.exit_code == 0
+        assert "... 'OFF-00000-00'" in response.output
+        assert "Failed to write" not in response.output
+
+        for season in SEASONS["1:3"]:
+            exported_files = os.listdir(os.path.join(tmpdir.strpath, outdir, season))
+            assert set(exported_files) - set(['error_mols']) == set(f"OFF-00000-00.{suffix}" for suffix in ["sdf", "json", "perf.json"])
 
 class TestOptimizationExecutor:
 
