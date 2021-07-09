@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# Pip install the openff-forcefields package to pull in the sage release candidate
+pip install git+https://github.com/openforcefield/openff-forcefields.git@2.0.0-rc.1
+
+
 # Explicitly move noarch packages into `lib/python?.?/site-packages` as a
 # workaround to [this issue][i86] with lack of `constructor` support for
 # `noarch` packages.
