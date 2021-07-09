@@ -58,7 +58,7 @@ def optimize():
     "-s",
     "--season",
     required=True,
-    type=click.Choice(["1:1", "1:2"]),
+    type=click.Choice(["1:1", "1:2", "1:3"]),
     help="Season identifier specifying compute selections applied to molecules",
 )
 @click.argument("input-path", nargs=-1)
@@ -82,7 +82,7 @@ def submit_molecules(fractal_uri, input_path, season, dataset_name, recursive):
 @click.option('-o', '--output-path', help="Path for serialized QCSubmit dataset")
 @click.option('-d', '--dataset-name', required=True, help="Dataset name to submit molecules under")
 @click.option('--recursive', is_flag=True, help="Recursively traverse directories for SDF files to submit")
-@click.option('-s', '--season', required=True, type=click.Choice(['1:1', '1:2']), help="Season identifier specifying compute selections applied to molecules")
+@click.option('-s', '--season', required=True, type=click.Choice(['1:1', '1:2', '1:3']), help="Season identifier specifying compute selections applied to molecules")
 @click.argument('input-path', nargs=-1)
 def create_submittable(output_path, input_path, season, dataset_name, recursive):
     """Create submittable, serialized QCSubmit OptimizationDataset from INPUT_PATH.

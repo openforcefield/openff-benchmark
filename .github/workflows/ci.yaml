@@ -7,9 +7,11 @@ on:
   push:
     branches:
       - "master"
+      - "season-1"
   pull_request:
     branches:
       - "master"
+      - "season-1"
 
 jobs:
   test:
