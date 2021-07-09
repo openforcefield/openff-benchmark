@@ -181,7 +181,7 @@ def test_cli_optimize_submit_molecules_mm_13(fractal_compute_server, tmpdir, eth
     with tmpdir.as_cwd():
         response = runner.invoke(cli, ['optimize', 'submit-molecules',
                                        '--fractal-uri', fc.address,
-                                       '--dataset-name', '"Test Dataset - MM"',
+                                       '--dataset-name', '"Test Dataset - MM-sage"',
                                        '--season', '1:3',
                                        ethane_qm_optimized])
 
@@ -193,7 +193,7 @@ def test_cli_optimize_submit_molecules_mm_13(fractal_compute_server, tmpdir, eth
 
         response = runner.invoke(cli, ['optimize', 'status',
                                        '--fractal-uri', fc.address,
-                                       '--dataset-name', '"Test Dataset - MM"'])
+                                       '--dataset-name', '"Test Dataset - MM-sage"'])
 
         assert response.exit_code == 0
         assert "COMPLETE" in response.output
