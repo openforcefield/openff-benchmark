@@ -1,5 +1,7 @@
 #!/bin/sh
 
+conda activate /home/runner/constructor_install
+
 # Pip install the openff-forcefields package to pull in the sage release candidate
 pip install git+https://github.com/openforcefield/openff-forcefields.git@2.0.0-rc.1
 
