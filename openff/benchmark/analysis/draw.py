@@ -525,8 +525,6 @@ def draw_density2d(
 
 
 def plot_compare_ffs(results_dir, output_directory):
-    global results
-    global method
     os.makedirs(output_directory, exist_ok=True)
     results = {}
     for path in results_dir:
