@@ -771,12 +771,11 @@ def match_minima(input_path, ref_method, output_directory):
 
 @report.command()
 @click.option('--input-path', multiple=True, required=True)
-@click.option('--ref-method', default='default', required=True)
 @click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
-def plots(input_path, ref_method, output_directory):
+def plots(input_path, output_directory):
     from .analysis import draw
 
-    draw.plot_compare_ffs(input_path, ref_method, output_directory)
+    draw.plot_compare_ffs(input_path, output_directory)
 
 
 @cli.group()

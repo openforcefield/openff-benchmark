@@ -524,8 +524,9 @@ def draw_density2d(
     colorbar_and_finish(size1, out_file)
 
 
-def plot_compare_ffs(results_dir, ref_method, output_directory):
+def plot_compare_ffs(results_dir, output_directory):
     global results
+    global method
     os.makedirs(output_directory, exist_ok=True)
     results = {}
     for path in results_dir:
@@ -544,7 +545,7 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
     for m, df in results.items():
         results[m].set_index('name', inplace=True)
 
-    index_intersect = results[ref_method].index
+    index_intersect = results[method].index
     for m in results:
         index_intersect = index_intersect.intersection(results[m].index)
     for m, df in results.items():
@@ -553,10 +554,10 @@ def plot_compare_ffs(results_dir, ref_method, output_directory):
             warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
 
 
-    plot_mol_minima(results, ref_method,  out_file=os.path.join(output_directory, 'minimaE.png'))
+    plot_mol_minima(results, method, out_file=os.path.join(output_directory, 'minimaE.png'))
     # we do not want to plot the ref_method in the following plots
     # remove it
-    results.pop(ref_method)
+    #results.pop(ref_method)
     plot_violin_signed(results, out_file=os.path.join(output_directory, 'violin.svg'))
 
 
@@ -883,7 +884,7 @@ def plot_mol_rmses(mol_name, rmses, xticklabels, eff_nconfs, ref_nconfs, what_fo
     plt.close(plt.gcf())
 
 
-def plot_mol_minima(dataframes, ref_method, out_file='minimaE.png', what_for='talk', selected=None):
+def plot_mol_minima(dataframes, method, out_file='minimaE.png', what_for='talk', selected=None):
     """
     Generate line plot of conformer energies of all methods (single molecule).
 
@@ -915,8 +916,8 @@ def plot_mol_minima(dataframes, ref_method, out_file='minimaE.png', what_for='ta
         xaxis_font = 10
         mark_size = 9
 
-    for mid in dataframes[ref_method].molecule_index.unique():    
-        ref_confs = dataframes[ref_method].loc[dataframes[ref_method].molecule_index==mid]
+    for mid in dataframes[method].molecule_index.unique():    
+        ref_confs = dataframes[method].loc[dataframes[method].molecule_index==mid]
         ref_nconfs = ref_confs.shape[0]
 
         # set figure-related labels
