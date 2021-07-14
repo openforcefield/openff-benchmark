@@ -4,7 +4,7 @@
 new_draw.py
 Plot generation for openff-benchmark
 By:      David F. Hahn, Lorenzo D'Amore
-Version: Jun 2 2021
+Version: Jul 14 2021
 """
 
 import os
@@ -17,9 +17,9 @@ import seaborn as sns
 import warnings
 
 
-def plot_bill(results_dir, ref_method, de_cutoff, rmsd_cutoff, output_directory):
-    global results
+def plot_swope(results_dir, de_cutoff, rmsd_cutoff, output_directory):
     os.makedirs(output_directory, exist_ok=True)
+    #global results
     results = {}
     for path in results_dir:
         if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
@@ -33,18 +33,11 @@ def plot_bill(results_dir, ref_method, de_cutoff, rmsd_cutoff, output_directory)
                         method = '.'.join(file.split('.')[:-1])
                         results[method] = pd.read_csv(path)
 
-    # these lines are necessary for the results intersection, however the density plot
-    # will fail in this case
-
-    # df['name'] for compare_forcefield, match_minima; df['mm_conf'] for bill; df['mm_ref'] for xavier
-
-#    for m, df in results.items():
-#        results[m].index = df['mm_conf']
-
+    # apply the intersection method
     for m, df in results.items():
         results[m].set_index('mm_conf', inplace=True)
 
-    index_intersect = results[ref_method].index
+    index_intersect = results[method].index
     for m in results:
         index_intersect = index_intersect.intersection(results[m].index)
     for m, df in results.items():
@@ -66,7 +59,8 @@ def plot_bill(results_dir, ref_method, de_cutoff, rmsd_cutoff, output_directory)
     new2 = new2[['qm_min', 'mm_min', 'rmsd (qm_min / mm_conf)', 'dE (mm_conf - mm_min)', 'method']]
     new2 = new2.rename(columns={'rmsd (qm_min / mm_conf)': 'rmsd ($\AA$)', 'dE (mm_conf - mm_min)': 'dE (kcal/mol)'})
 
-    draw_ridge_bill(
+    draw_ridge_swope(
+        results,
         new,
         'dE (mm_conf - mm_min)',
         'dE (kcal/mol)',
@@ -78,7 +72,8 @@ def plot_bill(results_dir, ref_method, de_cutoff, rmsd_cutoff, output_directory)
         hist_range=(-1.67,15)
     )
 
-    draw_ridge_bill(
+    draw_ridge_swope(
+        results,
         new2,
         'rmsd (qm_min / mm_conf)',
         'rmsd ($\AA$)',
@@ -91,7 +86,8 @@ def plot_bill(results_dir, ref_method, de_cutoff, rmsd_cutoff, output_directory)
     )
 
 
-def draw_ridge_bill(
+def draw_ridge_swope(
+    results,
     dataframes,
     key,
     x_label,
@@ -253,7 +249,7 @@ def draw_ridge_bill(
     # Remove axes details that don't play well with overlap
     g.set_titles("")
     #    g.set(yticks=[])
-    g.despine(bottom=True) #, left=True)
+    # g.despine(bottom=True, left=True)
     # ax = plt.gca()
     # ax.spines['left'].set_visible(True)
     # ax.spines['left'].set_position('zero')
@@ -267,14 +263,15 @@ def draw_ridge_bill(
     plt.xlabel(x_label, fontsize=ridgedict["xfontsize"])
     plt.ylabel("Count", fontsize=ridgedict["xfontsize"])
     plt.xticks(fontsize=ridgedict["xfontsize"])
-#    plt.yticks(fontsize=ridgedict["xfontsize"])
+    #plt.yticks(fontsize=ridgedict["xfontsize"])
 
     # save with transparency for overlapping plots
     plt.savefig(out_file, transparent=True, bbox_inches="tight")
     plt.clf()
 
 
-def plot_xavier(results_dir, ref_method, output_directory):
+def plot_lucas(results_dir, output_directory):
+    global results
     os.makedirs(output_directory, exist_ok=True)
     results = {}
     for path in results_dir:
@@ -289,15 +286,11 @@ def plot_xavier(results_dir, ref_method, output_directory):
                         method = '.'.join(file.split('.')[:-1])
                         results[method] = pd.read_csv(path)
 
-    # these lines are necessary for the results intersection, however the density plot
-    # will fail in this case
-    
-    # df['name'] for compare_forcefield, match_minima; df['mm_conf'] for bill; df['mm_ref'] for xavier
-    
+    # apply the intersection method
     for m, df in results.items():
-        results[m].index = df['mm_ref']
+        results[m].set_index('mm_ref', inplace=True)
 
-    index_intersect = results[ref_method].index
+    index_intersect = results[method].index
     for m in results:
         index_intersect = index_intersect.intersection(results[m].index)
     for m, df in results.items():
@@ -305,6 +298,7 @@ def plot_xavier(results_dir, ref_method, output_directory):
         if results[m].shape != df.shape:
             warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
 
+    plot_violin_signed(results, out_file=os.path.join(output_directory, 'violin.svg'))
 
     for method, result in results.items():
         # ddE vs RMSD scatter
@@ -702,7 +696,7 @@ def draw_ridgeplot(
     # Remove axes details that don't play well with overlap
     g.set_titles("")
     #    g.set(yticks=[])
-    g.despine(bottom=True)  # , left=True)
+    # g.despine(bottom=True, left=True)
     # ax = plt.gca()
     # ax.spines['left'].set_visible(True)
     # ax.spines['left'].set_position('zero')
@@ -814,8 +808,8 @@ def draw_density2d(
 
     # remove any nans from x_data, such as TFD score for urea-like mols
     nan_inds = x_data.isna()
-    x_data = x_data.dropna()
-    y_data = y_data[~nan_inds]
+    x_data = x_data.dropna().values
+    y_data = y_data[~nan_inds].values
 #    print('nan', x_data.isna().sum(), y_data.isna().sum())
 #    print('xd', x_data, x_data.max(), x_data.min())
 #    print('yd', y_data, y_data.max(), y_data.min())
@@ -853,7 +847,9 @@ def draw_density2d(
 
     # sort the points by density, so that the densest points are plotted last
     idx = z.argsort()
-    x, y, z = x_data.reindex(index=idx), y_data.reindex(index=idx), z[idx]
+#    x, y, z = x_data.reindex(index=idx), y_data.reindex(index=idx), z[idx]
+    x, y, z = x_data[idx], y_data[idx], z[idx]
+
 
     # print(
     #     f"{title} ranges of data in density plot:\n\t\tmin\t\tmax"
@@ -901,7 +897,7 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
     """
 
     # create dataframe from list of lists
-    df = pd.DataFrame({method: result.loc[:, 'dde[kcal/mol]'] for method, result in dataframes.items()})
+    df = pd.DataFrame({method: result.loc[:, 'dE (mm_ref - mm_min)'] for method, result in dataframes.items()})
 
     medians = df.median(axis=0)
 
@@ -957,7 +953,7 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
 
     # add labels and adjust font sizes
     ax.set_xlabel("")
-    ax.set_ylabel("ddE [kcal/mol]", size=large_font)
+    ax.set_ylabel("dE [kcal/mol]", size=large_font)
     plt.xticks(fontsize=small_font, rotation=xrot, ha=xha)
 
     # settings for overlapping violins

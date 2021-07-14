@@ -5,8 +5,7 @@ new_analysis.py
 
 For 2+ sets of SDF files that are analogous in terms of molecules and their conformers,
 assess them (e.g., having FF geometries) with respective to a reference SDF
-file (e.g., having QM geometries). Metrics include: RMSD of conformers, TFD
-(another geometric evaluation), and relative energy differences.
+file (e.g., having QM geometries). Metrics include: RMSD of conformers, and relative energy differences.
 
 By:      David F. Hahn, Lorenzo D'Amore
 Version: May 6 2021
@@ -24,7 +23,7 @@ from tqdm import tqdm
 
 from . import metrics, readwrite
 
-def xavier(input_path, ref_method, output_directory="./results_xavier"):
+def lucas(input_path, ref_method, output_directory="./5-results-lucas"):
     mols = {}
     dataframes = {}
     for path in tqdm(input_path, desc='Reading files'):
@@ -131,7 +130,7 @@ def xavier(input_path, ref_method, output_directory="./results_xavier"):
         
         mm_results = mm_results[['qm_min', 'mm_ref', 'mm_min', 'rmsd (mm_ref / mm_min)', 'dE (mm_ref - mm_min)']]
         
-        mm_results.to_csv(os.path.join(output_directory, f"xavier_{m}.csv"), index=False, float_format='%15.8e')
+        mm_results.to_csv(os.path.join(output_directory, f"lucas_{m}.csv"), index=False, float_format='%15.8e')
 
 
 def compare_conformers(reference, result):
@@ -174,7 +173,7 @@ def compare_conformers(reference, result):
     return conformer_match
 
 
-def bill(input_path, ref_method, output_directory="./results_bill"):
+def swope(input_path, ref_method, output_directory="./5-results-swope"):
     mols = {}
     dataframes = {}
     for path in tqdm(input_path, desc='Reading files'):
@@ -269,7 +268,7 @@ def bill(input_path, ref_method, output_directory="./results_bill"):
         mm_results = mm_results[['qm_min', 'mm_conf', 'mm_min', 'rmsd (qm_min / mm_conf)', 
                                 'dE (mm_conf - mm_min)']]
 
-        mm_results.to_csv(os.path.join(output_directory, f"bill_{m}.csv"), index=False, float_format='%15.8e')
+        mm_results.to_csv(os.path.join(output_directory, f"swope_{m}.csv"), index=False, float_format='%15.8e')
 
 def main(input_path, ref_method, output_directory="./results"):
     """
