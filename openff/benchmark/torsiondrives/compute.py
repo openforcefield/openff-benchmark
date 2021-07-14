@@ -42,7 +42,6 @@ class TorsiondriveExecutor:
         """
         import numpy as np
         from qcelemental.models import Molecule
-        from openff.qcsubmit.factories import OptimizationDatasetFactory
         from torsiondrive import td_api
         from geometric.nifty import bohr2ang, ang2bohr
 
