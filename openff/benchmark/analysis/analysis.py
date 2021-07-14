@@ -207,6 +207,8 @@ def main(input_path, ref_method, output_directory="./results"):
 
     os.makedirs(output_directory, exist_ok=True)
     for m in tqdm(dataframes, desc='Processing data'):
+        if m == ref_method:
+            continue
         ref_to_ref_confs(dataframes[m], ref_confs)
         calc_rmsd(dataframes[ref_method], dataframes[m])
         calc_tfd(dataframes[ref_method], dataframes[m])
