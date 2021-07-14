@@ -49,9 +49,13 @@ def calc_tfd(reference, result):
     for i, row in tqdm(reference.iterrows(), desc='Calculating TFD'):
         result.loc[i, 'tfd'] = metrics.calc_tfd(row['mol'].to_rdkit(), result.loc[i, 'mol'].to_rdkit())
 
-def calc_rmsd(reference, result):
+def calc_rmsd(reference, result, ref_name, result_name):
     for i, row in tqdm(reference.iterrows(), desc='Calculating RMSD'):
-        result.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(row['mol'].to_rdkit(), result.loc[i, 'mol'].to_rdkit())
+        try:
+            result.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(row['mol'].to_rdkit(), result.loc[i, 'mol'].to_rdkit())
+        except RuntimeError:
+            result.loc[i, 'rmsd'] = np.NaN
+            print(f"Unable to calculate best RMSD between {ref_name} and {result_name}; conformer `{i}`")
         
 def calc_dde(reference, result):
     result.loc[:,'dde'] = result.final_energy - reference.final_energy
@@ -208,7 +212,7 @@ def main(input_path, ref_method, output_directory="./results"):
     os.makedirs(output_directory, exist_ok=True)
     for m in tqdm(dataframes, desc='Processing data'):
         ref_to_ref_confs(dataframes[m], ref_confs)
-        calc_rmsd(dataframes[ref_method], dataframes[m])
+        calc_rmsd(dataframes[ref_method], dataframes[m], ref_name=ref_method, result_name=m)
         calc_tfd(dataframes[ref_method], dataframes[m])
         calc_dde(dataframes[ref_method], dataframes[m])
 
