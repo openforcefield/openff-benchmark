@@ -19,7 +19,6 @@ import warnings
 
 def plot_swope(results_dir, de_cutoff, rmsd_cutoff, output_directory):
     os.makedirs(output_directory, exist_ok=True)
-    #global results
     results = {}
     for path in results_dir:
         if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
