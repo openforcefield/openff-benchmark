@@ -1,8 +1,8 @@
 import os
 
 def mols_from_paths(input_paths, sourcefile_keys=False, recursive=False):
-    from openforcefield.topology import Molecule
-    from openforcefield.utils import toolkits
+    from openff.toolkit.topology import Molecule
+    from openff.toolkit.utils import toolkits
     
     # make sure we deregister OpenEye, if it is present
     try:

@@ -2,20 +2,20 @@
 Functions to help with producing simple coverage reports for a set of molecules.
 """
 from typing import Dict, Union, List, Optional
-from openforcefield.typing.engines.smirnoff import ForceField
-from openforcefield.topology import Molecule
+from openff.toolkit.typing.engines.smirnoff import ForceField
+from openff.toolkit.topology import Molecule
 import glob
 import os
 import tqdm
 import shutil
 import logging
 
-logger = logging.getLogger('openforcefield.utils.toolkits')
+logger = logging.getLogger('openff.toolkit.utils.toolkits')
 prev_log_level = logger.getEffectiveLevel()
 logger.setLevel(logging.ERROR)
 
-from openforcefield.topology import Molecule
-from openforcefield.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
+from openff.toolkit.topology import Molecule
+from openff.toolkit.utils.toolkits import GLOBAL_TOOLKIT_REGISTRY, OpenEyeToolkitWrapper
 
 logger.setLevel(prev_log_level)
 
@@ -55,7 +55,7 @@ def generate_coverage_report(input_molecules: List[Molecule],
     Returns
     -------
     coverage_report: A dictionary split into parameter types which lists the number of occurrences of each parameter.
-    success_mols: A list of openforcefield.topology.Molecule objects that were successful in this step
+    success_mols: A list of openff.toolkit.topology.Molecule objects that were successful in this step
     error_mols: A list of tuples (Molecule, Exception) of molecules that failed this step
     """
     if isinstance(input_molecules, Molecule):
@@ -67,9 +67,10 @@ def generate_coverage_report(input_molecules: List[Molecule],
     ff = ForceField(forcefield_name)
     # For speed, don't test charge assignment for now
     ff.deregister_parameter_handler('ToolkitAM1BCC')
+    # ff.deregister_parameter_handler("Electrostatics")
     ff.get_parameter_handler('ChargeIncrementModel',
-                             {'partial_charge_method':'formal_charge',
-                              'version':'0.3'})
+                             {'partial_charge_method': 'formal_charge',
+                              'version': '0.3'})
     # now run coverage on each molecule
     success_mols = []
     error_mols = []
@@ -131,8 +132,8 @@ def single_molecule_coverage(molecule: Molecule,
 
     Parameters
     ----------
-    molecule: The openforcefield molecule object for which the report should be generated.
-    ff: The openforcefield typing engine that should be used to check coverage and build an openmm system.
+    molecule: The openff-toolkit molecule object for which the report should be generated.
+    ff: The openff-toolkit typing engine that should be used to check coverage and build an openmm system.
 
     Returns
     -------

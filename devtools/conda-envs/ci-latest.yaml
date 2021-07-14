@@ -1,21 +1,16 @@
-name: openff-benchmark-optimization
+name: ci-latest
 channels:
   - conda-forge
   - psi4/label/dev
-  - omnia
   - defaults
   - omnia/label/rc
-  - omnia/label/benchmark
 dependencies:
   - python =3.7
   - pip
   - qcfractal =0.15.1
-  - qcengine =0.17.0
+  - qcengine =0.18.0
   - gau2grid =2.0.3
-  - click =7.1.2
-
-  # Benchmarking
-  - openff-benchmark =2021.04.09.0
+  - click
 
   # Storage dependencies
   - alembic
@@ -28,7 +23,7 @@ dependencies:
   - h5py
   - pandas
   - plotly >=4.0.0
-  - pyarrow >=0.13.0
+  - pyarrow #>=0.13.0
   - tqdm
 
   # QM calculations
@@ -36,15 +31,15 @@ dependencies:
   #- xtb-python =20.2
   - dftd3
   - gcp
+  - basis_set_exchange
     
   # MM calculations
-  - openforcefield =0.8.4
-  - rdkit =2020.09
-  - openforcefields =1.3.0
-  - openmm =7.4.2
-  - openmmforcefields =0.8.0
+  - openff-toolkit
+  - rdkit
+  - openmm
+  - openmmforcefields
   - conda-forge::libiconv
-  - ambertools =20.4
+  - ambertools
 
   # procedures
   - geometric
@@ -54,10 +49,12 @@ dependencies:
 
   # submission
   - qcportal
-  - openff-qcsubmit =0.2.1
+  #- openff-qcsubmit
 
   # analysis
   - numpy
   - pint
   - matplotlib
   - seaborn
+  - pip:
+      - git+git://github.com/openforcefield/openff-qcsubmit.git@23a91f570d0d9557cb62b2604607a68480dcd3a0
