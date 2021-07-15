@@ -560,7 +560,7 @@ class OptimizationExecutor:
                             os.path.join(output_directory, spec_name, 'error_mols', output_id))
 
                         self._execute_output_results(output_id=output_id,
-                                                     resultjson=result,
+                                                     resultjson=result.json(),
                                                      final_molecule=final_molecule,
                                                      outfile=error_outfile,
                                                      success=False,
@@ -855,7 +855,7 @@ class OptimizationExecutor:
                         os.path.join(output_directory, spec_name, 'error_mols', output_id))
 
                     self._execute_output_results(output_id=output_id,
-                                                 resultjson=result,
+                                                 resultjson=result.json(),
                                                  final_molecule=final_molecule,
                                                  outfile=error_outfile,
                                                  success=False,

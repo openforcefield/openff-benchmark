@@ -777,7 +777,6 @@ def plots(input_path, output_directory):
 
     draw.plot_compare_ffs(input_path, output_directory)
 
-
 @report.command()
 @click.option('--input-path', multiple=True, required=True)
 @click.option('--ref-method', default='b3lyp-d3bj', required=True)
