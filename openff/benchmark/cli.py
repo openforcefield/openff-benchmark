@@ -750,19 +750,53 @@ def report():
 
 
 @report.command()
-@click.option('--input-path', multiple=True, required=True)
-@click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='5-compare_forcefields', required=True)
+@click.option(
+    '--input-path',
+    multiple=True,
+    required=True,
+    help="Input directory of the QM optimization and MM optimization"
+)
+@click.option(
+    '--ref-method',
+    default='b3lyp-d3bj',
+    required=True,
+    help="Reference method, typically the QM method"
+)
+@click.option(
+    '--output-directory',
+    default='5-compare-forcefields',
+    required=True,
+    help="Output directory where the analysis results will be stored"
+)
 def compare_forcefields(input_path, ref_method, output_directory):
+    """
+    Compute the relative energy difference (ddE) between the FF and QM energy
+    for the i-th conformer.
+    """
     from .analysis import analysis
 
     analysis.main(input_path, ref_method, output_directory)
 
 
 @report.command()
-@click.option('--input-path', multiple=True, required=True)
-@click.option('--ref-method', default='b3lyp-d3bj', required=True)
-@click.option('--output-directory', default='5-match_minima', required=True)
+@click.option(
+    '--input-path',
+    multiple=True,
+    required=True,
+    help="Input directory of the QM optimization and MM optimization"
+)
+@click.option(
+    '--ref-method',
+    default='b3lyp-d3bj',
+    required=True,
+    help="Reference method, typically the QM method"
+)
+@click.option(
+    '--output-directory',
+    default='5-match-minima',
+    required=True,
+    help="Output directory where the analysis results will be stored"
+)
 def match_minima(input_path, ref_method, output_directory):
     from .analysis import analysis
 
@@ -770,12 +804,136 @@ def match_minima(input_path, ref_method, output_directory):
 
 
 @report.command()
-@click.option('--input-path', multiple=True, required=True)
-@click.option('--output-directory', default='5-plots-compare-forcefields', required=True)
+@click.option(
+    '--input-path',
+    multiple=True,
+    required=True,
+    help="Input directory containing the analysis results to be plotted"
+)
+@click.option(
+    '--output-directory',
+    default='5-plots-compare-forcefields',
+    required=True,
+    help="Output directory where the plots will be stored"
+)
 def plots(input_path, output_directory):
+    """ Generate plots from the compare-forcefields or match-minima analysis """
     from .analysis import draw
 
     draw.plot_compare_ffs(input_path, output_directory)
+
+
+@report.command()
+@click.option(
+    '--input-path',
+    multiple=True,
+    required=True,
+    help="Input directory of the QM optimization and MM optimization"
+)
+@click.option(
+    '--ref-method',
+    default='b3lyp-d3bj',
+    required=True,
+    help="Reference method, typically the QM method"
+)
+@click.option(
+    '--output-directory',
+    default='5-results-lucas',
+    required=True,
+    help="Output directory where the analysis results will be stored"
+)
+def lucas(input_path, ref_method, output_directory):
+    """
+    Execute the analysis proposed by Lucas.
+    For each molecule, the code finds the MM reference conformer (mm_ref) with the lowest RMSD
+    value with respect to the QM global minimum (qm_min) and then reports the relative energy (dE)
+    and RMDS between ref_conf and the MM global minimum (mm_min).
+    """
+    from .analysis import analysis
+    analysis.lucas(input_path, ref_method, output_directory)
+
+
+@report.command()
+@click.option(
+    '--input-path',
+    multiple=True,
+    required=True,
+    help="Input directory of the QM optimization and MM optimization"
+)
+@click.option(
+    '--ref-method',
+    default='b3lyp-d3bj',
+    required=True,
+    help="Reference method, typically the QM method"
+)
+@click.option(
+    '--output-directory',
+    default='5-results-swope',
+    required=True,
+    help="Output directory where the analysis results will be stored"
+)
+def swope(input_path, ref_method, output_directory):
+    """
+    Execute the analysis proposed by Swope
+    For each molecule, the code reports (i) the relative energy (dE) between each MM conformer (mm_conf)
+    and the MM conformer which is the global minimum (mm_min); (ii) the RMSD between each MM conformer 
+    and the QM conformer which is the global minimum (qm_min).
+
+    """
+    from .analysis import analysis
+    analysis.swope(input_path, ref_method, output_directory)
+
+
+@report.command()
+@click.option(
+    '--input-path',
+    multiple=True,
+    required=True,
+    help="Input directory containing the analysis results to be plotted"
+)
+@click.option(
+    '--output-directory',
+    default='6-plots-xavier',
+    required=True,
+    help="Output directory where the plots will be stored"
+)
+def plots_lucas(input_path, output_directory):
+    """ Generate plots from the analysis proposed by Lucas """
+
+    from .analysis import draw
+    draw.plot_lucas(input_path, output_directory)
+
+
+@report.command()
+@click.option(
+    '--input-path',
+    multiple=True,
+    required=True,
+    help="Input directory containing the analysis results to be plotted"
+)
+@click.option(
+    '--de-cutoff',
+    default='default',
+    required=True,
+    help="dE cutoff value to generate an rmsd ridge plot taking into account only conformers of relative energy within the given threshold"
+)
+@click.option(
+    '--rmsd-cutoff',
+    default='default',
+    required=True,
+    help="Rmsd cutoff value to generate a dE ridge plot taking into account only conformers with rmsd within the given threshold"
+)
+@click.option(
+    '--output-directory',
+    default='6-plots-bill',
+    required=True,
+    help="Output directory where the plots will be stored"
+)
+def plots_swope(input_path, de_cutoff, rmsd_cutoff, output_directory):
+    """ Generate plots from the analysis proposed by Swope """
+
+    from .analysis import draw
+    draw.plot_swope(input_path, de_cutoff, rmsd_cutoff, output_directory)
 
 
 @cli.group()

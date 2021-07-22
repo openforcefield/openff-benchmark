@@ -5,8 +5,8 @@ draw.py
 
 Plot generation for openff-benchmark
 
-By:      David F. Hahn, Victoria T. Lim
-Version: Dec 7 2020
+By:      David F. Hahn, Lorenzo D'Amore, Victoria T. Lim
+Version: Jul 22 2021
 
 """
 
@@ -18,6 +18,48 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
+
+
+def get_results(results_dir):
+    results = {}
+    for path in results_dir:
+        if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
+            method = '.'.join(os.path.split(path)[1].split('.')[:-1])
+            results[method] = pd.read_csv(path)
+        elif os.path.isdir(path):
+            for root, dirs, files in os.walk(path):
+                for file in files:
+                    path = os.path.join(root, file)
+                    if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
+                        method = '.'.join(file.split('.')[:-1])
+                        results[method] = pd.read_csv(path)
+
+    return results, method
+
+
+def res_inters(results, method, idx):
+    """
+    Takes only conformer which are present in all methods
+
+    Parameters
+    ---------
+    idx : string
+        idx is the column of the results df containing the molecule index:
+        'name' for compare-ff, match-minima
+        'mm_ref' for lucas analysis
+        'mm_conf' for swope analysis
+    """
+    for m, df in results.items():
+        results[m].set_index(idx, inplace=True)
+
+    index_intersect = results[method].index
+    for m in results:
+        index_intersect = index_intersect.intersection(results[m].index)
+    for m, df in results.items():
+        results[m] = df.loc[index_intersect]
+        if results[m].shape != df.shape:
+            warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
+
 
 def draw_scatter(
     x_data, y_data, method_label, x_label, y_label, out_file, what_for="talk"
@@ -83,7 +125,6 @@ def draw_scatter(
     # plt.show()
 
 
-
 def draw_corr(
     x_data, y_data, method, x_label, y_label, out_file, what_for="talk"
 ):
@@ -146,12 +187,14 @@ def draw_ridgeplot(
     dataframes,
     key,
     x_label,
+    y_label,
     out_file,
     what_for="paper",
     bw="hist",
     same_subplot=False,
     sym_log=False,
-    hist_range=(-15, 15)
+    hist_range=(-15, 15),
+    stat="probability"
 ):
 
     """
@@ -187,6 +230,8 @@ def draw_ridgeplot(
     hist_range : tuple
         tuple of min and max values to use for histogram;
         only needed if bw is set to 'hist'
+    stat : string
+        normalization for the distribution, either "probability" or "count"
 
     """
     # Define and use a simple function to label the plot in axes coordinates
@@ -235,6 +280,7 @@ def draw_ridgeplot(
 
     temp = []
     for method, result in dataframes.items():
+#        import pdb; pdb.set_trace()
         result = result.rename(columns={key: x_label})
         result["method"] = method
         temp.append(result)
@@ -261,7 +307,7 @@ def draw_ridgeplot(
                 x_label,
                 kind="hist",
                 bins=15,
-                stat="probability",
+                stat=stat,
                 hist_kws=histoptions,
             )
         else:
@@ -296,7 +342,7 @@ def draw_ridgeplot(
             sns.histplot,
             x_label,
             bins=15,
-            stat="probability",
+            stat=stat,
             **histoptions,
         )
 
@@ -351,13 +397,12 @@ def draw_ridgeplot(
 
     # adjust font sizes
     plt.xlabel(x_label, fontsize=ridgedict["xfontsize"])
-    plt.ylabel("Density", fontsize=ridgedict["xfontsize"])
+    plt.ylabel(y_label, fontsize=ridgedict["xfontsize"])
     plt.xticks(fontsize=ridgedict["xfontsize"])
 
     # save with transparency for overlapping plots
     plt.savefig(out_file, transparent=True, bbox_inches="tight")
     plt.clf()
-
 
 
 def draw_density2d(
@@ -378,7 +423,6 @@ def draw_density2d(
 
     """
     Draw a scatter plot colored smoothly to represent the 2D density.
-    Based on: https://stackoverflow.com/a/53865762/8397754
 
     Parameters
     ----------
@@ -455,10 +499,6 @@ def draw_density2d(
     nan_inds = x_data.isna()
     x_data = x_data.dropna().values
     y_data = y_data[~nan_inds].values
-#    print('nan', x_data.isna().sum(), y_data.isna().sum())
-#    print('xd', x_data, x_data.max(), x_data.min())
-#    print('yd', y_data, y_data.max(), y_data.min())
-#    print(f"\nNumber of data points in FF scatter plot: {len(x_data)} {len(y_data)}")
 
     # compute histogram in 2d
     data, x_e, y_e = np.histogram2d(x_data, y_data, bins=bins)
@@ -494,14 +534,6 @@ def draw_density2d(
     idx = z.argsort()
     x, y, z = x_data[idx], y_data[idx], z[idx]
 
-    # print(
-    #     f"{title} ranges of data in density plot:\n\t\tmin\t\tmax"
-    #     f"\nx\t{np.min(x):10.4f}\t{np.max(x):10.4f}"
-    #     f"\ny\t{np.min(y):10.4f}\t{np.max(y):10.4f}"
-    #     f"\nz\t{np.min(data):10.4f}\t{np.max(data):10.4f} (histogrammed)"
-    #     f"\nz'\t{np.nanmin(z):10.4f}\t{np.nanmax(z):10.4f} (interpolated)"
-    # )
-
 
     if z_range is None:
         z_range=(0, np.max(z))
@@ -511,7 +543,6 @@ def draw_density2d(
     y = np.append(y, [0, 0])
     z = np.append(z, [z_range[0], z_range[1]])
 
-    # print(f"z''\t{np.nanmin(z):10.4f}\t{np.nanmax(z):10.4f} (interp, bounded)")
 
     # generate the plot
     plt.scatter(x, y, c=z, vmin=z_range[0], vmax=z_range[1], **plt_options)
@@ -526,37 +557,14 @@ def draw_density2d(
 
 def plot_compare_ffs(results_dir, output_directory):
     os.makedirs(output_directory, exist_ok=True)
-    results = {}
-    for path in results_dir:
-        if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
-            method = '.'.join(os.path.split(path)[1].split('.')[:-1])
-            results[method] = pd.read_csv(path)
-        elif os.path.isdir(path):
-            for root, dirs, files in os.walk(path):
-                for file in files:
-                    path = os.path.join(root, file)
-                    if (os.path.isfile(path) and path.split('.')[-1].lower() == 'csv'):
-                        method = '.'.join(file.split('.')[:-1])
-                        results[method] = pd.read_csv(path)
 
-    # apply the intersection method
-    for m, df in results.items():
-        results[m].set_index('name', inplace=True)
+    results,method = get_results(results_dir)
 
-    index_intersect = results[method].index
-    for m in results:
-        index_intersect = index_intersect.intersection(results[m].index)
-    for m, df in results.items():
-        results[m] = df.loc[index_intersect]
-        if results[m].shape != df.shape:
-            warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
+    res_inters(results, method, 'name')
 
-
-    plot_mol_minima(results, method, out_file=os.path.join(output_directory, 'minimaE.png'))
-    # we do not want to plot the ref_method in the following plots
-    # remove it
-    #results.pop(ref_method)
-    plot_violin_signed(results, out_file=os.path.join(output_directory, 'violin.svg'))
+    plot_mol_minima(results, 'dde(kcal/mol)', 'dde[kcal/mol]', method, out_file=os.path.join(output_directory, 'minimaE.png'))
+    
+    plot_violin_signed(results, 'dde[kcal/mol]', out_file=os.path.join(output_directory, 'violin.svg'))
 
 
     for method, result in results.items():
@@ -674,6 +682,7 @@ def plot_compare_ffs(results_dir, output_directory):
         results,
         'dde[kcal/mol]',
         'ddE (kcal/mol)',
+        'Density',
         out_file=os.path.join(output_directory, f'fig_ridge_dde.png'),
         what_for="talk",
         bw="hist",
@@ -685,6 +694,7 @@ def plot_compare_ffs(results_dir, output_directory):
         results,
         'rmsd',
         'RMSD ($\AA$)',
+        'Density',
         out_file=os.path.join(output_directory, f'fig_ridge_rmsd.png'),
         what_for="talk",
         bw="hist",
@@ -696,6 +706,7 @@ def plot_compare_ffs(results_dir, output_directory):
         results,
         'tfd',
         'TFD',
+        'Density',
         out_file=os.path.join(output_directory, f'fig_ridge_tfd.png'),
         what_for="talk",
         bw="hist",
@@ -705,9 +716,211 @@ def plot_compare_ffs(results_dir, output_directory):
     )
     
 
+def plot_lucas(results_dir, output_directory):
+    os.makedirs(output_directory, exist_ok=True)
+
+    results,method = get_results(results_dir)
+
+    res_inters(results, method, 'mm_ref')
+
+    plot_violin_signed(results, 'dE (mm_ref-mm_min)', out_file=os.path.join(output_directory, 'violin.svg'))
+
+    for method, result in results.items():
+        # ddE vs RMSD scatter
+        draw_scatter(result.loc[:, 'rmsd (mm_ref/mm_min)'],
+                     result.loc[:,'dE (mm_ref-mm_min)'],
+                     method,
+                     'rmsd ($\AA$)',
+                     'dE (kcal/mol)',
+                     os.path.join(output_directory, f'fig_{method}_scatter_rmsd_de.png'),
+                     what_for="talk"
+                     )
+
+        # draw density 2D
+        draw_density2d(
+            result.loc[:, 'rmsd (mm_ref/mm_min)'],
+            result.loc[:,'dE (mm_ref-mm_min)'],
+            method,
+            'rmsd ($\AA$)',
+            'dE (kcal/mol)',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_de_linear.png'),
+            what_for="talk",
+            z_interp=True,
+            symlog=False
+        )
+
+        draw_density2d(
+            result.loc[:, 'rmsd (mm_ref/mm_min)'],
+            result.loc[:,'dE (mm_ref-mm_min)'],
+            method,
+            'rmsd ($\AA$)',
+            'dE (kcal/mol)',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_de_log.png'),
+            what_for="talk",
+            z_interp=True,
+            symlog=True
+        )
+
+        # draw correlation plots between methods
+        for method2 in list(results.keys())[list(results.keys()).index(method)+1:]:
+            draw_corr(
+                result.loc[:, 'rmsd (mm_ref/mm_min)'],
+                results[method2].loc[:, 'rmsd (mm_ref/mm_min)'],
+                f"{method2} vs. {method}",
+                f"rmsd {method} ($\AA$)",
+                f"rmsd {method2} ($\AA$)",
+                os.path.join(output_directory, f"fig_scatter_rmsd_{method2}_{method}.png"),
+                "paper"
+            )
+
+            draw_corr(
+                result.loc[:, 'dE (mm_ref-mm_min)'],
+                results[method2].loc[:, 'dE (mm_ref-mm_min)'],
+                f"{method2} vs. {method}",
+                f"dE {method} (kcal/mol)",
+                f"dE {method2} (kcal/mol)",
+                os.path.join(output_directory, f"fig_scatter_de_{method2}_{method}.png"),
+                "paper"
+            )
+
+    draw_ridgeplot(
+        results,
+        'dE (mm_ref-mm_min)',
+        'dE (kcal/mol)',
+        'Density',
+        out_file=os.path.join(output_directory, f'fig_ridge_de.png'),
+        what_for="talk",
+        bw="hist",
+        same_subplot=True,
+        sym_log=False,
+        hist_range=(-1.67,15)
+    )
+
+    draw_ridgeplot(
+        results,
+        'rmsd (mm_ref/mm_min)',
+        'rmsd ($\AA$)',
+        'Density',
+        out_file=os.path.join(output_directory, f'fig_ridge_rmsd.png'),
+        what_for="talk",
+        bw="hist",
+        same_subplot=True,
+        sym_log=False,
+        hist_range=(0, 3)
+    )
 
 
-def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
+def plot_swope(results_dir, de_cutoff, rmsd_cutoff, output_directory):
+    os.makedirs(output_directory, exist_ok=True)
+
+    results,method = get_results(results_dir)
+
+    res_inters(results, method, 'mm_conf')
+
+    plot_violin_signed(results, 'dE (mm_conf-mm_min)', out_file=os.path.join(output_directory, 'violin.svg'))
+
+    for method, result in results.items():
+        # ddE vs RMSD scatter
+        draw_scatter(result.loc[:, 'rmsd (mm_conf/qm_min)'],
+                     result.loc[:,'dE (mm_conf-mm_min)'],
+                     method,
+                     'rmsd ($\AA$)',
+                     'dE (kcal/mol)',
+                     os.path.join(output_directory, f'fig_{method}_scatter_rmsd_de.png'),
+                     what_for="talk"
+                     )
+
+        # draw density 2D
+        draw_density2d(
+            result.loc[:, 'rmsd (mm_conf/qm_min)'],
+            result.loc[:,'dE (mm_conf-mm_min)'],
+            method,
+            'rmsd ($\AA$)',
+            'dE (kcal/mol)',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_de_linear.png'),
+            what_for="talk",
+            z_interp=True,
+            symlog=False
+        )
+
+        draw_density2d(
+            result.loc[:, 'rmsd (mm_conf/qm_min)'],
+            result.loc[:,'dE (mm_conf-mm_min)'],
+            method,
+            'rmsd ($\AA$)',
+            'dE (kcal/mol)',
+            os.path.join(output_directory, f'fig_{method}_density_rmsd_de_log.png'),
+            what_for="talk",
+            z_interp=True,
+            symlog=True
+        )
+
+        # draw correlation plots between methods
+        for method2 in list(results.keys())[list(results.keys()).index(method)+1:]:
+            draw_corr(
+                result.loc[:, 'rmsd (mm_conf/qm_min)'],
+                results[method2].loc[:, 'rmsd (mm_conf/qm_min)'],
+                f"{method2} vs. {method}",
+                f"rmsd {method} ($\AA$)",
+                f"rmsd {method2} ($\AA$)",
+                os.path.join(output_directory, f"fig_scatter_rmsd_{method2}_{method}.png"),
+                "paper"
+            )
+
+            draw_corr(
+                result.loc[:, 'dE (mm_conf-mm_min)'],
+                results[method2].loc[:, 'dE (mm_conf-mm_min)'],
+                f"{method2} vs. {method}",
+                f"dE {method} (kcal/mol)",
+                f"dE {method2} (kcal/mol)",
+                os.path.join(output_directory, f"fig_scatter_de_{method2}_{method}.png"),
+                "paper"
+            )
+
+    combined_df = pd.concat(results, names=['method']).reset_index(0)
+
+    new = combined_df[(combined_df['rmsd (mm_conf/qm_min)']<float(rmsd_cutoff))]
+    new = new.reset_index()
+    new.drop('mm_conf', axis='columns', inplace=True)
+    new = new[['qm_min', 'mm_min', 'rmsd (mm_conf/qm_min)', 'dE (mm_conf-mm_min)', 'method']]
+    new = { name : group for name,group in new.groupby('method')}
+
+    new2 = combined_df[(combined_df['dE (mm_conf-mm_min)']<float(de_cutoff))]
+    new2 = new2.reset_index()
+    new2.drop('mm_conf', axis='columns', inplace=True)
+    new2 = new2[['qm_min', 'mm_min', 'rmsd (mm_conf/qm_min)', 'dE (mm_conf-mm_min)', 'method']]
+    new2 = { name : group for name,group in new2.groupby('method')}
+
+    draw_ridgeplot(
+        new,
+        'dE (mm_conf-mm_min)',
+        'dE (kcal/mol)',
+        'Count',
+        out_file=os.path.join(output_directory, f'fig_ridge_de_rmsd_cutoff_{rmsd_cutoff}.png'),
+        what_for="talk",
+        bw="hist",
+        same_subplot=True,
+        sym_log=False,
+        hist_range=(-1.67,15),
+        stat="count"
+    )
+
+    draw_ridgeplot(
+        new2,
+        'rmsd (mm_conf/qm_min)',
+        'rmsd ($\AA$)',
+        'Count',
+        out_file=os.path.join(output_directory, f'fig_ridge_rmsd_de_cutoff_{de_cutoff}.png'),
+        what_for="talk",
+        bw="hist",
+        same_subplot=True,
+        sym_log=False,
+        hist_range=(0, 3),
+        stat="count"
+    )
+
+
+def plot_violin_signed(dataframes, y_ax, out_file='violin.png', what_for='talk'):
     """
     Generate violin plots of the mean signed errors
     of force field energies with respect to QM energies.
@@ -717,6 +930,8 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
     msds : 2D numpy array
         Mean signed deviations for each method with reference to first method
         msds[i][j] represents ith mol, jth method's MSE
+    y_ax : string
+        column of the results df containing the results to plotted in the y axis
     ff_list : list
         list of methods corresponding to energies in msds
     what_for : string
@@ -726,7 +941,7 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
     """
 
     # create dataframe from list of lists
-    df = pd.DataFrame({method: result.loc[:, 'dde[kcal/mol]'] for method, result in dataframes.items()})
+    df = pd.DataFrame({method: result.loc[:, y_ax] for method, result in dataframes.items()})
 
     medians = df.median(axis=0)
 
@@ -782,7 +997,7 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
 
     # add labels and adjust font sizes
     ax.set_xlabel("")
-    ax.set_ylabel("ddE [kcal/mol]", size=large_font)
+    ax.set_ylabel(y_ax, size=large_font)
     plt.xticks(fontsize=small_font, rotation=xrot, ha=xha)
 
     # settings for overlapping violins
@@ -800,7 +1015,6 @@ def plot_violin_signed(dataframes, out_file='violin.png', what_for='talk'):
 
     # reset plot parameters (white grid)
     sns.reset_orig()
-
 
 
 def plot_mol_rmses(mol_name, rmses, xticklabels, eff_nconfs, ref_nconfs, what_for='talk'):
@@ -882,7 +1096,7 @@ def plot_mol_rmses(mol_name, rmses, xticklabels, eff_nconfs, ref_nconfs, what_fo
     plt.close(plt.gcf())
 
 
-def plot_mol_minima(dataframes, method, out_file='minimaE.png', what_for='talk', selected=None):
+def plot_mol_minima(dataframes, y_label, y_data, method, out_file='minimaE.png', what_for='talk', selected=None):
     """
     Generate line plot of conformer energies of all methods (single molecule).
 
@@ -921,7 +1135,7 @@ def plot_mol_minima(dataframes, method, out_file='minimaE.png', what_for='talk',
         # set figure-related labels
         mol_name = list(ref_confs.index)[0]
         plttitle = f"Relative Energies of {mol_name} Minima"
-        ylabel = "ddE (kcal/mol)"
+        ylabel = y_label
         figname = f"{out_file[:-4]}_{mol_name}{out_file[-4:]}"
         xlabs = ref_confs['conformer_index']
 
@@ -945,7 +1159,7 @@ def plot_mol_minima(dataframes, method, out_file='minimaE.png', what_for='talk',
             # define x's from integer range with step 1
             xi = list(range(ref_nconfs))
             # get the relative energies of method
-            energies = dataframes[method].loc[dataframes[method].molecule_index==mid]['dde[kcal/mol]']
+            energies = dataframes[method].loc[dataframes[method].molecule_index==mid][y_data]
             # plot values
             plt.plot(xi, energies, color=colors[i], label=method,
                      marker=markers[i], markersize=mark_size, alpha=0.6)
