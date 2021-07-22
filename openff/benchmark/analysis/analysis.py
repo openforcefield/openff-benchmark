@@ -140,12 +140,23 @@ def match_minima(input_path, ref_method, output_directory="./results"):
 
 
 def lucas(input_path, ref_method, output_directory="./5-results-lucas"):
-    """
+    """Execute comparison analysis proposed by Xavier Lucas.
+
     The command accepts the paths of the optimized molecules obtained from the optimization step
     and creates one output csv file per method.
+
     For each molecule, the code finds the MM reference conformer (ref_conf) with the lowest RMSD
     value with respect to the QM global minimum (qm_min) and then reports the relative energy (dE) 
     and RMDS between ref_conf and the MM global minimum (mm_min).
+
+    Parameters
+    ----------
+    input_path : Iterable[Path-like]
+        Input paths to gather input SDFs of molecule conformers to compare.
+    ref_methd : str
+        The value of the SDF property `method` to use as the reference method.
+    output_directory : Path-like
+        The directory in which to output results.
 
     """
 
@@ -215,12 +226,23 @@ def lucas(input_path, ref_method, output_directory="./5-results-lucas"):
 
 
 def swope(input_path, ref_method, output_directory="./5-results-swope"):
-    """
+    """Execute comparison analysis proposed by William Swope.
+
     The command accepts the paths of the optimized molecules obtained from the optimization step
     and creates one output csv file per method.
+
     For each molecule, the code reports (i) the relative energy (dE) between each MM conformer and the MM 
     conformer which is the global minimum (mm_min); (ii) the RMSD between each MM conformer and the QM
     conformer which is the global minimum (qm_min).
+
+    Parameters
+    ----------
+    input_path : Iterable[Path-like]
+        Input paths to gather input SDFs of molecule conformers to compare.
+    ref_methd : str
+        The value of the SDF property `method` to use as the reference method.
+    output_directory : Path-like
+        The directory in which to output results.
 
     """
 

@@ -843,11 +843,12 @@ def plots(input_path, output_directory):
     help="Output directory where the analysis results will be stored"
 )
 def lucas(input_path, ref_method, output_directory):
-    """
-    Execute the analysis proposed by Lucas.
-    For each molecule, the code finds the MM reference conformer (mm_ref) with the lowest RMSD
-    value with respect to the QM global minimum (qm_min) and then reports the relative energy (dE)
-    and RMDS between ref_conf and the MM global minimum (mm_min).
+    """Execute the analysis proposed by Lucas.
+
+    For each molecule, find the MM reference conformer (mm_ref) with the lowest RMSD
+    value with respect to the QM global minimum (qm_min); report the relative energy (dE)
+    and RMSD between ref_conf and the MM global minimum (mm_min).
+
     """
     from .analysis import analysis
     analysis.lucas(input_path, ref_method, output_directory)
@@ -873,11 +874,13 @@ def lucas(input_path, ref_method, output_directory):
     help="Output directory where the analysis results will be stored"
 )
 def swope(input_path, ref_method, output_directory):
-    """
-    Execute the analysis proposed by Swope
-    For each molecule, the code reports (i) the relative energy (dE) between each MM conformer (mm_conf)
-    and the MM conformer which is the global minimum (mm_min); (ii) the RMSD between each MM conformer 
-    and the QM conformer which is the global minimum (qm_min).
+    """Execute the analysis proposed by Swope.
+
+    For each molecule, report:
+    (i)  the relative energy (dE) between each MM conformer (mm_conf)
+         and the global minimum MM conformer (mm_min); 
+    (ii) the RMSD between each MM conformer 
+         and the global minimum QM conformer (qm_min).
 
     """
     from .analysis import analysis
@@ -898,7 +901,7 @@ def swope(input_path, ref_method, output_directory):
     help="Output directory where the plots will be stored"
 )
 def plots_lucas(input_path, output_directory):
-    """ Generate plots from the analysis proposed by Lucas """
+    """ Generate plots from the analysis proposed by Lucas. """
 
     from .analysis import draw
     draw.plot_lucas(input_path, output_directory)
@@ -921,7 +924,7 @@ def plots_lucas(input_path, output_directory):
     '--rmsd-cutoff',
     default='default',
     required=True,
-    help="Rmsd cutoff value to generate a dE ridge plot taking into account only conformers with rmsd within the given threshold"
+    help="RMSD cutoff value to generate a dE ridge plot taking into account only conformers with RMSD within the given threshold"
 )
 @click.option(
     '--output-directory',
@@ -930,7 +933,7 @@ def plots_lucas(input_path, output_directory):
     help="Output directory where the plots will be stored"
 )
 def plots_swope(input_path, de_cutoff, rmsd_cutoff, output_directory):
-    """ Generate plots from the analysis proposed by Swope """
+    """ Generate plots from the analysis proposed by Swope. """
 
     from .analysis import draw
     draw.plot_swope(input_path, de_cutoff, rmsd_cutoff, output_directory)

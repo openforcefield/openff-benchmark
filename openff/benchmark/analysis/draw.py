@@ -39,10 +39,18 @@ def get_results(results_dir):
 
 def res_inters(results, method, idx):
     """
-    Takes only conformer which are present in all methods
+    Takes only conformer which are present in all methods.
+
+    Modifies `results` dictionary Dataframes in-place.
 
     Parameters
-    ---------
+    ----------
+    results : Dict[str, pd.DataFrame]
+        Dict of Dataframes with method as keys, results as values.
+        This function modifies the Dataframes in-place.
+    method : str
+        Key in results used as the first method for intersection.
+        Can ultimately be any key in the dictionary due to the nature of the intersection.
     idx : string
         idx is the column of the results df containing the molecule index:
         'name' for compare-ff, match-minima
@@ -280,7 +288,6 @@ def draw_ridgeplot(
 
     temp = []
     for method, result in dataframes.items():
-#        import pdb; pdb.set_trace()
         result = result.rename(columns={key: x_label})
         result["method"] = method
         temp.append(result)
@@ -558,7 +565,7 @@ def draw_density2d(
 def plot_compare_ffs(results_dir, output_directory):
     os.makedirs(output_directory, exist_ok=True)
 
-    results,method = get_results(results_dir)
+    results, method = get_results(results_dir)
 
     res_inters(results, method, 'name')
 
@@ -688,7 +695,8 @@ def plot_compare_ffs(results_dir, output_directory):
         bw="hist",
         same_subplot=True,
         sym_log=False,
-        hist_range=(-15,15)
+        hist_range=(-15,15),
+        stat="probability"
     )
     draw_ridgeplot(
         results,
@@ -700,7 +708,8 @@ def plot_compare_ffs(results_dir, output_directory):
         bw="hist",
         same_subplot=True,
         sym_log=False,
-        hist_range=(0, 3)
+        hist_range=(0, 3),
+        stat="probability"
     )
     draw_ridgeplot(
         results,
@@ -712,14 +721,15 @@ def plot_compare_ffs(results_dir, output_directory):
         bw="hist",
         same_subplot=True,
         sym_log=False,
-        hist_range=(0, 0.5)
+        hist_range=(0, 0.5),
+        stat="probability"
     )
     
 
 def plot_lucas(results_dir, output_directory):
     os.makedirs(output_directory, exist_ok=True)
 
-    results,method = get_results(results_dir)
+    results, method = get_results(results_dir)
 
     res_inters(results, method, 'mm_ref')
 
@@ -793,7 +803,8 @@ def plot_lucas(results_dir, output_directory):
         bw="hist",
         same_subplot=True,
         sym_log=False,
-        hist_range=(-1.67,15)
+        hist_range=(-1.67,15),
+        stat="probability"
     )
 
     draw_ridgeplot(
@@ -806,7 +817,8 @@ def plot_lucas(results_dir, output_directory):
         bw="hist",
         same_subplot=True,
         sym_log=False,
-        hist_range=(0, 3)
+        hist_range=(0, 3),
+        stat="probability"
     )
 
 
@@ -1096,23 +1108,28 @@ def plot_mol_rmses(mol_name, rmses, xticklabels, eff_nconfs, ref_nconfs, what_fo
     plt.close(plt.gcf())
 
 
-def plot_mol_minima(dataframes, y_label, y_data, method, out_file='minimaE.png', what_for='talk', selected=None):
+def plot_mol_minima(dataframes, y_label, y_data, method, out_file='minimaE.png', what_for='talk'):
     """
     Generate line plot of conformer energies of all methods (single molecule).
 
     Parameters
     ----------
-    mol_name : string
-        title of the mol being plotted
-    minimaE : list of lists
-        minimaE[i][j] represents ith method and jth conformer energy
-    legend : list
-        list of strings with all method names in same order as minimaE
+    dataframes : Dict[str, pd.DataFrame]
+        Dict of Dataframes with method as keys, results as values.
+        This function modifies the Dataframes in-place.
+    y_label : str
+        y-axis label to use on the resulting plot.
+    y_data : str
+        Column name in each Dataframe corresponding to y-axis data.
+    method : str
+        Key in `dataframes` used as the reference method for figure generation.
+        Can ultimately be any key in the dictionary; does not matter which.
+    out_file : Path-like
+        Name of output file for rendered figure.
+        Extension indicates type of image format used.
     what_for : string
         dictates figure size, text size of axis labels, legend, etc.
         "paper" or "talk"
-    selected : list
-        list of indices for methods to be plotted; e.g., [0], [0, 4]
 
     """
     if what_for == 'paper':
