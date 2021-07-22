@@ -54,8 +54,8 @@ specs:
   # MM calculations
   - openforcefield =0.8.4
   - rdkit =2020.09
-  - openforcefields =1.3.0
-  - openff-forcefields
+  - openforcefields =2.0.0rc.1
+  #- openff-forcefields
   - openmm =7.4.2
   - openmmforcefields =0.8.0
   - conda-forge::libiconv

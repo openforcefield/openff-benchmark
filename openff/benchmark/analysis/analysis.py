@@ -24,6 +24,7 @@ from tqdm import tqdm
 
 from . import metrics, readwrite
 
+
 def gather_df(input_path, ref_method):
     mols = {}
     dataframes = {}
@@ -48,6 +49,7 @@ def gather_df(input_path, ref_method):
 
     return dataframes
 
+
 def intersect(dataframes, ref_method):
     index_intersect = dataframes[ref_method].index
     for m in tqdm(dataframes, desc='Checking input'):
@@ -56,6 +58,7 @@ def intersect(dataframes, ref_method):
         dataframes[m] = df.loc[index_intersect]
         if dataframes[m].shape != df.shape:
             warnings.warn(f"Not all conformers of method {m} considered, because these are not available in other methods.")
+
 
 def get_confs_min(dataframe):
     confs_min = {}
@@ -70,6 +73,7 @@ def get_confs_min(dataframe):
         dataframe.loc[conf_min, 'conf_min'] = True
     return confs_min
 
+
 def calc_de(dataframe, confs_min):
     for mid in tqdm(dataframe.molecule_index.unique(), desc='Calculating energy difference'):
         confs = dataframe.loc[dataframe.molecule_index==mid]
@@ -77,17 +81,25 @@ def calc_de(dataframe, confs_min):
         ref_energy = confs.loc[conf_min, 'final_energy']
         for i, row in confs.iterrows():
             dataframe.loc[i, 'final_energy'] = row['final_energy'] - ref_energy
-            
+
+
+def calc_rmsd(reference, result, ref_name, result_name):
+    for i, row in tqdm(reference.iterrows(), desc='Calculating RMSD'):
+        try:
+            result.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(row['mol'].to_rdkit(), result.loc[i, 'mol'].to_rdkit())
+        except RuntimeError:
+            result.loc[i, 'rmsd'] = np.NaN
+            print(f"Unable to calculate best RMSD between {ref_name} and {result_name}; conformer `{i}`")
+           
+
 def calc_tfd(reference, result):
     for i, row in tqdm(reference.iterrows(), desc='Calculating TFD'):
         result.loc[i, 'tfd'] = metrics.calc_tfd(row['mol'].to_rdkit(), result.loc[i, 'mol'].to_rdkit())
 
-def calc_rmsd(reference, result):
-    for i, row in tqdm(reference.iterrows(), desc='Calculating RMSD'):
-        result.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(row['mol'].to_rdkit(), result.loc[i, 'mol'].to_rdkit())
-        
+
 def calc_dde(reference, result):
     result.loc[:,'dde'] = result.final_energy - reference.final_energy
+
 
 def match_minima(input_path, ref_method, output_directory="./results"):
     
@@ -337,7 +349,7 @@ def main(input_path, ref_method, output_directory="./results"):
         if m == ref_method:
             continue
         calc_de(dataframes[m], confs_min)
-        calc_rmsd(dataframes[ref_method], dataframes[m])
+        calc_rmsd(dataframes[ref_method], dataframes[m], ref_name=ref_method, result_name=m)
         calc_tfd(dataframes[ref_method], dataframes[m])
         calc_dde(dataframes[ref_method], dataframes[m])
 
