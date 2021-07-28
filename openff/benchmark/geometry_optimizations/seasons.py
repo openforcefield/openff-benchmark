@@ -64,6 +64,15 @@ SEASONS = {
                  "spec_name": "openff-2.0.0-rc.1",
                  "spec_description": "default openff-2.0.0-rc.1 optimization spec",
                }
+            },
+        "1:4": {
+            "openff-2.0.0-rc.2": {
+                 "method": "openff-2.0.0-rc.2",
+                 "basis": "smirnoff",
+                 "program": "openmm",
+                 "spec_name": "openff-2.0.0-rc.2",
+                 "spec_description": "default openff-2.0.0-rc.2 optimization spec",
+               }
             }
           }
 
