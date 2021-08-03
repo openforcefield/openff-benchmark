@@ -72,7 +72,7 @@ SEASONS = {
                  "program": "openmm",
                  "spec_name": "openff-2.0.0-rc.2",
                  "spec_description": "default openff-2.0.0-rc.2 optimization spec",
-               }
+               } 
             }
           }
 
