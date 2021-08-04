@@ -1,10 +1,10 @@
 package:
   name: openff-benchmark
-  version: 2021.07.08.0
+  version: 2021.08.04.0
 
 source:
   git_url: https://github.com/openforcefield/openff-benchmark.git
-  git_tag: 2021.07.08.0
+  git_tag: 2021.08.04.0
 
 build:
   preserve_egg_dir: True
