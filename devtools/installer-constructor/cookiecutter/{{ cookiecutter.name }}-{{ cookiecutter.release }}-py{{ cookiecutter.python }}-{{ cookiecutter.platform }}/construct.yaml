@@ -29,7 +29,7 @@ specs:
   - gau2grid =2.0.3
 
   # # Benchmarking
-  - openff-benchmark =2021.07.08.0
+  - openff-benchmark =2021.08.04.0
 
   # # Storage dependencies
   - alembic
@@ -54,7 +54,7 @@ specs:
   # MM calculations
   - openforcefield =0.8.4
   - rdkit =2020.09
-  - openforcefields =2.0.0rc.1
+  - openforcefields =2.0.0rc.2
   #- openff-forcefields
   - openmm =7.4.2
   - openmmforcefields =0.8.0
