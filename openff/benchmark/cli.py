@@ -960,7 +960,7 @@ def torsiondrive():
 @click.option("--dihedral", required=False, type=(int, int, int, int), default=None, 
               help="1-based atom indices forming dihedral to drive")
 @click.option("--grid-spacing", required=True, type=int, help="Grid spacing in degrees between optimizations")
-@click.option("--dihedral-range", default=None, help="Upper and lower angles setting the bounds for driving the dihedral")
+@click.option("--dihedral-range", default=None, help="Comma-separated upper and lower angles setting the bounds for driving the dihedral")
 @click.option('-p', '--program', required=False, help="Program to use for calculation")
 @click.option('-d', '--method', required=False, help="Method to use within program")
 @click.option('-b', '--basis', required=False, help="Basis to use for method")

@@ -44,13 +44,20 @@ class TorsiondriveExecutor:
         from qcelemental.models import Molecule
         from torsiondrive import td_api
         from geometric.nifty import bohr2ang, ang2bohr
+        from openff.qcsubmit.factories import TorsiondriveDatasetFactory
 
         local_options={"ncores": ncores,
                        "memory": memory}
 
-        # get qcelemental molecule from openff molecule
-        qcmol = offmol.to_qcschema()
-        
+        factory = TorsiondriveDatasetFactory()
+
+        # This block will fail for OFF Toolkit 0.8.4, but succeed for 0.8.4rc1
+        try:
+            attributes = factory.create_cmiles_metadata(offmol)
+            qcmol = offmol.to_qcschema(extras=attributes)
+        # In OFFTK 0.8.4, the CMILES field is automatically populated by this method
+        except:
+            qcmol = offmol.to_qcschema()
 
         # this is the object we care about returning
         opts = dict()
