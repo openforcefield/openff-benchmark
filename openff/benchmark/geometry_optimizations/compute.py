@@ -134,6 +134,7 @@ class OptimizationExecutor:
         return offmol
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
+                             compute_specs=None,
                              delete_existing=False, keep_existing=True, processes=None):
         """Export all molecule data from target QCFractal server to the given directory.
     
@@ -145,6 +146,8 @@ class OptimizationExecutor:
             Directory path to deposit exported data.
         dataset_name : str
             Dataset name to extract from the QCFractal server.
+        compute_specs : List[str]
+            Compute specs to limit export to.
         delete_existing : bool (False)
             If True, delete existing directory if present.
         keep_existing : bool (True)
@@ -190,6 +193,12 @@ class OptimizationExecutor:
         # deposit SDF giving final molecule, energy
         specs = optds.list_specifications().index.tolist()
         for spec in specs:
+
+            # skip this compute spec if `compute_specs` specified and this isn't present
+            if compute_specs is not None:
+                if spec not in compute_specs:
+                    continue
+
             print("Exporting spec: '{}'".format(spec))
             os.makedirs(os.path.join(output_directory, spec, 'error_mols'), exist_ok=True)
             optentspec = optds.get_specification(spec)
