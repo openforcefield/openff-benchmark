@@ -134,7 +134,7 @@ class OptimizationExecutor:
         return offmol
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
-                             compute_specs=None,
+                             compute_specs=None, sdf_only=False,
                              delete_existing=False, keep_existing=True, processes=None):
         """Export all molecule data from target QCFractal server to the given directory.
     
@@ -148,6 +148,9 @@ class OptimizationExecutor:
             Dataset name to extract from the QCFractal server.
         compute_specs : List[str]
             Compute specs to limit export to.
+        sdf_only : bool (False)
+            If True, only write SDF files of final molecules from optimizations.
+            No performance or result JSON files will be written.
         delete_existing : bool (False)
             If True, delete existing directory if present.
         keep_existing : bool (True)
@@ -194,7 +197,8 @@ class OptimizationExecutor:
         specs = optds.list_specifications().index.tolist()
         for spec in specs:
 
-            # skip this compute spec if `compute_specs` specified and this isn't present
+            # skip this compute spec if `compute_specs` specified
+            # and this one isn't present
             if compute_specs is not None:
                 if spec not in compute_specs:
                     continue
@@ -214,7 +218,8 @@ class OptimizationExecutor:
                         optentspec,
                         client=client,
                         qcmol=qcmol,
-                        delete_existing=delete_existing)
+                        delete_existing=delete_existing,
+                        sdf_only=sdf_only)
                 if processes is not None:
                     work.append(task)
                 else:
@@ -231,7 +236,8 @@ class OptimizationExecutor:
     def _export_id_mol(
             self, id, opt, output_directory, 
             spec, optentspec, client, qcmol,
-            delete_existing=False):
+            delete_existing=False,
+            sdf_only=False):
         import json
 
         # skip incomplete cases
@@ -279,7 +285,8 @@ class OptimizationExecutor:
                                          final_molecule=final_molecule,
                                          outfile=outfile,
                                          success=True,
-                                         perfd=perfd)
+                                         perfd=perfd,
+                                         sdf_only=sdf_only)
 
         except Exception as e:
             final_molecule = None
@@ -298,7 +305,8 @@ class OptimizationExecutor:
                                          final_molecule=final_molecule,
                                          outfile=error_outfile,
                                          success=False,
-                                         perfd=perfd)
+                                         perfd=perfd,
+                                         sdf_only=sdf_only)
             return ("... '{}' : export error".format(id))
 
         return ("... '{}' : exported COMPLETE".format(id))
@@ -622,7 +630,7 @@ class OptimizationExecutor:
         return results
 
     @staticmethod
-    def _execute_output_results(output_id, resultjson, final_molecule, outfile, success, perfd):
+    def _execute_output_results(output_id, resultjson, final_molecule, outfile, success, perfd, sdf_only=False):
         import json
         import bz2
         if success:
@@ -632,6 +640,10 @@ class OptimizationExecutor:
                 print("Failed to write out SDF for '{}'".format(output_id))
         else:
             print("Optimization failed for '{}'; check JSON results output".format(output_id))
+
+        # return early if we only want SDF outputs
+        if sdf_only:
+            return
 
         try:
             with open("{}.json.bz2".format(outfile), 'wb') as f:
