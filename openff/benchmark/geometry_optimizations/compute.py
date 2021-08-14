@@ -260,11 +260,16 @@ class OptimizationExecutor:
             return ("... '{}' : skipping SDF exists".format(id))
 
         #print("... '{}' : exporting COMPLETE".format(id))
-        optd = self._get_complete_optimization_result(opt, client)
-        optdjson = json.dumps(optd)
 
-        perfd = {'walltime': opt.provenance.wall_time,
-                 'completed': opt.modified_on.isoformat()}
+        if sdf_only:
+            optjson = "{}"
+            perfd = {}
+        else:
+            optd = self._get_complete_optimization_result(opt, client)
+            optdjson = json.dumps(optd)
+
+            perfd = {'walltime': opt.provenance.wall_time,
+                     'completed': opt.modified_on.isoformat()}
 
         try:
             offmol = self._mol_from_qcserver(qcmol)
