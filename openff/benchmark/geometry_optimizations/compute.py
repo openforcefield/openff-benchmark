@@ -162,6 +162,7 @@ class OptimizationExecutor:
             if `None`, no separate process pool will be used.
     
         """
+        import gc
         import json
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -210,7 +211,7 @@ class OptimizationExecutor:
             records = optds.data.dict()['records']
     
             work = []
-            for id, opt in optds.df[spec].iteritems():
+            for i, (id, opt) in enumerate(optds.df[spec].iteritems()):
                 qcmol = records[id.lower()]
                 task = execute(self._export_id_mol,
                         id, opt, output_directory, 
@@ -224,14 +225,20 @@ class OptimizationExecutor:
                     work.append(task)
                 else:
                     print(task)
+                    del task
+                    if i % 1000 == 0:
+                        gc.collect()
+
 
             if processes is not None:
-                for completed_task in as_completed(work):
+                for i, completed_task in enumerate(as_completed(work)):
                     print(completed_task.result())
 
                     # conserve memory
                     work.remove(completed_task)
                     del completed_task
+                    if i % 1000 == 0:
+                        gc.collect()
 
     def _export_id_mol(
             self, id, opt, output_directory, 
