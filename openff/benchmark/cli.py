@@ -960,7 +960,7 @@ def torsiondrive():
 @click.option("--dihedral", required=False, type=(int, int, int, int), default=None, 
               help="1-based atom indices forming dihedral to drive")
 @click.option("--grid-spacing", required=True, type=int, help="Grid spacing in degrees between optimizations")
-@click.option("--dihedral-range", default=None, help="Comma-separated upper and lower angles setting the bounds for driving the dihedral")
+@click.option("--dihedral-range", default=None, help="Comma-separated upper and lower angles setting the bounds for driving the dihedral; starting structure must have dihedral angle within this range")
 @click.option('-p', '--program', required=False, help="Program to use for calculation")
 @click.option('-d', '--method', required=False, help="Method to use within program")
 @click.option('-b', '--basis', required=False, help="Basis to use for method")
@@ -971,12 +971,15 @@ def torsiondrive():
 @click.option('--scf-maxiter', type=int, default=200, help="Maximum iterations to allow for SCF convergence")
 @click.option('--geometric-maxiter', type=int, default=300, help="Maximum iterations to allow for geometry optimization convergence")
 @click.option('--geometric-coordsys', type=click.Choice(['dlc', 'tric']), default='dlc', help="Internal coordinate scheme to use for geometry optimization")
-@click.option('--geometric-qccnv/--no-geometric-qccnv', default=True, help="If set, use QChem-style convergence criteria")
+@click.option('--geometric-qccnv/--no-geometric-qccnv', default=True, help="If set, use QChem-style convergence criteria for geometry optimization")
+@click.option('--no-json', is_flag=True, help="If set, do not write results to <OUTPUT_PATH>.json")
+@click.option('--no-sdf', is_flag=True, help="If set, write results to <OUTPUT_PATH>.sdf")
 @click.argument('input-path', nargs=1)
 def execute_single(input_path, dihedral, grid_spacing, dihedral_range,
             program, method, basis, season,
             nthreads, memory, output_path,
-            scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv):
+            scf_maxiter, geometric_maxiter, geometric_coordsys, geometric_qccnv,
+            no_json, no_sdf):
     """Execute molecule torsiondrive locally from a single molecule in an SDF file.
 
     You must specify either SEASON or a combination of PROGRAM, METHOD, and BASIS.
@@ -988,12 +991,19 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range,
     This allows for experimentation and debugging of problematic cases.
     Please avoid changing parameters for production benchmarking data, taking care to output results to a different directory with `-o OUTPUT_DIRECTORY`.
 
-    You can output to a file by specifying `-o OUTPUT_PATH`.
+    Specify `-o OUTPUT_PATH` for output file names.
+    By default, both an OUTPUT_PATH.json and OUTPUT_PATH.sdf will be written.
+    You can disable either one of these with the `--no-json` and `--no-sdf` flags, respectively.
 
     """
+    import io
     import os
     import json
     import warnings
+
+    import numpy as np
+    from qcelemental.models import OptimizationResult
+    from openff.toolkit.topology import Molecule as offMolecule
 
     from .utils.io import mols_from_paths
     from .torsiondrives.compute import TorsiondriveExecutor
@@ -1001,8 +1011,9 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range,
     offmol = mols_from_paths([input_path])[0]
     tdexec = TorsiondriveExecutor()
 
+    # process input angles
     if dihedral_range is not None:
-        dihedral_range = [[int(i) for i in dihedral_range.split(',')]]
+        dihedral_range = [sorted([int(i) for i in dihedral_range.split(',')])]
 
     #if dihedral is None:
     #    # drive all rotatable bonds
@@ -1038,11 +1049,42 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range,
     for spec_name in results:
         output[spec_name] = dict()
         for gridpoint in results[spec_name]:
-            output[spec_name][gridpoint] = [json.loads(opt.json()) for opt in results[spec_name][gridpoint]]
+            output[spec_name][gridpoint] = json.loads(results[spec_name][gridpoint].json())
 
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    with open(output_path, 'w') as f:
-        json.dump(output, f)
+    if not no_json:
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open("{}.json".format(output_path), 'w') as f:
+            json.dump(output, f)
+
+    if not no_sdf:
+        sdf_res = {}
+        sdf_res['mol'] = []
+        sdf_res['energy'] = []
+        sdf_res['angle'] = []
+
+        for angle, opt in results['single'].items():
+            sdf_res['angle'].append(angle)
+            sdf_res['mol'].append(offMolecule.from_qcschema(opt.final_molecule))
+            sdf_res['energy'].append(opt.energies[-1])
+
+        for i in sdf_res:
+            sdf_res[i] = np.array(sdf_res[i])
+
+        sdf_res['angle'] = sdf_res['angle'].astype(int)
+        ordered_angle = np.argsort(sdf_res['angle'])
+
+        with io.StringIO() as s:
+            for i in ordered_angle:
+                mol = sdf_res['mol'][i]
+                mol.properties['angle (degree)'] = sdf_res['angle'][i]
+                mol.properties['energy (hartree)'] = sdf_res['energy'][i] # in hartree
+
+                mol.to_file(s, 'SDF')
+            out = s.getvalue()
+
+        # write out
+        with open("{}.sdf".format(output_path), 'w') as f:
+            f.write(out)
 
 if __name__ == "__main__":
     cli()

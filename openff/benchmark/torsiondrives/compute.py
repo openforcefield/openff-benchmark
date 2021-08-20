@@ -28,16 +28,49 @@ class TorsiondriveExecutor:
 
         Parameters
         ----------
+        offmol : openff.toolkit.topology.Molecule
+            Molecule with 
+
         dihedrals : List of tuples
             A list of the dihedrals to scan over.
         grid_spacing : List of int
-            The grid seperation for each dihedral angle
-        dihedral_ranges: (Optional) List of [low, high] pairs
-            consistent with launch.py, e.g. [[-120, 120], [-90, 150]]
-        energy_decrease_thresh: (Optional) Float
-            Threshold of an energy decrease to triggle activate new grid point. Default is 1e-5
-        energy_upper_limit: (Optional) Float
-            Upper limit of energy relative to current global minimum to spawn new optimization tasks.
+            The grid seperation for each dihedral angle.
+        dihedral_ranges : List of [low, high] pairs
+            Pairs of ranges, with each range corresponding to each
+            dihedral in `dihedrals`, e.g. `[[-120, 120], [-90, 150]]`.
+            The dihedrals in given `offmol` conformation must be within these
+            ranges.
+        program : str
+            Program to use for calculation.
+            Either `season` or (`program`, `method`, `basis`) must be given, not both.
+        method : str
+            Method to use within program.
+            Either `season` or (`program`, `method`, `basis`) must be given, not both.
+        basis : str
+            Basis to use for method.
+            Either `season` or (`program`, `method`, `basis`) must be given, not both.
+        season : str
+            Season identifier specifying compute selections applied to molecules.
+            See `..geometry_optimizations.seasons.SEASONS` for available keys.
+            Either `season` or (`program`, `method`, `basis`) must be given, not both.
+        ncores : int
+            Number of threads to use for each gradient calculation step by the underlying `program`.
+        memory : int
+            Maximum memory in GiB to allocate for each gradient calculation.
+            Set at least 5% *below* desired maximum.
+        scf_maxiter : int
+            Maximum iterations to allow for SCF convergence, if applicable.
+        geometric_maxiter : int
+            Maximum iterations to allow for geometry optimization convergence.
+        geometric_coordsys : str
+            Internal coordinate scheme to use for geometry optimization.
+        geometric_qccnv : bool
+            If set, use QChem-style convergence criteria for geometry optimization.
+
+        Returns
+        -------
+        opts : Dict[str, Dict[str, OptimizationResult]]
+            Optimization results, grouped by compute spec name, with dihedral angle as keys.
 
         """
         import numpy as np
@@ -68,9 +101,9 @@ class TorsiondriveExecutor:
             specs = SEASONS[season].items()
         elif all((program, method)):
             specs = {'single': {
+                        "program": program,
                         "method": method,
                         "basis": basis,
-                        "program": program,
                         "spec_name": 'single',
                         "spec_description": 'user-specified compute specification'
                         },
@@ -142,7 +175,8 @@ class TorsiondriveExecutor:
                                                             result.final_molecule.geometry.flatten().tolist(),
                                                             result.energies[-1]))
 
-                            opts[spec_name][gridpoint].append(result)
+                            # at the moment, we only hold on to a single result per gridpoint
+                            opts[spec_name][gridpoint] = result
                         else:
                             raise QCEngineError(f"QCEngine failure: {result.error.error_message}")
 
