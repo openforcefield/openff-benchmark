@@ -269,7 +269,7 @@ class OptimizationExecutor:
         #print("... '{}' : exporting COMPLETE".format(id))
 
         if sdf_only:
-            optjson = "{}"
+            optdjson = "{}"
             perfd = {}
         else:
             optd = self._get_complete_optimization_result(opt, client)
