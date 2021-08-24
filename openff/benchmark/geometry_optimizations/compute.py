@@ -135,7 +135,8 @@ class OptimizationExecutor:
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
                              compute_specs=None, sdf_only=False,
-                             delete_existing=False, keep_existing=True, processes=None):
+                             delete_existing=False, keep_existing=True, processes=None,
+                             molids=None):
         """Export all molecule data from target QCFractal server to the given directory.
     
         Parameters
@@ -160,6 +161,8 @@ class OptimizationExecutor:
         processes : int
             Number of processes to use for export;
             if `None`, no separate process pool will be used.
+        molids : List[str]
+            List of specific molids in the dataset (entries) to export.
     
         """
         import gc
@@ -169,7 +172,12 @@ class OptimizationExecutor:
         # get dataset
         client = FractalClient(fractal_uri, verify=False)
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+
+        optds.status(specs=compute_specs)
+        df = optds.df
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
     
         try:
             os.makedirs(output_directory)
@@ -181,7 +189,6 @@ class OptimizationExecutor:
             else:
                 raise Exception(f'Output directory {output_directory} already exists. '
                                  'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
-
 
         # set up process pool for compute submission
         # if processes == 0, perform in-process, no pool
@@ -195,23 +202,16 @@ class OptimizationExecutor:
     
         # for each compute spec, create a folder in the output directory
         # deposit SDF giving final molecule, energy
-        specs = optds.list_specifications().index.tolist()
+        specs = df.columns.tolist()
+        records = optds.data.dict()['records']
         for spec in specs:
-
-            # skip this compute spec if `compute_specs` specified
-            # and this one isn't present
-            if compute_specs is not None:
-                if spec not in compute_specs:
-                    continue
-
             print("Exporting spec: '{}'".format(spec))
             os.makedirs(os.path.join(output_directory, spec, 'error_mols'), exist_ok=True)
             optentspec = optds.get_specification(spec)
-    
-            records = optds.data.dict()['records']
-    
+
             work = []
-            for i, (id, opt) in enumerate(optds.df[spec].iteritems()):
+            for i, (id, opt) in enumerate(df[spec].iteritems()):
+
                 qcmol = records[id.lower()]
                 task = execute(self._export_id_mol,
                         id, opt, output_directory, 
@@ -332,15 +332,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
         
         df = optds.df.sort_index(ascending=True)
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         return df
 
@@ -394,15 +391,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
 
         df = optds.df
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         for opt in df.values.flatten():
             if opt.status == 'ERROR':
@@ -422,15 +416,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
 
         df = optds.df
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         out = []
         for opt in df.values.flatten():
@@ -483,15 +474,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
         
         df = optds.df.sort_index(ascending=True)
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         errors = df.applymap(lambda x: x.get_error().error_message if x.status == 'ERROR' else None)
 
@@ -546,15 +534,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
 
         df = optds.df
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         local_options={"ncores": ncores,
                        "memory": memory}
