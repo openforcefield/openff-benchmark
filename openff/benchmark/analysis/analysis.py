@@ -184,7 +184,7 @@ def lucas(input_path, ref_method, output_directory="./5-results-lucas"):
 
         mm_df = dataframes[m]
 
-        match = get_ref_conf(qm_df, mm_df)
+        match = get_ref_conf(qm_df, mm_df, ref_method, m)
         ref_confs = {molecule_id:
                                  match[ match['name'] == ref_conformer ]['ff_mol_name'].values[0]
                                  for molecule_id, ref_conformer in qm_mins.items() }
