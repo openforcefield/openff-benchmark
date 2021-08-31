@@ -23,10 +23,7 @@ specs:
   - python {{ cookiecutter.python }}*
   - pip
 
-  # QC Stuff
-  - qcfractal =0.15.1
-  - qcengine =0.17.0
-  - gau2grid =2.0.3
+
 
   # From here down, this is copied from https://github.com/openforcefield/2021-benchmarking-workshop/blob/47fbcd44caf25363a575105d6265763896e65e6f/env.yml
   # # Benchmarking
@@ -69,6 +66,10 @@ specs:
   - seaborn
   
   
+  # # QC Stuff
+  #- qcfractal =0.15.1
+  #- qcengine =0.17.0
+  #- gau2grid =2.0.3
   
   # # Storage dependencies
   #- alembic
