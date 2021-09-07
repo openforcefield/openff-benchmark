@@ -51,7 +51,7 @@ specs:
   - basis_set_exchange
   - torsiondrive
   # Jeff made a conda package of this commit just for the workshop
-  - bespoke-fit = 2021.09.07
+  - openff-bespokefit =2021.09.07
   #- pip:
   #  - -e git+https://github.com/openforcefield/bespoke-fit.git
   
