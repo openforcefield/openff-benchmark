@@ -1,4 +1,4 @@
-name: 2021-bespokefit-workshop
+name: {{ cookiecutter.name }}
 
 version: "{{ cookiecutter.release }}"
 
@@ -8,7 +8,7 @@ version: "{{ cookiecutter.release }}"
     {% set platform2 = "MacOSX-x86_64" %}
 {% endif %}
 
-installer_filename: 2021-bespokefit-workshop-{{ cookiecutter.release }}-py{{ cookiecutter.python | replace(".", "") }}-{{ platform2 }}.sh
+installer_filename: {{ cookiecutter.name }}-{{ cookiecutter.release }}-py{{ cookiecutter.python | replace(".", "") }}-{{ platform2 }}.sh
 
 #specs:
 #  - conda
