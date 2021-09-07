@@ -51,7 +51,7 @@ specs:
   - basis_set_exchange
   - torsiondrive
   - pip:
-    - git+https://github.com/openforcefield/bespoke-fit.git
+    - -e git+https://github.com/openforcefield/bespoke-fit.git
   
   
   # # QC Stuff
