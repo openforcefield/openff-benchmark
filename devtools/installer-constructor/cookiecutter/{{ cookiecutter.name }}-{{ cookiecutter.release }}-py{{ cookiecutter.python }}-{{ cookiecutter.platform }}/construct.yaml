@@ -50,8 +50,8 @@ specs:
   - chemper
   - basis_set_exchange
   - torsiondrive
-  #- pip:
-  #  - git+https://github.com/openforcefield/bespoke-fit.git@27c4904
+  - pip:
+    - git+https://github.com/openforcefield/bespoke-fit.git
   
   
   # # QC Stuff
