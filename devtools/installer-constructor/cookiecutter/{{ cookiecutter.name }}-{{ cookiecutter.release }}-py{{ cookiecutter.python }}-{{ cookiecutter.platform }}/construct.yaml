@@ -50,8 +50,10 @@ specs:
   - chemper
   - basis_set_exchange
   - torsiondrive
-  - pip:
-    - -e git+https://github.com/openforcefield/bespoke-fit.git
+  # Jeff made a conda package of this commit just for the workshop
+  - bespoke-fit = 2021.09.07
+  #- pip:
+  #  - -e git+https://github.com/openforcefield/bespoke-fit.git
   
   
   # # QC Stuff
@@ -117,7 +119,7 @@ post_install: post_install.sh  [unix]
 channels: &id1
   - conda-forge
   - defaults
-
+  - j-wags
 
 
 
