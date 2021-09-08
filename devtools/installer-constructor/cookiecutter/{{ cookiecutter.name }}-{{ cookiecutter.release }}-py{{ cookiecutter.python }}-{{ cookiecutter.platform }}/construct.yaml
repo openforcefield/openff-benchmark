@@ -50,6 +50,7 @@ specs:
   - chemper
   - basis_set_exchange
   - torsiondrive
+  - seaborn
   # Jeff made a conda package of this commit just for the workshop
   - openff-bespokefit =2021.09.07
   #- pip:
