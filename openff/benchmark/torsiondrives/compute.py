@@ -98,7 +98,7 @@ class TorsiondriveExecutor:
         if (season is not None) and any((program, method, basis)):
             raise ValueError("Cannot specify both `season` and any of (`program`, `method`, `basis`)")
         elif season is not None:
-            specs = SEASONS[season].items()
+            specs = SEASONS[season]
         elif all((program, method)):
             specs = {'single': {
                         "program": program,

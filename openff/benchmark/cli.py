@@ -1043,43 +1043,52 @@ def execute_single(input_path, dihedral, grid_spacing, dihedral_range,
                                                  geometric_coordsys=geometric_coordsys,
                                                  geometric_qccnv=geometric_qccnv)
 
+    # special treatment for 180: create a -180 entry that's
+    # a duplicate for visualization ease and user experience
+    for spec_name in results:
+        if "180" in results[spec_name]:
+            results[spec_name]["-180"] = results[spec_name]["180"]
 
     # export and read back into JSON for final output
-    output = dict()
-    for spec_name in results:
-        output[spec_name] = dict()
-        for gridpoint in results[spec_name]:
-            output[spec_name][gridpoint] = json.loads(results[spec_name][gridpoint].json())
-
     if not no_json:
+        output = dict()
+        for spec_name in results:
+            output[spec_name] = dict()
+            for gridpoint in results[spec_name]:
+                output[spec_name][gridpoint] = json.loads(results[spec_name][gridpoint].json())
+
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         with open("{}.json".format(output_path), 'w') as f:
             json.dump(output, f)
 
     if not no_sdf:
-        sdf_res = {}
-        sdf_res['mol'] = []
-        sdf_res['energy'] = []
-        sdf_res['angle'] = []
-
-        for angle, opt in results['single'].items():
-            sdf_res['angle'].append(angle)
-            sdf_res['mol'].append(offMolecule.from_qcschema(opt.final_molecule))
-            sdf_res['energy'].append(opt.energies[-1])
-
-        for i in sdf_res:
-            sdf_res[i] = np.array(sdf_res[i])
-
-        sdf_res['angle'] = sdf_res['angle'].astype(int)
-        ordered_angle = np.argsort(sdf_res['angle'])
-
         with io.StringIO() as s:
-            for i in ordered_angle:
-                mol = sdf_res['mol'][i]
-                mol.properties['angle (degree)'] = sdf_res['angle'][i]
-                mol.properties['energy (hartree)'] = sdf_res['energy'][i] # in hartree
+            for spec_name in results:
+                sdf_res = {}
+                sdf_res['mol'] = []
+                sdf_res['energy'] = []
+                sdf_res['angle'] = []
+                sdf_res['spec_name'] = []
+                for angle, opt in results[spec_name].items():
+                    sdf_res['angle'].append(angle)
+                    sdf_res['mol'].append(offMolecule.from_qcschema(opt.final_molecule))
+                    sdf_res['energy'].append(opt.energies[-1])
+                    sdf_res['spec_name'].append(spec_name)
 
-                mol.to_file(s, 'SDF')
+                for i in sdf_res:
+                    sdf_res[i] = np.array(sdf_res[i])
+
+                sdf_res['angle'] = sdf_res['angle'].astype(int)
+                ordered_angle = np.argsort(sdf_res['angle'])
+
+                for i in ordered_angle:
+                    mol = sdf_res['mol'][i]
+                    mol.properties['angle (degree)'] = sdf_res['angle'][i]
+                    mol.properties['energy (hartree)'] = sdf_res['energy'][i] # in hartree
+                    mol.properties['spec_name'] = sdf_res['spec_name'][i]
+
+                    mol.to_file(s, 'SDF')
+
             out = s.getvalue()
 
         # write out
