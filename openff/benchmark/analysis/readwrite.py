@@ -61,6 +61,10 @@ def mols_to_dataframe(mols):
     df = pd.DataFrame(moldata)
     df['molecule_index'] = df['molecule_index'].astype(int)
     df['conformer_index'] = df['conformer_index'].astype(int)
+    # add a unique molecule identifier in case there are two or molecules with the same 
+    # molecule index, but different group names
+    for i, row in df.iterrows():
+        df.loc[i, 'molecule_identifier'] = f"{row['group_name']}_{row['molecule_index']:05d}"
     convert_to_quantity(df, columns=['initial_energy', 'final_energy'])
     df.set_index('name', drop=False, inplace=True)
     return df

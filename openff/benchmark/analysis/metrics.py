@@ -58,7 +58,7 @@ def calc_tfd(ref_mol, query_mol):
         # triggered for molecules such as urea
         except IndexError:
             print(
-                f"- Error calculating TFD on molecule {ref_mol.GetProp('_Name')}."
+                f"- Could not calculate TFD on molecule {ref_mol.GetProp('_Name')}."
                 " Possibly no non-terminal rotatable bonds found."
             )
             tfd = np.nan
