@@ -134,7 +134,9 @@ class OptimizationExecutor:
         return offmol
     
     def export_molecule_data(self, fractal_uri, output_directory, dataset_name,
-                             delete_existing=False, keep_existing=True):
+                             compute_specs=None, sdf_only=False,
+                             delete_existing=False, keep_existing=True, processes=None,
+                             molids=None):
         """Export all molecule data from target QCFractal server to the given directory.
     
         Parameters
@@ -145,20 +147,37 @@ class OptimizationExecutor:
             Directory path to deposit exported data.
         dataset_name : str
             Dataset name to extract from the QCFractal server.
+        compute_specs : List[str]
+            Compute specs to limit export to.
+        sdf_only : bool (False)
+            If True, only write SDF files of final molecules from optimizations.
+            No performance or result JSON files will be written.
         delete_existing : bool (False)
             If True, delete existing directory if present.
         keep_existing : bool (True)
             If True, keep existing files in export directory.
             Files corresponding to server data will not be re-exported.
             Relies *only* on filepaths of existing files for determining match.
+        processes : int
+            Number of processes to use for export;
+            if `None`, no separate process pool will be used.
+        molids : List[str]
+            List of specific molids in the dataset (entries) to export.
     
         """
+        import gc
         import json
+        from concurrent.futures import ProcessPoolExecutor, as_completed
 
         # get dataset
         client = FractalClient(fractal_uri, verify=False)
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+
+        optds.status(specs=compute_specs)
+        df = optds.df
+
+        if (molids is not None) and (len(molids) != 0):
+            df = df.loc[list(molids)]
     
         try:
             os.makedirs(output_directory)
@@ -170,87 +189,139 @@ class OptimizationExecutor:
             else:
                 raise Exception(f'Output directory {output_directory} already exists. '
                                  'Specify `delete_existing=True` to remove, or `keep_existing=True` to tolerate')
+
+        # set up process pool for compute submission
+        # if processes == 0, perform in-process, no pool
+        if processes is None:
+            def execute(func, *args, **kwargs):
+                return func(*args, **kwargs)
+
+        else:
+            pool = ProcessPoolExecutor(max_workers=processes)
+            execute = pool.submit
     
         # for each compute spec, create a folder in the output directory
         # deposit SDF giving final molecule, energy
-        specs = optds.list_specifications().index.tolist()
+        specs = df.columns.tolist()
+        records = optds.data.dict()['records']
         for spec in specs:
             print("Exporting spec: '{}'".format(spec))
             os.makedirs(os.path.join(output_directory, spec, 'error_mols'), exist_ok=True)
             optentspec = optds.get_specification(spec)
+
+            work = []
+            for i, (id, opt) in enumerate(df[spec].iteritems()):
+
+                qcmol = records[id.lower()]
+                task = execute(self._export_id_mol,
+                        id, opt, output_directory, 
+                        spec, 
+                        optentspec,
+                        client=client,
+                        qcmol=qcmol,
+                        delete_existing=delete_existing,
+                        sdf_only=sdf_only)
+                if processes is not None:
+                    work.append(task)
+                else:
+                    print(task)
+                    del task
+                    if i % 1000 == 0:
+                        gc.collect()
+
+
+            if processes is not None:
+                for i, completed_task in enumerate(as_completed(work)):
+                    print(completed_task.result())
+
+                    # conserve memory
+                    work.remove(completed_task)
+                    del completed_task
+                    if i % 1000 == 0:
+                        gc.collect()
+
+    def _export_id_mol(
+            self, id, opt, output_directory, 
+            spec, optentspec, client, qcmol,
+            delete_existing=False,
+            sdf_only=False):
+        import json
+
+        # skip incomplete cases
+        if opt.final_molecule is None:
+            return ("... '{}' : skipping INCOMPLETE".format(id))
     
-            records = optds.data.dict()['records']
+        # fix to ensure output fidelity of ids; losing 02 padding on conformer
+        org, molecule, conformer = id.split('-')
+        output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
+                                                                molecule=int(molecule),
+                                                                conformer=int(conformer))
     
-            for id, opt in optds.df[spec].iteritems():
-    
-                # skip incomplete cases
-                if opt.final_molecule is None:
-                    print("... '{}' : skipping INCOMPLETE".format(id))
-                    continue
-    
-                # fix to ensure output fidelity of ids; losing 02 padding on conformer
-                org, molecule, conformer = id.split('-')
-                output_id = "{org}-{molecule:05}-{conformer:02}".format(org=org,
-                                                                        molecule=int(molecule),
-                                                                        conformer=int(conformer))
-    
-                # subfolders for each compute spec, files named according to molecule ids
-                outfile = "{}".format(
-                        os.path.join(output_directory, spec, output_id))
+        # subfolders for each compute spec, files named according to molecule ids
+        outfile = "{}".format(
+                os.path.join(output_directory, spec, output_id))
 
-                # if we did not delete everything at the start and the path already exists,
-                # skip this one; reduces processing and writes to filesystem
-                if (not delete_existing) and os.path.exists("{}.sdf".format(outfile)):
-                    print("... '{}' : skipping SDF exists".format(id))
-                    continue
+        # if we did not delete everything at the start and the path already exists,
+        # skip this one; reduces processing and writes to filesystem
+        if (not delete_existing) and os.path.exists("{}.sdf".format(outfile)):
+            return ("... '{}' : skipping SDF exists".format(id))
 
-                print("... '{}' : exporting COMPLETE".format(id))
-                optd = self._get_complete_optimization_result(opt, client)
-                optdjson = json.dumps(optd)
+        #print("... '{}' : exporting COMPLETE".format(id))
 
-                perfd = {'walltime': opt.provenance.wall_time,
-                         'completed': opt.modified_on.isoformat()}
+        if sdf_only:
+            optdjson = "{}"
+            perfd = {}
+        else:
+            optd = self._get_complete_optimization_result(opt, client)
+            optdjson = json.dumps(optd)
 
-                try:
-                    offmol = self._mol_from_qcserver(records[id.lower()])
+            perfd = {'walltime': opt.provenance.wall_time,
+                     'completed': opt.modified_on.isoformat()}
 
-                    # set conformer as final, optimized geometry
-                    final_qcmol = opt.get_final_molecule()
-                    final_molecule = self._process_final_mol(output_id,
-                                                             offmol,
-                                                             final_qcmol,
-                                                             optentspec.qc_spec.method,
-                                                             optentspec.qc_spec.basis,
-                                                             optentspec.qc_spec.program,
-                                                             opt.energies)
+        try:
+            offmol = self._mol_from_qcserver(qcmol)
+
+            # set conformer as final, optimized geometry
+            final_qcmol = opt.get_final_molecule()
+            final_molecule = self._process_final_mol(output_id,
+                                                     offmol,
+                                                     final_qcmol,
+                                                     optentspec.qc_spec.method,
+                                                     optentspec.qc_spec.basis,
+                                                     optentspec.qc_spec.program,
+                                                     opt.energies)
 
 
-                    self._execute_output_results(output_id=output_id,
-                                                 resultjson=optdjson,
-                                                 final_molecule=final_molecule,
-                                                 outfile=outfile,
-                                                 success=True,
-                                                 perfd=perfd)
+            self._execute_output_results(output_id=output_id,
+                                         resultjson=optdjson,
+                                         final_molecule=final_molecule,
+                                         outfile=outfile,
+                                         success=True,
+                                         perfd=perfd,
+                                         sdf_only=sdf_only)
 
-                except Exception as e:
-                    print("... '{}' : export error".format(id))
-                    final_molecule = None
+        except Exception as e:
+            final_molecule = None
 
-                    error_outfile = "{}".format(
-                        os.path.join(output_directory, spec, 'error_mols', output_id))
+            error_outfile = "{}".format(
+                os.path.join(output_directory, spec, 'error_mols', output_id))
 
-                    try:
-                        with open("{}.txt".format(error_outfile), 'w') as f:
-                            f.write(str(e))
-                    except:
-                        pass
+            try:
+                with open("{}.txt".format(error_outfile), 'w') as f:
+                    f.write(str(e))
+            except:
+                pass
 
-                    self._execute_output_results(output_id=output_id,
-                                                 resultjson=optdjson,
-                                                 final_molecule=final_molecule,
-                                                 outfile=error_outfile,
-                                                 success=False,
-                                                 perfd=perfd)
+            self._execute_output_results(output_id=output_id,
+                                         resultjson=optdjson,
+                                         final_molecule=final_molecule,
+                                         outfile=error_outfile,
+                                         success=False,
+                                         perfd=perfd,
+                                         sdf_only=sdf_only)
+            return ("... '{}' : export error".format(id))
+
+        return ("... '{}' : exported COMPLETE".format(id))
 
     def get_optimization_status(self, fractal_uri, dataset_name, client=None,
             compute_specs=None, molids=None):
@@ -261,15 +332,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
         
         df = optds.df.sort_index(ascending=True)
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         return df
 
@@ -323,15 +391,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
 
         df = optds.df
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         for opt in df.values.flatten():
             if opt.status == 'ERROR':
@@ -351,15 +416,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
 
         df = optds.df
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         out = []
         for opt in df.values.flatten():
@@ -412,15 +474,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
         
         df = optds.df.sort_index(ascending=True)
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         errors = df.applymap(lambda x: x.get_error().error_message if x.status == 'ERROR' else None)
 
@@ -475,15 +534,12 @@ class OptimizationExecutor:
             client = FractalClient(fractal_uri, verify=False)
 
         optds = client.get_collection("OptimizationDataset", dataset_name)
-        optds.status()
+        optds.status(specs=compute_specs)
 
         df = optds.df
 
         if (molids is not None) and (len(molids) != 0):
             df = df.loc[list(molids)]
-
-        if compute_specs is not None:
-            df = df[compute_specs]
 
         local_options={"ncores": ncores,
                        "memory": memory}
@@ -571,8 +627,9 @@ class OptimizationExecutor:
         return results
 
     @staticmethod
-    def _execute_output_results(output_id, resultjson, final_molecule, outfile, success, perfd):
+    def _execute_output_results(output_id, resultjson, final_molecule, outfile, success, perfd, sdf_only=False):
         import json
+        import bz2
         if success:
             try:
                 final_molecule.to_file("{}.sdf".format(outfile), file_format='sdf')
@@ -581,18 +638,21 @@ class OptimizationExecutor:
         else:
             print("Optimization failed for '{}'; check JSON results output".format(output_id))
 
+        # return early if we only want SDF outputs
+        if sdf_only:
+            return
+
         try:
-            with open("{}.json".format(outfile), 'w') as f:
-                f.write(resultjson)
+            with open("{}.json.bz2".format(outfile), 'wb') as f:
+                f.write(bz2.compress(resultjson.encode('utf-8')))
         except:
                 print("Failed to write result JSON for '{}'".format(output_id))
 
         try:
-            with open("{}.perf.json".format(outfile), 'w') as f:
-                json.dump(perfd, f)
+            with open("{}.perf.json.bz2".format(outfile), 'wb') as f:
+                f.write(bz2.compress(json.dumps(perfd).encode('utf-8')))
         except:
                 print("Failed to write performance JSON for '{}'".format(output_id))
-
 
     @staticmethod
     def _args_from_optimizationrecord(opt, client):

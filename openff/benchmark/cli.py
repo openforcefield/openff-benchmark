@@ -86,10 +86,16 @@ def create_submittable(output_path, input_path, season, dataset_name, recursive)
 @optimize.command()
 @click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
 @click.option('-d', '--dataset-name', required=True, help="Dataset name to export molecule optimization data from")
+@click.option('-c', '--compute-specs', default=None, help="Comma-separated compute spec names to limit progress display to")
+@click.option('-s', '--sdf-only', is_flag=True, help="If given, only write SDF files of final molecules from optimizations, not perf or result JSON files.")
 @click.option('--delete-existing', is_flag=True,
               help="Delete existing output directory if it exists")
+@click.option("-p", "--processes",
+              default=None,
+              type=click.INT, help="Number of parellel processes to use for export; if not specified, export done in series.")
 @click.option('-o', '--output-directory', required=True, help="Output directory to use for results")
-def export(fractal_uri, output_directory, dataset_name, delete_existing):
+@click.argument('molids', nargs=-1)
+def export(molids, fractal_uri, output_directory, dataset_name, compute_specs, sdf_only, delete_existing, processes):
     """Export molecule optimization data from a given dataset into an output directory.
 
     You must provide the dataset name via `-d DATASET_NAME` that you wish to export.
@@ -100,12 +106,16 @@ def export(fractal_uri, output_directory, dataset_name, delete_existing):
     import warnings
     from .geometry_optimizations.compute import OptimizationExecutor
 
+    if compute_specs is not None:
+        compute_specs = compute_specs.split(',')
+
     if (not delete_existing) and os.path.exists(output_directory):
         warnings.warn(f"Output directory {output_directory} exists and will be used for export; existing data files will not be replaced.")
 
     optexec = OptimizationExecutor()
     optexec.export_molecule_data(
-            fractal_uri, output_directory, dataset_name, delete_existing)
+            fractal_uri, output_directory, dataset_name, compute_specs,
+            sdf_only=sdf_only, delete_existing=delete_existing, processes=processes, molids=molids)
 
 @optimize.command()
 @click.option('-u', '--fractal-uri', default="localhost:7777", help="Address and port of the QCFractal Server")
