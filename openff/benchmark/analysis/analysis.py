@@ -44,9 +44,9 @@ def gather_df(input_path, ref_method):
     # convert molecules to dataframes
     for method in mols:
         dataframes[method] = readwrite.mols_to_dataframe(mols[method])
+        assert dataframes[method].index.duplicated().sum() == 0, f"Error: Duplicate molecule entries in the {method} molecule set."
 
     assert ref_method in mols, f"No molecules for reference method {ref_method} in input path(s)."
-
     return dataframes
 
 
@@ -63,8 +63,8 @@ def intersect(dataframes, ref_method):
 def get_confs_min(dataframe):
     confs_min = {}
     dataframe.loc[:,'conf_min'] = False
-    for mid in tqdm(dataframe.molecule_index.unique(), desc='Finding conformer minima'):
-        confs = dataframe.loc[dataframe.molecule_index==mid]
+    for mid in tqdm(dataframe.molecule_identifier.unique(), desc='Finding conformer minima'):
+        confs = dataframe.loc[dataframe.molecule_identifier==mid]
         if confs.shape[0] == 1:
             conf_min = confs.name[0]
         else:
@@ -75,8 +75,8 @@ def get_confs_min(dataframe):
 
 
 def calc_de(dataframe, confs_min):
-    for mid in tqdm(dataframe.molecule_index.unique(), desc='Calculating energy difference'):
-        confs = dataframe.loc[dataframe.molecule_index==mid]
+    for mid in tqdm(dataframe.molecule_identifier.unique(), desc='Calculating energy difference'):
+        confs = dataframe.loc[dataframe.molecule_identifier==mid]
         conf_min = confs_min[mid]
         ref_energy = confs.loc[conf_min, 'final_energy']
         for i, row in confs.iterrows():
@@ -194,15 +194,15 @@ def lucas(input_path, ref_method, output_directory="./5-results-lucas"):
 
         # calculate dE between ref_conf and mm_min
         for i, row in mm_df.iterrows():
-            mm_min = mm_mins[row['molecule_index']]
-            ref_conf = ref_confs[row['molecule_index']]
+            mm_min = mm_mins[row['molecule_identifier']]
+            ref_conf = ref_confs[row['molecule_identifier']]
             if row['conf_min'] == True:
                 mm_df.loc[i, 'final_energy'] = mm_df.loc[ref_conf,'final_energy'] - mm_df.loc[mm_min,'final_energy']
 
         # calculate RMSD between mm_min and ref_conf
         for i, row in mm_df.iterrows():
-            mm_min = mm_mins[row['molecule_index']]
-            ref_conf = ref_confs[row['molecule_index']]
+            mm_min = mm_mins[row['molecule_identifier']]
+            ref_conf = ref_confs[row['molecule_identifier']]
             if row['conf_min'] == True:
                 mm_df.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(
                                 qm_df.loc[ref_conf, 'mol'].to_rdkit(), qm_df.loc[mm_min, 'mol'].to_rdkit())
@@ -212,8 +212,8 @@ def lucas(input_path, ref_method, output_directory="./5-results-lucas"):
 
         # adds qm_min and ref_conf to the new dataframe
         for i, row in mm_results.iterrows():
-            qm_min = qm_mins[row['molecule_index']]
-            ref_conf = ref_confs[row['molecule_index']]
+            qm_min = qm_mins[row['molecule_identifier']]
+            ref_conf = ref_confs[row['molecule_identifier']]
             mm_results.loc[i, 'qm_min'] = qm_min
             mm_results.loc[i, 'ref_conf'] = ref_conf
 
@@ -270,8 +270,8 @@ def swope(input_path, ref_method, output_directory="./5-results-swope"):
         mm_mins = get_confs_min(dataframes[m])
 
         # calculate dE between ech MM conformer and mm_min
-        for mid in tqdm(mm_df.molecule_index.unique(), desc='Calculating energy difference'):
-            confs = mm_df.loc[mm_df.molecule_index==mid]
+        for mid in tqdm(mm_df.molecule_identifier.unique(), desc='Calculating energy difference'):
+            confs = mm_df.loc[mm_df.molecule_identifier==mid]
             mm_min = mm_mins[mid]
             mm_min_energy = confs.loc[mm_min, 'final_energy']
             for i, row in confs.iterrows():
@@ -279,7 +279,7 @@ def swope(input_path, ref_method, output_directory="./5-results-swope"):
 
         # calculate RMSD
         for i, row in tqdm(mm_df.iterrows(), desc='Calculating RMSD'):
-            qm_min = qm_mins[row['molecule_index']]
+            qm_min = qm_mins[row['molecule_identifier']]
             mm_df.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(
                              row['mol'].to_rdkit(), qm_df.loc[qm_min, 'mol'].to_rdkit())
 
@@ -287,8 +287,8 @@ def swope(input_path, ref_method, output_directory="./5-results-swope"):
 
         # adds qm_min and mm_min to the new dataframe
         for i, row in mm_results.iterrows():
-            qm_min = qm_mins[row['molecule_index']]
-            mm_min = mm_mins[row['molecule_index']]
+            qm_min = qm_mins[row['molecule_identifier']]
+            mm_min = mm_mins[row['molecule_identifier']]
             mm_results.loc[i, 'qm_min'] = qm_min
             mm_results.loc[i, 'mm_min'] = mm_min
 
@@ -323,9 +323,9 @@ def get_ref_conf(reference, result):
     """
     
     conformer_match = reference.copy()
-    for mid in tqdm(reference.molecule_index.unique(), desc='Matching conformers'):
-        confs_min = reference.loc[reference.molecule_index==mid]
-        query_confs = result.loc[result.molecule_index==mid]
+    for mid in tqdm(reference.molecule_identifier.unique(), desc='Matching conformers'):
+        confs_min = reference.loc[reference.molecule_identifier==mid]
+        query_confs = result.loc[result.molecule_identifier==mid]
         rms_matrix = {i: {} for i, ref_row in confs_min.iterrows()}
         for i, ref_row in confs_min.iterrows():
             for j, query_row in query_confs.iterrows():
