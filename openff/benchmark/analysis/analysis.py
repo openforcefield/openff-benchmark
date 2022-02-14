@@ -122,7 +122,7 @@ def match_minima(input_path, ref_method, output_directory="./results"):
         # because it's just a comparison with itself
         if m == ref_method:
             continue
-        match = get_ref_conf(dataframes[ref_method], dataframes[m])
+        match = get_ref_conf(dataframes[ref_method], dataframes[m], ref_method, m)
         ref_confs = {molecule_id: 
                          match[ match['name'] == ref_conformer ]['ff_mol_name'].values[0] 
                          for molecule_id, ref_conformer in confs_min.items() }
@@ -184,7 +184,7 @@ def lucas(input_path, ref_method, output_directory="./5-results-lucas"):
 
         mm_df = dataframes[m]
 
-        match = get_ref_conf(qm_df, mm_df)
+        match = get_ref_conf(qm_df, mm_df, ref_method, m)
         ref_confs = {molecule_id:
                                  match[ match['name'] == ref_conformer ]['ff_mol_name'].values[0]
                                  for molecule_id, ref_conformer in qm_mins.items() }
@@ -204,8 +204,12 @@ def lucas(input_path, ref_method, output_directory="./5-results-lucas"):
             mm_min = mm_mins[row['molecule_identifier']]
             ref_conf = ref_confs[row['molecule_identifier']]
             if row['conf_min'] == True:
-                mm_df.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(
-                                qm_df.loc[ref_conf, 'mol'].to_rdkit(), qm_df.loc[mm_min, 'mol'].to_rdkit())
+                try:
+                    mm_df.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(
+                                    qm_df.loc[ref_conf, 'mol'].to_rdkit(), qm_df.loc[mm_min, 'mol'].to_rdkit())
+                except RuntimeError:
+                    mm_df.loc[i, 'rmsd'] = np.NaN
+                    print(f"Unable to calculate best RMSD between {ref_method} and {m}; conformer `{i}`")
 
         # take only the mm_min = True of the dataframe
         mm_results = mm_df.loc[mm_df.conf_min].copy()
@@ -280,8 +284,13 @@ def swope(input_path, ref_method, output_directory="./5-results-swope"):
         # calculate RMSD
         for i, row in tqdm(mm_df.iterrows(), desc='Calculating RMSD'):
             qm_min = qm_mins[row['molecule_identifier']]
-            mm_df.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(
-                             row['mol'].to_rdkit(), qm_df.loc[qm_min, 'mol'].to_rdkit())
+            try:
+
+                mm_df.loc[i, 'rmsd'] = rdMolAlign.GetBestRMS(
+                                 row['mol'].to_rdkit(), qm_df.loc[qm_min, 'mol'].to_rdkit())
+            except RuntimeError:
+                mm_df.loc[i, 'rmsd'] = np.NaN
+                print(f"Unable to calculate best RMSD between {ref_method} and {m}; conformer `{i}`")
 
         mm_results = mm_df.copy()
 
@@ -301,7 +310,7 @@ def swope(input_path, ref_method, output_directory="./5-results-swope"):
 
 
 
-def get_ref_conf(reference, result):
+def get_ref_conf(reference, result, ref_name, result_name):
     """
     For each MM method, get the conformers that are the closest (by RMSD) to the global 
     minima conformers calculated with the reference (QM) method.
@@ -329,7 +338,11 @@ def get_ref_conf(reference, result):
         rms_matrix = {i: {} for i, ref_row in confs_min.iterrows()}
         for i, ref_row in confs_min.iterrows():
             for j, query_row in query_confs.iterrows():
-                rmsd = rdMolAlign.GetBestRMS(ref_row['mol'].to_rdkit(), query_row['mol'].to_rdkit())
+                try:
+                    rmsd = rdMolAlign.GetBestRMS(ref_row['mol'].to_rdkit(), query_row['mol'].to_rdkit())
+                except:
+                    rmsd = np.NaN
+                    print(f"Unable to calculate best RMSD between {ref_name} and {result_name}; conformer `{i}`")
                 rms_matrix[i][j] = rmsd
         for ref, rms_list in rms_matrix.items():
             conf = min(rms_list, key=rms_list.get)
