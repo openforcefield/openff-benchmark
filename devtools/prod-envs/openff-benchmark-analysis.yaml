@@ -13,7 +13,7 @@ dependencies:
   - click =7.1.2
 
   # Benchmarking
-  - openff-benchmark =2021.08.04.0
+  - openff-benchmark =2022.02.16.0
 
   # Storage dependencies
   - alembic
