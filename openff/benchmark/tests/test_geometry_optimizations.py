@@ -113,6 +113,7 @@ def test_cli_optimize_submit_molecules_qm(fractal_compute_server, tmpdir, ethane
                                        '--dataset-name', '"Test Dataset - QM"'])
 
         assert response.exit_code == 0
+        assert "INCOMPLETE" not in response.output
         assert "COMPLETE" in response.output
 
 
