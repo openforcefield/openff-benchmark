@@ -10,6 +10,7 @@ dependencies:
   - pip
   - qcfractal =0.15.1
   - qcengine =0.17.0
+  - qcelemental =0.21.0
   - click =7.1.2
 
   # Benchmarking
@@ -42,7 +43,7 @@ dependencies:
   - dask-jobqueue
 
   # pulling data
-  - qcportal
+  - qcportal =0.15.6
   - openff-qcsubmit =0.2.1
 
   # analysis
@@ -50,3 +51,6 @@ dependencies:
   - pint
   - matplotlib
   - seaborn
+
+  # testing
+  - pytest =6.2.4
