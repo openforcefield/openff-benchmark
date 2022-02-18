@@ -47,8 +47,6 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         #python-version: ${{ matrix.python-version }}
-        use-mamba: true
-        mamba-version: "*"
         activate-environment: openff-benchmark-optimization
         environment-file: devtools/prod-envs/openff-benchmark-optimization.yaml
         auto-activate-base: false
