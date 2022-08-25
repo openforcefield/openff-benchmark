@@ -220,6 +220,16 @@ def postprocess(
                 "conformer_index"
             ] = f"{mol.properties['conformer_index']:02d}"
             mol.properties["method"] = f"opls4_{mol.properties['method']}"
+        elif "r_ff_Potential_Energy" in mol.properties:
+            mol.properties[
+                "final_energy"
+            ] = f'{mol.properties["r_ff_Potential_Energy"]} kilocalorie / mole'
+            mol.properties["initial_energy"] = "0.0 kilocalorie / mole"
+            mol.properties["molecule_index"] = f"{mol.properties['molecule_index']:05d}"
+            mol.properties[
+                "conformer_index"
+            ] = f"{mol.properties['conformer_index']:02d}"
+            mol.properties["method"] = f"opls4_{mol.properties['method']}"
         else:
             raise Exception(
                 f"Molecule {mol.properties['name']} does not have any knwon Schrodinger "
