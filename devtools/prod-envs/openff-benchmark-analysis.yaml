@@ -23,7 +23,7 @@ dependencies:
 
   # QCPortal dependencies
   - double-conversion >=3.0.0
-  - h5py
+  - h5py =3.1.0     # pinning because latest (3.3.0) build appears broken
   - pandas
   - plotly >=4.0.0
   - pyarrow >=0.13.0
