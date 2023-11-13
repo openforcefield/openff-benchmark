@@ -1,0 +1,3 @@
+
+class QCEngineError(Exception):
+    pass
