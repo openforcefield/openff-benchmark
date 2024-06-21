@@ -366,6 +366,53 @@ BBB""" in file_text
             assert "Input molecule graph is already present in output" in error_txts[0]
             assert "Input molecule graph is already present in output" in error_txts[1]
 
+
+
+    # mirror image duplicates
+    def test_multi_file_single_mol_mirror_conf(self, tmpdir):
+        with tmpdir.as_cwd():
+            test_dir =  '1-validate_and_assign'
+            # NOTE: These conformers have a "naive" heavy atom RMSD of 0.5 A, and a mirror RMSD of
+            # effectively 0 (probably less than 0.1A)
+            input_mols = [get_data_file_path('phenylpyridine_n30.sdf'),
+                          get_data_file_path('phenylpyridine_p30.sdf')
+                          ]
+            response = runner.invoke(cli, ["preprocess", "validate",
+                                           "-g", "BBB",
+                                           "-o", test_dir,
+                                           *input_mols],
+                                     catch_exceptions=False)
+            output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
+            output_files = [os.path.basename(fname) for fname in output_files]
+            assert sorted(output_files) == ['BBB-00000-00.sdf']
+            error_files = glob.glob(os.path.join(test_dir, 'error_mols', '*.sdf'))
+            error_files = [os.path.basename(fname) for fname in error_files]
+            assert error_files == ['error_mol_0.sdf']
+            error_txts = glob.glob(os.path.join(test_dir, 'error_mols', '*.txt'))
+            error_txts = [open(fname).read() for fname in error_txts]
+            assert 'Duplicate molecule conformer input detected' in error_txts[0]
+
+
+    # molecules that are almost mirror image duplicates but have a stereocenter
+    def test_multi_file_single_mol_mirror_conf_not_deleted_because_stereo(self, tmpdir):
+        with tmpdir.as_cwd():
+            test_dir =  '1-validate_and_assign'
+            input_mols = [get_data_file_path('phenylpyridine_w_chiral_n30.sdf'),
+                          get_data_file_path('phenylpyridine_w_chiral_p30.sdf')
+                          ]
+            response = runner.invoke(cli, ["preprocess", "validate",
+                                           "-g", "BBB",
+                                           "-o", test_dir,
+                                           *input_mols],
+                                     catch_exceptions=False)
+            output_files = glob.glob(os.path.join(test_dir, '*.sdf'))
+            output_files = [os.path.basename(fname) for fname in output_files]
+            assert sorted(output_files) == ['BBB-00000-00.sdf', 'BBB-00000-01.sdf']
+            error_files = glob.glob(os.path.join(test_dir, 'error_mols', '*.sdf'))
+            error_files = [os.path.basename(fname) for fname in error_files]
+            assert error_files == []
+
+
 # test add_no_redundant
 # test_mol_fails_roundtrip
 # Test file does not exist
